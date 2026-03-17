@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo negro -->
+  <rect width="512" height="512" fill="#0a0a0a"/>
+  <!-- Libro abierto (minimalista) -->
+  <!-- Lomo central -->
+  <rect x="248" y="140" width="16" height="232" fill="#ffffff"/>
+  <!-- Página izquierda -->
+  <rect x="108" y="152" width="140" height="208" rx="4" fill="none" stroke="#ffffff" stroke-width="14"/>
+  <!-- Líneas de texto izquierda -->
+  <rect x="128" y="188" width="100" height="10" rx="2" fill="#ffffff" opacity="0.7"/>
+  <rect x="128" y="212" width="80" height="10" rx="2" fill="#ffffff" opacity="0.5"/>
+  <rect x="128" y="236" width="100" height="10" rx="2" fill="#ffffff" opacity="0.5"/>
+  <rect x="128" y="260" width="60" height="10" rx="2" fill="#ffffff" opacity="0.3"/>
+  <!-- Página derecha -->
+  <rect x="264" y="152" width="140" height="208" rx="4" fill="none" stroke="#ffffff" stroke-width="14"/>
+  <!-- Líneas de texto derecha -->
+  <rect x="284" y="188" width="100" height="10" rx="2" fill="#ffffff" opacity="0.7"/>
+  <rect x="284" y="212" width="70" height="10" rx="2" fill="#ffffff" opacity="0.5"/>
+  <rect x="284" y="236" width="100" height="10" rx="2" fill="#ffffff" opacity="0.5"/>
+  <rect x="284" y="260" width="85" height="10" rx="2" fill="#ffffff" opacity="0.3"/>
+</svg>

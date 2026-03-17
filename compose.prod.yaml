@@ -1,0 +1,47 @@
+# compose.prod.yaml — usado por Coolify (o para pruebas locales de producción)
+# Coolify inyecta las variables de entorno desde su panel; aquí solo
+# se definen los servicios y su relación.
+#
+# Para pruebas locales:
+#   docker compose -f compose.prod.yaml --env-file .env up
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${PORT:-3000}:3000'
+    environment:
+      NODE_ENV: production
+      ORIGIN: ${ORIGIN}
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-librarian}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-librarian}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-librarian}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # En Coolify, NO exponer este puerto al exterior.
+    # Solo para acceso local durante desarrollo:
+    # ports:
+    #   - "5432:5432"
+
+volumes:
+  pgdata:

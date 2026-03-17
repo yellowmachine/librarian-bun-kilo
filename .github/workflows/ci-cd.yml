@@ -1,0 +1,67 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── CI: typecheck + build ─────────────────────────────────────────────────
+  # Se ejecuta en todos los push y en todas las PRs hacia main.
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run check
+        env:
+          # svelte-check necesita estas vars aunque sean placeholders
+          DATABASE_URL: postgres://placeholder
+          ORIGIN: http://localhost
+          BETTER_AUTH_SECRET: ci-placeholder
+
+      - name: Build
+        run: bun run build
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgres://placeholder
+          ORIGIN: http://localhost
+          BETTER_AUTH_SECRET: ci-placeholder
+
+  # ─── CD: deploy vía webhook de Coolify ────────────────────────────────────
+  # Solo se ejecuta cuando el CI pasa en la rama main (no en PRs).
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Trigger Coolify deploy
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_WEBHOOK_TOKEN }}" \
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}")
+
+          echo "Coolify responded with HTTP $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
+            echo "Deploy webhook failed with status $HTTP_STATUS"
+            exit 1
+          fi
+
+          echo "Deploy triggered successfully"

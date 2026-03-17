@@ -3,66 +3,81 @@
 	let { form } = $props();
 </script>
 
-<div class="flex min-h-screen items-center justify-center bg-gray-50">
-	<div class="w-full max-w-sm space-y-6 rounded-xl bg-white p-8 shadow-sm">
-		<div>
-			<h1 class="text-2xl font-semibold text-gray-900">Librarian</h1>
-			<p class="mt-1 text-sm text-gray-500">Crea tu cuenta</p>
+<div class="flex min-h-screen items-center justify-center bg-white px-5">
+	<div class="w-full max-w-sm">
+		<div class="mb-10 text-center">
+			<h1 class="font-serif text-4xl font-normal tracking-tight text-neutral-900">librarian</h1>
+			<p class="mt-2 text-sm text-neutral-400">Crea tu cuenta</p>
 		</div>
 
 		{#if form?.error}
-			<p class="rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">{form.error}</p>
+			<p class="mb-4 border border-neutral-900 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900">
+				{form.error}
+			</p>
 		{/if}
 
 		<form method="POST" use:enhance class="space-y-4">
 			<div>
-				<label for="name" class="block text-sm font-medium text-gray-700">Nombre</label>
+				<label
+					for="name"
+					class="block text-xs font-medium tracking-widest text-neutral-500 uppercase">Nombre</label
+				>
 				<input
 					id="name"
 					name="name"
 					type="text"
 					required
 					autocomplete="name"
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+					placeholder="Tu nombre"
+					class="mt-1.5 block w-full border-0 border-b border-neutral-300 bg-transparent px-0 py-2 text-sm text-neutral-900 placeholder-neutral-300 focus:border-neutral-900 focus:ring-0"
 				/>
 			</div>
-
 			<div>
-				<label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+				<label
+					for="email"
+					class="block text-xs font-medium tracking-widest text-neutral-500 uppercase">Email</label
+				>
 				<input
 					id="email"
 					name="email"
 					type="email"
 					required
 					autocomplete="email"
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+					placeholder="tu@email.com"
+					class="mt-1.5 block w-full border-0 border-b border-neutral-300 bg-transparent px-0 py-2 text-sm text-neutral-900 placeholder-neutral-300 focus:border-neutral-900 focus:ring-0"
 				/>
 			</div>
-
 			<div>
-				<label for="password" class="block text-sm font-medium text-gray-700">Contraseña</label>
+				<label
+					for="password"
+					class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
+					>Contraseña</label
+				>
 				<input
 					id="password"
 					name="password"
 					type="password"
 					required
 					autocomplete="new-password"
+					placeholder="8 caracteres mínimo"
 					minlength="8"
-					class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+					class="mt-1.5 block w-full border-0 border-b border-neutral-300 bg-transparent px-0 py-2 text-sm text-neutral-900 placeholder-neutral-300 focus:border-neutral-900 focus:ring-0"
 				/>
 			</div>
 
-			<button
-				type="submit"
-				class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
-			>
-				Crear cuenta
-			</button>
+			<div class="pt-2">
+				<button
+					type="submit"
+					class="w-full border border-neutral-900 bg-neutral-900 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+				>
+					Crear cuenta
+				</button>
+			</div>
 		</form>
 
-		<p class="text-center text-sm text-gray-500">
+		<p class="mt-8 text-center text-sm text-neutral-400">
 			¿Ya tienes cuenta?
-			<a href="/login" class="text-blue-600 hover:underline">Inicia sesión</a>
+			<a href="/login" class="text-neutral-900 underline underline-offset-2">Inicia sesión</a>
 		</p>
 	</div>
 </div>

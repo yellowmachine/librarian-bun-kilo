@@ -1,0 +1,32 @@
+# Dependencias locales — se reinstalan en el build
+node_modules
+
+# Output de builds anteriores
+build
+.svelte-kit
+
+# Ficheros de entorno — nunca en la imagen
+.env
+.env.*
+!.env.example
+
+# Git y editor
+.git
+.gitignore
+.vscode
+.idea
+
+# Tests y Storybook
+**/*.test.ts
+**/*.spec.ts
+**/*.e2e.ts
+.storybook
+src/stories
+
+# Docker
+Dockerfile
+.dockerignore
+compose.yaml
+
+# Logs
+*.log

@@ -1,3 +1,84 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* ─── Sistema de diseño: blanco y negro con fuerte contraste ─────────────────
+   Inspirado en la tipografía editorial. Sin colores de acento salvo negro puro.
+   Los únicos "colores" permitidos son escalas de gris para jerarquía.
+──────────────────────────────────────────────────────────────────────────────── */
+
+@theme {
+	/* Tipografía base: serif para títulos, sans para UI */
+	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-serif: 'Georgia', 'Times New Roman', ui-serif, serif;
+
+	/* Paleta estricta B&W */
+	--color-ink: #0a0a0a; /* negro casi puro — texto principal */
+	--color-ink-2: #3d3d3d; /* gris oscuro — texto secundario */
+	--color-ink-3: #737373; /* gris medio — texto terciario / placeholders */
+	--color-ink-4: #a3a3a3; /* gris claro — deshabilitado / decorativo */
+	--color-paper: #ffffff; /* blanco puro — fondo */
+	--color-paper-2: #fafafa; /* blanco roto — fondo alternativo */
+	--color-paper-3: #f5f5f5; /* gris muy claro — hover / inputs */
+	--color-paper-4: #e5e5e5; /* gris claro — bordes / separadores */
+	--color-paper-5: #d4d4d4; /* gris medio — bordes fuertes */
+
+	/* Espaciado base */
+	--spacing-page: 1.25rem; /* padding lateral en móvil */
+}
+
+/* ─── Base global ─────────────────────────────────────────────────────────── */
+html {
+	background-color: var(--color-paper);
+	color: var(--color-ink);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Tipografía editorial ────────────────────────────────────────────────── */
+h1,
+h2,
+h3 {
+	font-family: var(--font-serif);
+	letter-spacing: -0.02em;
+}
+
+/* ─── Inputs: override del plugin forms para estilo B&W ──────────────────── */
+[type='text'],
+[type='email'],
+[type='password'],
+[type='search'],
+textarea,
+select {
+	border-color: var(--color-paper-4);
+	background-color: var(--color-paper);
+	color: var(--color-ink);
+	border-radius: 0.375rem;
+}
+
+[type='text']:focus,
+[type='email']:focus,
+[type='password']:focus,
+[type='search']:focus,
+textarea:focus,
+select:focus {
+	border-color: var(--color-ink);
+	outline: none;
+	box-shadow: 0 0 0 1px var(--color-ink);
+}
+
+/* ─── Scrollbar sutil ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--color-paper-4);
+	border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--color-ink-4);
+}

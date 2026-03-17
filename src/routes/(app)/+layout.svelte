@@ -1,27 +1,75 @@
 <script lang="ts">
+	import { page } from '$app/state';
+	import { BookOpen, Books, ArrowsLeftRight, SignOut } from 'phosphor-svelte';
+
 	let { children, data } = $props();
-	const { user } = data;
+	const { user, pendingLoans } = data;
+
+	const currentPath = $derived(page.url.pathname);
+	function isActive(path: string) {
+		return currentPath.startsWith(path);
+	}
+
+	const NAV = [
+		{ href: '/library', label: 'Biblioteca', icon: BookOpen },
+		{ href: '/groups', label: 'Grupos', icon: Books },
+		{ href: '/loans', label: 'Préstamos', icon: ArrowsLeftRight }
+	];
 </script>
 
-<!-- Shell principal de la app: nav + contenido -->
-<div class="flex min-h-screen flex-col">
-	<header class="border-b border-gray-200 bg-white">
-		<nav class="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-			<a href="/library" class="text-lg font-semibold text-gray-900">Librarian</a>
+<div class="flex min-h-screen flex-col bg-white">
+	<!-- ── Cabecera ──────────────────────────────────────────────────────── -->
+	<header class="sticky top-0 z-30 border-b border-neutral-200 bg-white">
+		<div class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
+			<!-- Logotipo -->
+			<a href="/library" class="font-serif text-xl font-normal tracking-tight text-neutral-900">
+				librarian
+			</a>
 
-			<div class="flex items-center gap-4">
-				<a href="/library" class="text-sm text-gray-600 hover:text-gray-900">Mi biblioteca</a>
-				<a href="/groups" class="text-sm text-gray-600 hover:text-gray-900">Grupos</a>
-				<a href="/loans" class="text-sm text-gray-600 hover:text-gray-900">Préstamos</a>
-				<span class="text-sm text-gray-500">{user.name}</span>
+			<!-- Nav principal -->
+			<nav class="flex items-center gap-1">
+				{#each NAV as item}
+					<a
+						href={item.href}
+						class="relative flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors
+						{isActive(item.href)
+							? 'bg-neutral-900 text-white'
+							: 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}"
+					>
+						<item.icon weight={isActive(item.href) ? 'fill' : 'regular'} size={16} />
+						<span class="hidden sm:inline">{item.label}</span>
+
+						{#if item.href === '/loans' && pendingLoans > 0}
+							<span
+								class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full
+								{isActive(item.href) ? 'bg-white text-neutral-900' : 'bg-neutral-900 text-white'}
+								text-[10px] leading-none font-bold"
+							>
+								{pendingLoans > 9 ? '9+' : pendingLoans}
+							</span>
+						{/if}
+					</a>
+				{/each}
+			</nav>
+
+			<!-- Usuario + salir -->
+			<div class="flex items-center gap-3">
+				<span class="hidden text-sm text-neutral-400 sm:block">{user.name}</span>
 				<form method="POST" action="/logout">
-					<button type="submit" class="text-sm text-gray-500 hover:text-gray-900">Salir</button>
+					<button
+						type="submit"
+						title="Cerrar sesión"
+						class="flex items-center rounded-md p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+					>
+						<SignOut size={18} />
+					</button>
 				</form>
 			</div>
-		</nav>
+		</div>
 	</header>
 
-	<main class="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+	<!-- ── Contenido ─────────────────────────────────────────────────────── -->
+	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8">
 		{@render children()}
 	</main>
 </div>
