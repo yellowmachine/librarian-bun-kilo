@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { LoanWithDetails } from '$lib/server/loans';
 	import { ArrowsLeftRight } from 'phosphor-svelte';
+	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
 
 	let { data } = $props();
 	const { asOwner, asBorrower } = data;
@@ -27,16 +28,6 @@
 	const pendingOwner = $derived(
 		(asOwner as LoanWithDetails[]).filter((l) => ACTIVE.has(l.status)).length
 	);
-
-	const STATUS_LABEL: Record<string, string> = {
-		requested: 'Solicitado',
-		accepted: 'Aceptado',
-		active: 'Activo',
-		return_requested: 'Dev. solicitada',
-		returned: 'Devuelto',
-		rejected: 'Rechazado',
-		cancelled: 'Cancelado'
-	};
 </script>
 
 <div class="space-y-8">
@@ -112,13 +103,8 @@
 									})}
 								</p>
 							</div>
-							<div class="shrink-0 text-right">
-								<span
-									class="text-xs
-								{ACTIVE.has(loan.status) ? 'font-medium text-neutral-900' : 'text-neutral-400'}"
-								>
-									{STATUS_LABEL[loan.status] ?? loan.status}
-								</span>
+							<div class="shrink-0">
+								<LoanStatusBadge status={loan.status} />
 							</div>
 						</a>
 					</li>

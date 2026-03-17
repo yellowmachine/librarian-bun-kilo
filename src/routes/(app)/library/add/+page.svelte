@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { Barcode, MagnifyingGlass, ArrowLeft, SpinnerGap } from 'phosphor-svelte';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
+	import BookCard from '$lib/components/BookCard.svelte';
 
 	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'adding';
 
@@ -170,40 +171,20 @@
 					<SpinnerGap size={24} class="animate-spin text-neutral-400" />
 				</div>
 			{:else}
-				<ul class="divide-y divide-neutral-100">
+				<ul class="grid grid-cols-1 divide-neutral-100 sm:grid-cols-2 sm:gap-2">
 					{#each searchResults as book (book.id)}
-						<li>
-							<button
-								type="button"
+						<li class="border-b border-neutral-100 sm:border sm:border-neutral-100">
+							<BookCard
+								title={book.title}
+								authors={book.authors}
+								coverUrl={book.coverUrl}
+								publishYear={book.publishYear}
+								variant="list"
 								onclick={() => {
 									selectedBook = book;
 									mode = 'confirm';
 								}}
-								class="flex w-full items-center gap-4 py-4 text-left hover:bg-neutral-50"
-							>
-								{#if book.coverUrl}
-									<img
-										src={book.coverUrl}
-										alt={book.title}
-										class="h-16 w-11 flex-shrink-0 object-cover"
-									/>
-								{:else}
-									<div
-										class="flex h-16 w-11 flex-shrink-0 items-center justify-center bg-neutral-100 font-serif text-xs text-neutral-300"
-									>
-										?
-									</div>
-								{/if}
-								<div class="min-w-0 flex-1">
-									<p class="truncate text-sm font-medium text-neutral-900">{book.title}</p>
-									{#if book.authors.length > 0}
-										<p class="truncate text-xs text-neutral-400">{book.authors.join(', ')}</p>
-									{/if}
-									{#if book.publishYear}<p class="text-xs text-neutral-300">
-											{book.publishYear}
-										</p>{/if}
-								</div>
-							</button>
+							/>
 						</li>
 					{/each}
 				</ul>
@@ -213,26 +194,17 @@
 		<!-- Confirmar -->
 	{:else if mode === 'confirm' && selectedBook}
 		<div class="space-y-6">
-			<div class="flex gap-5 border border-neutral-200 p-5">
-				{#if selectedBook.coverUrl}
-					<img
-						src={selectedBook.coverUrl}
-						alt={selectedBook.title}
-						class="h-28 w-20 flex-shrink-0 object-cover"
-					/>
+			<div class="border border-neutral-200 p-5">
+				<BookCard
+					title={selectedBook.title}
+					authors={selectedBook.authors}
+					coverUrl={selectedBook.coverUrl}
+					publishYear={selectedBook.publishYear}
+					variant="detail"
+				/>
+				{#if selectedBook.isbn}
+					<p class="mt-3 text-xs text-neutral-300">ISBN {selectedBook.isbn}</p>
 				{/if}
-				<div class="min-w-0 flex-1 space-y-1">
-					<p class="font-serif text-lg leading-snug text-neutral-900">{selectedBook.title}</p>
-					{#if selectedBook.authors.length > 0}
-						<p class="text-sm text-neutral-500">{selectedBook.authors.join(', ')}</p>
-					{/if}
-					{#if selectedBook.publishYear}<p class="text-xs text-neutral-400">
-							{selectedBook.publishYear}
-						</p>{/if}
-					{#if selectedBook.isbn}<p class="text-xs text-neutral-300">
-							ISBN {selectedBook.isbn}
-						</p>{/if}
-				</div>
 			</div>
 
 			<div>

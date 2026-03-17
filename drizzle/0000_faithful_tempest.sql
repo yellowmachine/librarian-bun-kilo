@@ -15,6 +15,7 @@ CREATE TABLE "books" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "books" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "group_members" (
 	"group_id" text NOT NULL,
 	"user_id" text NOT NULL,
@@ -22,6 +23,7 @@ CREATE TABLE "group_members" (
 	"joined_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "group_members" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "groups" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -33,6 +35,7 @@ CREATE TABLE "groups" (
 	CONSTRAINT "groups_invite_code_unique" UNIQUE("invite_code")
 );
 --> statement-breakpoint
+ALTER TABLE "groups" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "loans" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_book_id" text NOT NULL,
@@ -48,6 +51,7 @@ CREATE TABLE "loans" (
 	"notes" text
 );
 --> statement-breakpoint
+ALTER TABLE "loans" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "shared_tags" (
 	"id" text PRIMARY KEY NOT NULL,
 	"tag_id" text NOT NULL,
@@ -56,6 +60,7 @@ CREATE TABLE "shared_tags" (
 	"shared_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "shared_tags" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "tags" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -64,11 +69,13 @@ CREATE TABLE "tags" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "tags" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "user_book_tags" (
 	"user_book_id" text NOT NULL,
 	"tag_id" text NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "user_book_tags" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "user_books" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -79,6 +86,7 @@ CREATE TABLE "user_books" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "user_books" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -161,4 +169,93 @@ CREATE INDEX "user_books_user_idx" ON "user_books" USING btree ("user_id");--> s
 CREATE INDEX "user_books_book_idx" ON "user_books" USING btree ("book_id");--> statement-breakpoint
 CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");
+CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");--> statement-breakpoint
+CREATE POLICY "books_select" ON "books" AS PERMISSIVE FOR SELECT TO "app_user" USING (true);--> statement-breakpoint
+CREATE POLICY "books_insert" ON "books" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK (true);--> statement-breakpoint
+CREATE POLICY "books_update" ON "books" AS PERMISSIVE FOR UPDATE TO "app_user" USING (true);--> statement-breakpoint
+CREATE POLICY "group_members_select" ON "group_members" AS PERMISSIVE FOR SELECT TO "app_user" USING ("group_members"."user_id" = current_setting('app.current_user_id', true)
+				or exists (
+					select 1 from group_members gm2
+					where gm2.group_id = "group_members"."group_id"
+					  and gm2.user_id = current_setting('app.current_user_id', true)
+				));--> statement-breakpoint
+CREATE POLICY "group_members_insert" ON "group_members" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK ("group_members"."user_id" = current_setting('app.current_user_id', true)
+				or exists (
+					select 1 from group_members gm
+					where gm.group_id = "group_members"."group_id"
+					  and gm.user_id = current_setting('app.current_user_id', true)
+					  and gm.role in ('owner', 'admin')
+				));--> statement-breakpoint
+CREATE POLICY "group_members_delete" ON "group_members" AS PERMISSIVE FOR DELETE TO "app_user" USING ("group_members"."user_id" = current_setting('app.current_user_id', true)
+				or exists (
+					select 1 from group_members gm
+					where gm.group_id = "group_members"."group_id"
+					  and gm.user_id = current_setting('app.current_user_id', true)
+					  and gm.role in ('owner', 'admin')
+				));--> statement-breakpoint
+CREATE POLICY "groups_select" ON "groups" AS PERMISSIVE FOR SELECT TO "app_user" USING (exists (
+				select 1 from group_members gm
+				where gm.group_id = "groups"."id"
+				  and gm.user_id = current_setting('app.current_user_id', true)
+			));--> statement-breakpoint
+CREATE POLICY "groups_insert" ON "groups" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK ("groups"."created_by" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "groups_update" ON "groups" AS PERMISSIVE FOR UPDATE TO "app_user" USING (exists (
+				select 1 from group_members gm
+				where gm.group_id = "groups"."id"
+				  and gm.user_id = current_setting('app.current_user_id', true)
+				  and gm.role in ('owner', 'admin')
+			));--> statement-breakpoint
+CREATE POLICY "groups_delete" ON "groups" AS PERMISSIVE FOR DELETE TO "app_user" USING (exists (
+				select 1 from group_members gm
+				where gm.group_id = "groups"."id"
+				  and gm.user_id = current_setting('app.current_user_id', true)
+				  and gm.role = 'owner'
+			));--> statement-breakpoint
+CREATE POLICY "loans_select" ON "loans" AS PERMISSIVE FOR SELECT TO "app_user" USING ("loans"."owner_id" = current_setting('app.current_user_id', true)
+				or "loans"."borrower_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "loans_insert" ON "loans" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK ("loans"."borrower_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "loans_update" ON "loans" AS PERMISSIVE FOR UPDATE TO "app_user" USING ("loans"."owner_id" = current_setting('app.current_user_id', true)
+				or "loans"."borrower_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "loans_delete" ON "loans" AS PERMISSIVE FOR DELETE TO "app_user" USING ("loans"."borrower_id" = current_setting('app.current_user_id', true)
+				and "loans"."status" = 'requested');--> statement-breakpoint
+CREATE POLICY "shared_tags_select" ON "shared_tags" AS PERMISSIVE FOR SELECT TO "app_user" USING (exists (
+				select 1 from group_members gm
+				where gm.group_id = "shared_tags"."group_id"
+				  and gm.user_id = current_setting('app.current_user_id', true)
+			));--> statement-breakpoint
+CREATE POLICY "shared_tags_insert" ON "shared_tags" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK ("shared_tags"."shared_by" = current_setting('app.current_user_id', true)
+				and exists (
+					select 1 from group_members gm
+					where gm.group_id = "shared_tags"."group_id"
+					  and gm.user_id = current_setting('app.current_user_id', true)
+				));--> statement-breakpoint
+CREATE POLICY "shared_tags_delete" ON "shared_tags" AS PERMISSIVE FOR DELETE TO "app_user" USING ("shared_tags"."shared_by" = current_setting('app.current_user_id', true)
+				or exists (
+					select 1 from group_members gm
+					where gm.group_id = "shared_tags"."group_id"
+					  and gm.user_id = current_setting('app.current_user_id', true)
+					  and gm.role in ('owner', 'admin')
+				));--> statement-breakpoint
+CREATE POLICY "tags_select" ON "tags" AS PERMISSIVE FOR SELECT TO "app_user" USING ("tags"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "tags_insert" ON "tags" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK ("tags"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "tags_update" ON "tags" AS PERMISSIVE FOR UPDATE TO "app_user" USING ("tags"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "tags_delete" ON "tags" AS PERMISSIVE FOR DELETE TO "app_user" USING ("tags"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "user_book_tags_select" ON "user_book_tags" AS PERMISSIVE FOR SELECT TO "app_user" USING (exists (
+				select 1 from user_books ub
+				where ub.id = "user_book_tags"."user_book_id"
+				  and ub.user_id = current_setting('app.current_user_id', true)
+			));--> statement-breakpoint
+CREATE POLICY "user_book_tags_insert" ON "user_book_tags" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK (exists (
+				select 1 from user_books ub
+				where ub.id = "user_book_tags"."user_book_id"
+				  and ub.user_id = current_setting('app.current_user_id', true)
+			));--> statement-breakpoint
+CREATE POLICY "user_book_tags_delete" ON "user_book_tags" AS PERMISSIVE FOR DELETE TO "app_user" USING (exists (
+				select 1 from user_books ub
+				where ub.id = "user_book_tags"."user_book_id"
+				  and ub.user_id = current_setting('app.current_user_id', true)
+			));--> statement-breakpoint
+CREATE POLICY "user_books_select" ON "user_books" AS PERMISSIVE FOR SELECT TO "app_user" USING ("user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "user_books_insert" ON "user_books" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK ("user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "user_books_update" ON "user_books" AS PERMISSIVE FOR UPDATE TO "app_user" USING ("user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "user_books_delete" ON "user_books" AS PERMISSIVE FOR DELETE TO "app_user" USING ("user_books"."user_id" = current_setting('app.current_user_id', true));

@@ -19,7 +19,9 @@ import { user } from './auth.schema';
 // Rol de BD para queries de la aplicación. El superuser (root) tiene BYPASSRLS
 // para las operaciones de better-auth y admin.
 
-export const appUser = pgRole('app_user', { createDb: false, createRole: false, inherit: true });
+// .existing() indica a Drizzle que este rol ya existe (creado por init.sql)
+// y NO debe emitir CREATE ROLE en las migraciones generadas.
+export const appUser = pgRole('app_user').existing();
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 

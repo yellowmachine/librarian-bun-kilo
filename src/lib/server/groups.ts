@@ -207,7 +207,7 @@ export async function joinGroupByCode(
 		.where(and(eq(groupMembers.groupId, group.id), eq(groupMembers.userId, userId)));
 
 	if (existing.length > 0) {
-		return { success: false, error: 'Ya eres miembro de este grupo' };
+		return { success: false, groupId: group.id, error: 'Ya eres miembro de este grupo' };
 	}
 
 	await withRLS(userId, (tx) =>

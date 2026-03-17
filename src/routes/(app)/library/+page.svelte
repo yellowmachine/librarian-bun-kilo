@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Plus, MagnifyingGlass, Tag } from 'phosphor-svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
+	import BookGrid from '$lib/components/BookGrid.svelte';
 
 	let { data } = $props();
 	const { userBooks } = data;
@@ -98,44 +99,17 @@
 		{#if filtered().length === 0}
 			<p class="py-12 text-center text-sm text-neutral-400">Sin resultados.</p>
 		{:else}
-			<div class="grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-				{#each filtered() as book (book.userBookId)}
-					<a href="/library/{book.userBookId}" class="group space-y-2">
-						<!-- Portada -->
-						<div class="relative aspect-[2/3] overflow-hidden bg-neutral-100">
-							{#if book.coverUrl}
-								<img
-									src={book.coverUrl}
-									alt={book.title}
-									class="h-full w-full object-cover transition-opacity duration-200 group-hover:opacity-80"
-								/>
-							{:else}
-								<div class="flex h-full items-center justify-center p-2">
-									<span class="text-center font-serif text-xs leading-snug text-neutral-400"
-										>{book.title}</span
-									>
-								</div>
-							{/if}
-							{#if !book.isAvailable}
-								<div
-									class="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent p-2"
-								>
-									<span class="text-xs font-medium text-white">Prestado</span>
-								</div>
-							{/if}
-						</div>
-						<!-- Metadatos -->
-						<div class="space-y-0.5">
-							<p class="line-clamp-2 text-xs leading-snug font-medium text-neutral-900">
-								{book.title}
-							</p>
-							{#if book.authors.length > 0}
-								<p class="truncate text-xs text-neutral-400">{book.authors[0]}</p>
-							{/if}
-						</div>
-					</a>
-				{/each}
-			</div>
+			<BookGrid
+				books={filtered().map((b) => ({
+					id: b.userBookId,
+					title: b.title,
+					authors: b.authors,
+					coverUrl: b.coverUrl,
+					publishYear: b.publishYear,
+					isAvailable: b.isAvailable,
+					href: `/library/${b.userBookId}`
+				}))}
+			/>
 		{/if}
 	{:else}
 		<!-- Estado vacío -->

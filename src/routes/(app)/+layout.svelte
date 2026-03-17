@@ -23,7 +23,7 @@
 		<div class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
 			<!-- Logotipo -->
 			<a href="/library" class="font-serif text-xl font-normal tracking-tight text-neutral-900">
-				librarian
+				The Svelte Librarian
 			</a>
 
 			<!-- Nav principal -->
@@ -72,4 +72,24 @@
 	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8">
 		{@render children()}
 	</main>
+
+	<!-- ── Footer ────────────────────────────────────────────────────────── -->
+	<footer class="border-t border-neutral-100 py-4">
+		<p class="text-center text-xs text-neutral-400">
+			Built with <a
+				href="https://kilo.ai"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="underline underline-offset-2 transition-colors hover:text-neutral-600">Kilo</a
+			>
+			and
+			<a
+				href="https://www.anthropic.com/claude"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="underline underline-offset-2 transition-colors hover:text-neutral-600"
+				>Claude Sonnet 4.6</a
+			>
+		</p>
+	</footer>
 </div>

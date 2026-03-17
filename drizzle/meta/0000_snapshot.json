@@ -1,5 +1,5 @@
 {
-  "id": "530e0acb-af03-4f79-839f-07b133d3cab8",
+  "id": "087f2dae-6979-4274-9f6e-901733987903",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -103,7 +103,35 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "books_select": {
+          "name": "books_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "true"
+        },
+        "books_insert": {
+          "name": "books_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "true"
+        },
+        "books_update": {
+          "name": "books_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "app_user"
+          ],
+          "using": "true"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -207,7 +235,35 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "group_members_select": {
+          "name": "group_members_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm2\n\t\t\t\t\twhere gm2.group_id = \"group_members\".\"group_id\"\n\t\t\t\t\t  and gm2.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t)"
+        },
+        "group_members_insert": {
+          "name": "group_members_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"group_members\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+        },
+        "group_members_delete": {
+          "name": "group_members_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"group_members\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -286,7 +342,44 @@
           ]
         }
       },
-      "policies": {},
+      "policies": {
+        "groups_select": {
+          "name": "groups_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
+        "groups_insert": {
+          "name": "groups_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "\"groups\".\"created_by\" = current_setting('app.current_user_id', true)"
+        },
+        "groups_update": {
+          "name": "groups_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "app_user"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t)"
+        },
+        "groups_delete": {
+          "name": "groups_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_user"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t  and gm.role = 'owner'\n\t\t\t)"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -475,7 +568,44 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "loans_select": {
+          "name": "loans_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"loans\".\"owner_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor \"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
+        },
+        "loans_insert": {
+          "name": "loans_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
+        },
+        "loans_update": {
+          "name": "loans_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"loans\".\"owner_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor \"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
+        },
+        "loans_delete": {
+          "name": "loans_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tand \"loans\".\"status\" = 'requested'"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -596,7 +726,35 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "shared_tags_select": {
+          "name": "shared_tags_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"shared_tags\".\"group_id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
+        "shared_tags_insert": {
+          "name": "shared_tags_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true)\n\t\t\t\tand exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"shared_tags\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t)"
+        },
+        "shared_tags_delete": {
+          "name": "shared_tags_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"shared_tags\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -691,7 +849,44 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "tags_select": {
+          "name": "tags_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "tags_insert": {
+          "name": "tags_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "tags_update": {
+          "name": "tags_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "tags_delete": {
+          "name": "tags_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -780,7 +975,35 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "user_book_tags_select": {
+          "name": "user_book_tags_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from user_books ub\n\t\t\t\twhere ub.id = \"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
+        "user_book_tags_insert": {
+          "name": "user_book_tags_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "exists (\n\t\t\t\tselect 1 from user_books ub\n\t\t\t\twhere ub.id = \"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
+        "user_book_tags_delete": {
+          "name": "user_book_tags_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_user"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from user_books ub\n\t\t\t\twhere ub.id = \"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
@@ -917,7 +1140,44 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "user_books_select": {
+          "name": "user_books_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "user_books_insert": {
+          "name": "user_books_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_user"
+          ],
+          "withCheck": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "user_books_update": {
+          "name": "user_books_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "user_books_delete": {
+          "name": "user_books_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "app_user"
+          ],
+          "using": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     },

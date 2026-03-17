@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { ArrowLeft, BookOpen } from 'phosphor-svelte';
 	import type { LoanWithDetails } from '$lib/server/loans';
+	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
 
 	let { data, form } = $props();
 	const loan = $derived(data.loan as LoanWithDetails);
@@ -63,18 +64,6 @@
 		return [];
 	});
 
-	const STATUS_LABEL: Record<string, string> = {
-		requested: 'Solicitud enviada',
-		accepted: 'Aceptado — pendiente de entrega',
-		active: 'Préstamo activo',
-		return_requested: 'Devolución solicitada',
-		returned: 'Devuelto',
-		rejected: 'Rechazado',
-		cancelled: 'Cancelado'
-	};
-
-	const ACTIVE = new Set(['requested', 'accepted', 'active', 'return_requested']);
-
 	const timeline = $derived(() =>
 		[
 			{ label: 'Solicitado', date: loan.requestedAt },
@@ -125,13 +114,7 @@
 			{#if loan.authors.length > 0}
 				<p class="text-sm text-neutral-500">{loan.authors.join(', ')}</p>
 			{/if}
-			<p
-				class="text-sm {ACTIVE.has(loan.status)
-					? 'font-medium text-neutral-900'
-					: 'text-neutral-400'}"
-			>
-				{STATUS_LABEL[loan.status] ?? loan.status}
-			</p>
+			<LoanStatusBadge status={loan.status} variant="long" />
 		</div>
 	</div>
 

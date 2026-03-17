@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Tag, Plus, Trash, BookOpen } from 'phosphor-svelte';
+	import { ArrowLeft, Tag, Plus, Trash } from 'phosphor-svelte';
+	import BookCard from '$lib/components/BookCard.svelte';
 
 	let { data, form } = $props();
 	let { book, userTags } = $derived(data);
@@ -29,26 +30,15 @@
 	</a>
 
 	<!-- Libro -->
-	<div class="flex gap-6">
-		<div class="flex-shrink-0">
-			{#if book.coverUrl}
-				<img src={book.coverUrl} alt={book.title} class="h-40 w-28 object-cover shadow-sm" />
-			{:else}
-				<div class="flex h-40 w-28 items-center justify-center bg-neutral-100">
-					<BookOpen size={32} weight="thin" class="text-neutral-300" />
-				</div>
-			{/if}
-		</div>
-		<div class="min-w-0 space-y-2 pt-1">
-			<h1 class="font-serif text-2xl leading-tight font-normal text-neutral-900">{book.title}</h1>
-			{#if book.authors.length > 0}
-				<p class="text-sm text-neutral-500">{book.authors.join(', ')}</p>
-			{/if}
-			{#if book.publishYear}
-				<p class="text-xs text-neutral-400">{book.publishYear}</p>
-			{/if}
-		</div>
-	</div>
+	<BookCard
+		title={book.title}
+		authors={book.authors}
+		coverUrl={book.coverUrl}
+		publishYear={book.publishYear}
+		isAvailable={book.isAvailable}
+		openLibraryId={book.bookId}
+		variant="detail"
+	/>
 
 	<!-- Notas y disponibilidad -->
 	<form method="POST" action="?/update" use:enhance class="space-y-5">
