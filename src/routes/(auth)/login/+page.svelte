@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	let { form } = $props();
+	let { form, data } = $props();
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-white px-5">
@@ -9,6 +9,12 @@
 		<div class="mb-10 text-center">
 			<h1 class="font-serif text-4xl font-normal tracking-tight text-neutral-900">librarian</h1>
 			<p class="mt-2 text-sm text-neutral-400">Tu biblioteca particular</p>
+			{#if data.userCount > 0}
+				<p class="mt-3 text-xs text-neutral-400">
+					{data.userCount}
+					{data.userCount === 1 ? 'lector' : 'lectores'} en la red
+				</p>
+			{/if}
 		</div>
 
 		{#if form?.error}

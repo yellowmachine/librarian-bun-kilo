@@ -387,7 +387,7 @@ export async function searchBooksInGroup(
 		const tagIds = opts.tagId ? [opts.tagId] : sharedTagRows.map((r) => r.tagId);
 
 		// 2. Obtener user_books que tienen alguna de esas etiquetas
-		const ubRows = await db
+		const ubRows = await tx
 			.select({
 				userBookId: userBookTags.userBookId,
 				tagId: userBookTags.tagId
@@ -400,7 +400,7 @@ export async function searchBooksInGroup(
 		const userBookIds = [...new Set(ubRows.map((r) => r.userBookId))];
 
 		// 3. Obtener detalles de esos user_books con su libro y propietario
-		const detailRows = await db
+		const detailRows = await tx
 			.select({
 				userBookId: userBooks.id,
 				bookId: books.id,
@@ -434,7 +434,7 @@ export async function searchBooksInGroup(
 		const result: GroupBookResult[] = [];
 
 		for (const row of filtered) {
-			const bookTagRows = await db
+			const bookTagRows = await tx
 				.select({ id: tags.id, name: tags.name, color: tags.color })
 				.from(userBookTags)
 				.innerJoin(tags, eq(userBookTags.tagId, tags.id))

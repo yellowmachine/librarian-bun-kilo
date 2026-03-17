@@ -30,6 +30,6 @@ export const actions = {
 			return fail(400, { error: 'No se pudo crear la cuenta. El email puede estar en uso.' });
 		}
 
-		redirect(302, '/library');
+		redirect(302, '/verify-email');
 	}
 };
