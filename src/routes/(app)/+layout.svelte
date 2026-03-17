@@ -22,8 +22,14 @@
 	<header class="sticky top-0 z-30 border-b border-neutral-200 bg-white">
 		<div class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
 			<!-- Logotipo -->
-			<a href="/library" class="font-serif text-xl font-normal tracking-tight text-neutral-900">
+			<a
+				href="/library"
+				class="flex items-baseline gap-2 font-serif text-xl font-normal tracking-tight text-neutral-900"
+			>
 				The Svelte Librarian
+				<span class="font-sans text-[10px] font-semibold tracking-widest text-neutral-400 uppercase"
+					>Beta</span
+				>
 			</a>
 
 			<!-- Nav principal -->

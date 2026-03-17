@@ -59,6 +59,9 @@ export default defineConfig({
 		}),
 		devtoolsJson()
 	],
+	server: {
+		allowedHosts: ['modern-abnormally-crab.ngrok-free.app']
+	},
 	test: {
 		expect: {
 			requireAssertions: true
