@@ -1,0 +1,2 @@
+ALTER POLICY "group_members_select" ON "group_members" TO app_user USING ("group_members"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+ALTER POLICY "group_members_delete" ON "group_members" TO app_user USING ("group_members"."user_id" = current_setting('app.current_user_id', true));

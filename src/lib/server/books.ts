@@ -36,16 +36,8 @@ export async function addBookToLibrary(
 	bookId: string,
 	notes?: string
 ): Promise<string> {
-	// Comprobamos si ya lo tiene (sin RLS, la unicidad la garantiza el índice)
-	const existing = await db
-		.select({ id: userBooks.id })
-		.from(userBooks)
-		.where(eq(userBooks.userId, userId));
-
-	const alreadyHas = existing.find(() => true); // simplificado, la BD tiene unique index
-
 	return withRLS(userId, async (tx) => {
-		// Verificar si ya tiene este libro concreto
+		// Verificar si ya tiene este libro concreto (RLS filtra por userId automáticamente)
 		const dup = await tx
 			.select({ id: userBooks.id })
 			.from(userBooks)

@@ -167,24 +167,35 @@ export async function getGroup(userId: string, groupId: string): Promise<GroupWi
 export async function getGroupMembers(userId: string, groupId: string): Promise<GroupMember[]> {
 	const { user } = await import('./db/schema');
 
-	return withRLS(userId, async (tx) => {
-		const rows = await tx
-			.select({
-				userId: groupMembers.userId,
-				role: groupMembers.role,
-				joinedAt: groupMembers.joinedAt,
-				name: user.name,
-				email: user.email
-			})
+	// Primero verificar que el solicitante es miembro del grupo (con RLS)
+	const membership = await withRLS(userId, (tx) =>
+		tx
+			.select({ role: groupMembers.role })
 			.from(groupMembers)
-			.innerJoin(user, eq(groupMembers.userId, user.id))
-			.where(eq(groupMembers.groupId, groupId));
+			.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)))
+	);
 
-		return rows.map((r) => ({
-			...r,
-			role: r.role as GroupRole
-		}));
-	});
+	if (membership.length === 0) return [];
+
+	// Listar todos los miembros sin RLS — la política solo permite ver filas propias,
+	// pero aquí necesitamos ver los demás miembros del grupo.
+	// El acceso ya está validado por la comprobación de membresía anterior.
+	const rows = await db
+		.select({
+			userId: groupMembers.userId,
+			role: groupMembers.role,
+			joinedAt: groupMembers.joinedAt,
+			name: user.name,
+			email: user.email
+		})
+		.from(groupMembers)
+		.innerJoin(user, eq(groupMembers.userId, user.id))
+		.where(eq(groupMembers.groupId, groupId));
+
+	return rows.map((r) => ({
+		...r,
+		role: r.role as GroupRole
+	}));
 }
 
 // ─── Unirse a grupo por código de invitación ──────────────────────────────────
@@ -215,9 +226,10 @@ export async function joinGroupByCode(
 		return { success: false, groupId: group.id, error: 'Ya eres miembro de este grupo' };
 	}
 
-	await withRLS(userId, (tx) =>
-		tx.insert(groupMembers).values({ groupId: group.id, userId, role: 'member' })
-	);
+	// Insertar sin RLS: el usuario aún no es miembro, así que la política
+	// group_members_insert (que requiere ser owner/admin) bloquearía este insert.
+	// La validación del código de invitación ya garantiza que el join es legítimo.
+	await db.insert(groupMembers).values({ groupId: group.id, userId, role: 'member' });
 
 	return { success: true, groupId: group.id };
 }
@@ -286,33 +298,44 @@ export async function getSharedTagsInGroup(
 ): Promise<SharedTagWithBooks[]> {
 	const { user } = await import('./db/schema');
 
-	return withRLS(userId, async (tx) => {
-		const rows = await tx
-			.select({
-				sharedTagId: sharedTags.id,
-				tagId: tags.id,
-				tagName: tags.name,
-				tagColor: tags.color,
-				ownerId: sharedTags.sharedBy,
-				ownerName: user.name
-			})
-			.from(sharedTags)
-			.innerJoin(tags, eq(sharedTags.tagId, tags.id))
-			.innerJoin(user, eq(sharedTags.sharedBy, user.id))
-			.where(eq(sharedTags.groupId, groupId));
+	// Verificar que el solicitante es miembro del grupo (con RLS)
+	const membership = await withRLS(userId, (tx) =>
+		tx
+			.select({ role: groupMembers.role })
+			.from(groupMembers)
+			.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)))
+	);
 
-		// Contar libros por etiqueta compartida
-		const result: SharedTagWithBooks[] = [];
-		for (const row of rows) {
-			const bookCount = await db
-				.select({ id: userBookTags.userBookId })
-				.from(userBookTags)
-				.where(eq(userBookTags.tagId, row.tagId));
+	if (membership.length === 0) return [];
 
-			result.push({ ...row, bookCount: bookCount.length });
-		}
-		return result;
-	});
+	// Consultar sin RLS — las etiquetas compartidas pueden ser de otros usuarios,
+	// la política de tags solo deja ver las propias y bloquearía el JOIN.
+	// El acceso está validado por la comprobación de membresía anterior.
+	const rows = await db
+		.select({
+			sharedTagId: sharedTags.id,
+			tagId: tags.id,
+			tagName: tags.name,
+			tagColor: tags.color,
+			ownerId: sharedTags.sharedBy,
+			ownerName: user.name
+		})
+		.from(sharedTags)
+		.innerJoin(tags, eq(sharedTags.tagId, tags.id))
+		.innerJoin(user, eq(sharedTags.sharedBy, user.id))
+		.where(eq(sharedTags.groupId, groupId));
+
+	// Contar libros por etiqueta compartida
+	const result: SharedTagWithBooks[] = [];
+	for (const row of rows) {
+		const bookCount = await db
+			.select({ id: userBookTags.userBookId })
+			.from(userBookTags)
+			.where(eq(userBookTags.tagId, row.tagId));
+
+		result.push({ ...row, bookCount: bookCount.length });
+	}
+	return result;
 }
 
 // ─── Etiquetas propias del usuario que puede compartir en un grupo ────────────

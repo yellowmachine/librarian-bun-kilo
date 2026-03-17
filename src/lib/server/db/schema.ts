@@ -271,12 +271,7 @@ export const groupMembers = pgTable(
 		pgPolicy('group_members_select', {
 			for: 'select',
 			to: appUser,
-			using: sql`${table.userId} = ${currentUserId}
-				or exists (
-					select 1 from group_members gm2
-					where gm2.group_id = ${table.groupId}
-					  and gm2.user_id = ${currentUserId}
-				)`
+			using: sql`${table.userId} = ${currentUserId}`
 		}),
 		// Solo owners/admins pueden añadir miembros.
 		// El flujo joinGroupByCode corre como superuser (bypass RLS) por lo que
@@ -294,13 +289,7 @@ export const groupMembers = pgTable(
 		pgPolicy('group_members_delete', {
 			for: 'delete',
 			to: appUser,
-			using: sql`${table.userId} = ${currentUserId}
-				or exists (
-					select 1 from group_members gm
-					where gm.group_id = ${table.groupId}
-					  and gm.user_id = ${currentUserId}
-					  and gm.role in ('owner', 'admin')
-				)`
+			using: sql`${table.userId} = ${currentUserId}`
 		})
 	]
 );
