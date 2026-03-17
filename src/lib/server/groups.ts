@@ -67,20 +67,25 @@ export async function createGroup(
 	const id = nanoid();
 	const inviteCode = nanoid(8).toUpperCase();
 
-	// Insertar grupo y añadir al creador como owner en una transacción con RLS
-	await withRLS(userId, async (tx) => {
-		await tx.insert(groups).values({
+	// Insertar el grupo con RLS (la política valida que createdBy = currentUser)
+	await withRLS(userId, (tx) =>
+		tx.insert(groups).values({
 			id,
 			name: data.name,
 			description: data.description ?? null,
 			inviteCode,
 			createdBy: userId
-		});
-		await tx.insert(groupMembers).values({
-			groupId: id,
-			userId,
-			role: 'owner'
-		});
+		})
+	);
+
+	// Añadir al creador como owner sin RLS: en el momento de insertar el primer
+	// miembro todavía no hay ningún admin en el grupo, así que la política
+	// group_members_insert (que requiere ser admin preexistente) bloquearía
+	// esta operación si se hiciera con app_user. El superuser bypasea RLS.
+	await db.insert(groupMembers).values({
+		groupId: id,
+		userId,
+		role: 'owner'
 	});
 
 	return id;

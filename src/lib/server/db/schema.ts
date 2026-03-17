@@ -278,11 +278,13 @@ export const groupMembers = pgTable(
 					  and gm2.user_id = ${currentUserId}
 				)`
 		}),
+		// Solo owners/admins pueden añadir miembros.
+		// El flujo joinGroupByCode corre como superuser (bypass RLS) por lo que
+		// no necesita pasar por esta política.
 		pgPolicy('group_members_insert', {
 			for: 'insert',
 			to: appUser,
-			withCheck: sql`${table.userId} = ${currentUserId}
-				or exists (
+			withCheck: sql`exists (
 					select 1 from group_members gm
 					where gm.group_id = ${table.groupId}
 					  and gm.user_id = ${currentUserId}
