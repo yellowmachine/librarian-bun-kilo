@@ -26,9 +26,18 @@
 		copied = true;
 		setTimeout(() => (copied = false), 2000);
 	}
+
+	// Mostrar errores de acciones en un banner transitorio
+	let actionError = $derived(form?.error as string | undefined);
 </script>
 
 <div class="mx-auto max-w-2xl space-y-8">
+	{#if actionError}
+		<p class="border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+			{actionError}
+		</p>
+	{/if}
+
 	<!-- Cabecera -->
 	<div>
 		<a

@@ -97,11 +97,8 @@ export async function getUserLoans(userId: string): Promise<{
 	const { user } = await import('./db/schema');
 
 	const rows = await withRLS(userId, async (tx) => {
-		const borrower = user; // alias para claridad
-
-		// Drizzle no soporta bien self-joins, usamos db directamente con alias via SQL
-		// Hacemos dos queries separadas y las combinamos
-		const ownerLoans = await db
+		// Dos queries separadas porque Drizzle no soporta bien self-joins con alias
+		const ownerLoans = await tx
 			.select({
 				id: loans.id,
 				status: loans.status,
@@ -125,7 +122,7 @@ export async function getUserLoans(userId: string): Promise<{
 			.innerJoin(books, eq(userBooks.bookId, books.id))
 			.where(eq(loans.ownerId, userId));
 
-		const borrowerLoans = await db
+		const borrowerLoans = await tx
 			.select({
 				id: loans.id,
 				status: loans.status,

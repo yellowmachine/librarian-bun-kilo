@@ -1,10 +1,10 @@
 import { error, fail } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import { getUserBook, updateUserBook, removeFromLibrary } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
-import { tags, userBookTags } from '$lib/server/db/schema';
+import { tags, userBookTags, loans } from '$lib/server/db/schema';
 
 export const load = async ({ locals, params }: RequestEvent) => {
 	const book = await getUserBook(locals.user!.id, params.id!);
@@ -77,6 +77,26 @@ export const actions = {
 
 	// Eliminar libro de la biblioteca
 	remove: async ({ locals, params }: RequestEvent) => {
+		// Verificar que no hay préstamos activos antes de eliminar
+		// (la FK onDelete:restrict lanzaría un error de DB sin este guard)
+		const activeLoans = await withRLS(locals.user!.id, (tx) =>
+			tx
+				.select({ id: loans.id })
+				.from(loans)
+				.where(
+					and(
+						eq(loans.userBookId, params.id!),
+						inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+					)
+				)
+		);
+
+		if (activeLoans.length > 0) {
+			return fail(400, {
+				error: 'No puedes eliminar este libro porque tiene un préstamo en curso.'
+			});
+		}
+
 		await removeFromLibrary(locals.user!.id, params.id!);
 		return { removed: true };
 	}

@@ -1,6 +1,17 @@
 // Servicio de integración con OpenLibrary API
 // Docs: https://openlibrary.org/developers/api
 
+// Timeout por request individual a OpenLibrary (ms)
+const OL_TIMEOUT_MS = 8_000;
+
+/**
+ * fetch con timeout automático hacia OpenLibrary.
+ * Lanza AbortError si la respuesta tarda más de OL_TIMEOUT_MS.
+ */
+async function fetchOL(url: string): Promise<Response> {
+	return fetch(url, { signal: AbortSignal.timeout(OL_TIMEOUT_MS) });
+}
+
 export interface OpenLibraryBook {
 	id: string; // work ID: "OL45804W"
 	isbn: string | null;
@@ -19,7 +30,7 @@ export interface OpenLibraryBook {
 export async function searchByIsbn(isbn: string): Promise<OpenLibraryBook | null> {
 	const clean = isbn.replace(/[^0-9X]/gi, '');
 
-	const res = await fetch(
+	const res = await fetchOL(
 		`https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`
 	);
 	if (!res.ok) return null;
@@ -49,7 +60,7 @@ export async function searchBooks(query: string, limit = 10): Promise<SearchResu
 		limit: String(limit),
 		fields: 'key,title,author_name,cover_i,first_publish_year,isbn'
 	});
-	const res = await fetch(`https://openlibrary.org/search.json?${params}`);
+	const res = await fetchOL(`https://openlibrary.org/search.json?${params}`);
 	if (!res.ok) return [];
 
 	const data = await res.json();
@@ -68,19 +79,23 @@ export async function searchBooks(query: string, limit = 10): Promise<SearchResu
 // ─── Obtener detalle completo de una obra ─────────────────────────────────────
 
 export async function getWorkById(workId: string): Promise<OpenLibraryBook | null> {
-	// Primero obtenemos el work
-	const workRes = await fetch(`https://openlibrary.org/works/${workId}.json`);
+	// Work y ediciones en paralelo
+	const [workRes, editionRes] = await Promise.all([
+		fetchOL(`https://openlibrary.org/works/${workId}.json`),
+		fetchOL(`https://openlibrary.org/works/${workId}/editions.json?limit=1`)
+	]);
+
 	if (!workRes.ok) return null;
 	const work = await workRes.json();
 
-	// Autores
+	// Autores (en paralelo entre sí, tras obtener el work)
 	const authorNames: string[] = [];
 	if (Array.isArray(work.authors)) {
 		await Promise.all(
 			work.authors.slice(0, 5).map(async (a: any) => {
 				const authorKey: string = a.author?.key ?? a.key ?? '';
 				if (!authorKey) return;
-				const aRes = await fetch(`https://openlibrary.org${authorKey}.json`);
+				const aRes = await fetchOL(`https://openlibrary.org${authorKey}.json`);
 				if (aRes.ok) {
 					const aData = await aRes.json();
 					if (aData.name) authorNames.push(aData.name as string);
@@ -90,7 +105,6 @@ export async function getWorkById(workId: string): Promise<OpenLibraryBook | nul
 	}
 
 	// Edición para ISBN, publisher, año, idioma
-	const editionRes = await fetch(`https://openlibrary.org/works/${workId}/editions.json?limit=1`);
 	let isbn: string | null = null;
 	let publisher: string | null = null;
 	let publishYear: number | null = null;

@@ -32,8 +32,8 @@
 				>
 			</a>
 
-			<!-- Nav principal -->
-			<nav class="flex items-center gap-1">
+			<!-- Nav principal — solo visible en sm+ -->
+			<nav class="hidden items-center gap-1 sm:flex">
 				{#each NAV as item}
 					<a
 						href={item.href}
@@ -43,7 +43,7 @@
 							: 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900'}"
 					>
 						<item.icon weight={isActive(item.href) ? 'fill' : 'regular'} size={16} />
-						<span class="hidden sm:inline">{item.label}</span>
+						<span>{item.label}</span>
 
 						{#if item.href === '/loans' && pendingLoans > 0}
 							<span
@@ -75,12 +75,13 @@
 	</header>
 
 	<!-- ── Contenido ─────────────────────────────────────────────────────── -->
-	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8">
+	<!-- pb-20 en mobile deja espacio para la barra inferior -->
+	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8 pb-24 sm:pb-8">
 		{@render children()}
 	</main>
 
-	<!-- ── Footer ────────────────────────────────────────────────────────── -->
-	<footer class="border-t border-neutral-100 py-4">
+	<!-- ── Footer — solo visible en sm+ ─────────────────────────────────── -->
+	<footer class="hidden border-t border-neutral-100 py-4 sm:block">
 		<p class="text-center text-xs text-neutral-400">
 			Built with <a
 				href="https://kilo.ai"
@@ -98,4 +99,32 @@
 			>
 		</p>
 	</footer>
+
+	<!-- ── Barra de navegación inferior — solo mobile ────────────────────── -->
+	<nav
+		class="fixed right-0 bottom-0 left-0 z-30 border-t border-neutral-200 bg-white
+		pb-[env(safe-area-inset-bottom)] sm:hidden"
+	>
+		<div class="flex">
+			{#each NAV as item}
+				<a
+					href={item.href}
+					class="relative flex flex-1 flex-col items-center gap-1 py-3 text-xs transition-colors
+					{isActive(item.href) ? 'text-neutral-900' : 'text-neutral-400'}"
+				>
+					<item.icon weight={isActive(item.href) ? 'fill' : 'regular'} size={22} />
+					<span>{item.label}</span>
+
+					{#if item.href === '/loans' && pendingLoans > 0}
+						<span
+							class="absolute top-2 left-1/2 ml-2 flex h-4 w-4 items-center justify-center
+							rounded-full bg-neutral-900 text-[10px] leading-none font-bold text-white"
+						>
+							{pendingLoans > 9 ? '9+' : pendingLoans}
+						</span>
+					{/if}
+				</a>
+			{/each}
+		</div>
+	</nav>
 </div>
