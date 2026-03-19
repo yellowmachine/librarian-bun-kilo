@@ -5,16 +5,28 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { getUserBook, updateUserBook, removeFromLibrary } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
 import { tags, userBookTags, loans } from '$lib/server/db/schema';
+import {
+	getMyReview,
+	getBookReviews,
+	getBookReviewStats,
+	upsertReview,
+	deleteReview
+} from '$lib/server/reviews';
 
 export const load = async ({ locals, params }: RequestEvent) => {
 	const book = await getUserBook(locals.user!.id, params.id!);
 	if (!book) error(404, 'Libro no encontrado en tu biblioteca');
 
-	const userTags = await withRLS(locals.user!.id, (tx) =>
-		tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
-	);
+	const [userTags, myReview, reviews, reviewStats] = await Promise.all([
+		withRLS(locals.user!.id, (tx) =>
+			tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
+		),
+		getMyReview(locals.user!.id, book.bookId),
+		getBookReviews(locals.user!.id, book.bookId),
+		getBookReviewStats(locals.user!.id, book.bookId)
+	]);
 
-	return { book, userTags };
+	return { book, userTags, myReview, reviews, reviewStats };
 };
 
 export const actions = {
@@ -73,6 +85,38 @@ export const actions = {
 				.where(and(eq(userBookTags.userBookId, params.id!), eq(userBookTags.tagId, tagId)))
 		);
 		return { success: true };
+	},
+
+	// Guardar (crear o actualizar) reseña propia
+	saveReview: async ({ locals, params, request }: RequestEvent) => {
+		const book = await getUserBook(locals.user!.id, params.id!);
+		if (!book) return fail(404, { reviewError: 'Libro no encontrado' });
+
+		const data = await request.formData();
+		const ratingRaw = data.get('rating') as string;
+		const body = (data.get('body') as string | null)?.trim() || undefined;
+
+		const rating = parseInt(ratingRaw, 10);
+		if (!rating || rating < 1 || rating > 5) {
+			return fail(400, { reviewError: 'La puntuación debe ser entre 1 y 5 estrellas' });
+		}
+
+		try {
+			await upsertReview(locals.user!.id, book.bookId, { rating, body });
+		} catch (e) {
+			return fail(400, { reviewError: e instanceof Error ? e.message : 'Error al guardar' });
+		}
+
+		return { reviewSaved: true };
+	},
+
+	// Eliminar reseña propia
+	deleteReview: async ({ locals, params }: RequestEvent) => {
+		const book = await getUserBook(locals.user!.id, params.id!);
+		if (!book) return fail(404, { reviewError: 'Libro no encontrado' });
+
+		await deleteReview(locals.user!.id, book.bookId);
+		return { reviewDeleted: true };
 	},
 
 	// Eliminar libro de la biblioteca

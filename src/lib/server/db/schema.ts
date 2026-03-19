@@ -402,10 +402,62 @@ export const loans = pgTable(
 	]
 );
 
+// ─── Book Reviews ─────────────────────────────────────────────────────────────
+// Cualquier usuario autenticado puede reseñar cualquier libro del catálogo,
+// independientemente de quién sea el propietario. Una reseña por usuario y libro.
+
+export const bookReviews = pgTable(
+	'book_reviews',
+	{
+		id: text('id').primaryKey(),
+		bookId: text('book_id')
+			.notNull()
+			.references(() => books.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		rating: integer('rating').notNull(), // 1–5 estrellas
+		body: text('body'), // texto opcional de la reseña
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	(table) => [
+		uniqueIndex('book_reviews_book_user_idx').on(table.bookId, table.userId),
+		index('book_reviews_book_idx').on(table.bookId),
+		index('book_reviews_user_idx').on(table.userId),
+		// Lectura abierta a todos los usuarios autenticados (como books)
+		pgPolicy('book_reviews_select', { for: 'select', to: appUser, using: sql`true` }),
+		// Solo el autor puede insertar su propia reseña
+		pgPolicy('book_reviews_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		// Solo el autor puede editar su reseña
+		pgPolicy('book_reviews_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		// Solo el autor puede borrar su reseña
+		pgPolicy('book_reviews_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const booksRelations = relations(books, ({ many }) => ({
-	userBooks: many(userBooks)
+	userBooks: many(userBooks),
+	reviews: many(bookReviews)
+}));
+
+export const bookReviewsRelations = relations(bookReviews, ({ one }) => ({
+	book: one(books, { fields: [bookReviews.bookId], references: [books.id] }),
+	user: one(user, { fields: [bookReviews.userId], references: [user.id] })
 }));
 
 export const userBooksRelations = relations(userBooks, ({ one, many }) => ({
