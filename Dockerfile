@@ -29,9 +29,8 @@ ENV DATABASE_URL=postgres://placeholder
 RUN bun run build
 
 # ─── Stage 3: prod ────────────────────────────────────────────────────────────
-# Imagen final mínima: solo Node (el output de adapter-node es JS puro,
-# no necesita Bun en runtime).
-FROM node:22-alpine AS prod
+# Imagen final con Bun: svelte-adapter-bun genera un servidor Bun nativo.
+FROM oven/bun:1 AS prod
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -41,7 +40,7 @@ COPY --from=build /app/build ./build
 COPY --from=build /app/package.json ./
 COPY --from=build /app/drizzle ./drizzle
 COPY scripts/entrypoint.sh ./entrypoint.sh
-COPY scripts/migrate.mjs ./scripts/migrate.mjs
+COPY scripts/migrate.ts ./scripts/migrate.ts
 
 # Deps de runtime
 COPY --from=deps /app/node_modules ./node_modules

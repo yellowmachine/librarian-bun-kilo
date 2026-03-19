@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Aplica las migraciones de Drizzle contra la BD de producción.
 // Se ejecuta desde el entrypoint.sh antes de arrancar el servidor.
 import { drizzle } from 'drizzle-orm/postgres-js';

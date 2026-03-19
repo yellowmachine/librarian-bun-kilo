@@ -4,7 +4,7 @@
 set -e
 
 echo "[entrypoint] Aplicando migraciones..."
-node /app/scripts/migrate.mjs
+bun /app/scripts/migrate.ts
 
 echo "[entrypoint] Arrancando servidor..."
-exec node /app/build/index.js
+exec bun /app/build/index.js
