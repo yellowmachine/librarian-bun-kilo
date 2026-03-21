@@ -100,6 +100,12 @@ CREATE TABLE "librarian"."user_books" (
 );
 --> statement-breakpoint
 ALTER TABLE "librarian"."user_books" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE TABLE "librarian"."user_profile" (
+	"user_id" text PRIMARY KEY NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "librarian"."user_profile" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -164,6 +170,7 @@ ALTER TABLE "librarian"."user_book_tags" ADD CONSTRAINT "user_book_tags_user_boo
 ALTER TABLE "librarian"."user_book_tags" ADD CONSTRAINT "user_book_tags_tag_id_tags_id_fk" FOREIGN KEY ("tag_id") REFERENCES "librarian"."tags"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "librarian"."user_books" ADD CONSTRAINT "user_books_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "librarian"."user_books" ADD CONSTRAINT "user_books_book_id_books_id_fk" FOREIGN KEY ("book_id") REFERENCES "librarian"."books"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "librarian"."user_profile" ADD CONSTRAINT "user_profile_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "book_reviews_book_user_idx" ON "librarian"."book_reviews" USING btree ("book_id","user_id");--> statement-breakpoint
@@ -268,4 +275,5 @@ CREATE POLICY "user_book_tags_delete" ON "librarian"."user_book_tags" AS PERMISS
 CREATE POLICY "user_books_select" ON "librarian"."user_books" AS PERMISSIVE FOR SELECT TO "app_user" USING ("librarian"."user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
 CREATE POLICY "user_books_insert" ON "librarian"."user_books" AS PERMISSIVE FOR INSERT TO "app_user" WITH CHECK ("librarian"."user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
 CREATE POLICY "user_books_update" ON "librarian"."user_books" AS PERMISSIVE FOR UPDATE TO "app_user" USING ("librarian"."user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
-CREATE POLICY "user_books_delete" ON "librarian"."user_books" AS PERMISSIVE FOR DELETE TO "app_user" USING ("librarian"."user_books"."user_id" = current_setting('app.current_user_id', true));
+CREATE POLICY "user_books_delete" ON "librarian"."user_books" AS PERMISSIVE FOR DELETE TO "app_user" USING ("librarian"."user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
+CREATE POLICY "user_profile_select" ON "librarian"."user_profile" AS PERMISSIVE FOR SELECT TO "app_user" USING ("librarian"."user_profile"."user_id" = current_setting('app.current_user_id', true));

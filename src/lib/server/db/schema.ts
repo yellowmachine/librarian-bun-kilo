@@ -48,6 +48,29 @@ export const loanStatusEnum = librarianSchema.enum('loan_status', [
 
 const currentUserId = sql`current_setting('app.current_user_id', true)`;
 
+// ─── User Profile ─────────────────────────────────────────────────────────────
+// Marca que un usuario se registró a través de Librarian.
+// Se crea en el momento del signup (antes de verificar el email).
+// Si un usuario tiene public.user pero no este registro, vino de Scholio
+// y no tiene acceso a Librarian.
+
+export const userProfile = librarianSchema.table(
+	'user_profile',
+	{
+		userId: text('user_id')
+			.primaryKey()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(table) => [
+		pgPolicy('user_profile_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
 // ─── Books ────────────────────────────────────────────────────────────────────
 
 export const books = librarianSchema.table(

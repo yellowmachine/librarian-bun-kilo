@@ -1,5 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { auth } from '$lib/server/auth';
+import { db } from '$lib/server/db';
+import { userProfile } from '$lib/server/db/schema';
 import type { RequestEvent } from '@sveltejs/kit';
 
 export const load = ({ locals }: RequestEvent) => {
@@ -29,6 +31,10 @@ export const actions = {
 		if (!result || result.user == null) {
 			return fail(400, { error: 'No se pudo crear la cuenta. El email puede estar en uso.' });
 		}
+
+		// Marcar que este usuario se registró a través de Librarian.
+		// Se usa el db superuser (bypass RLS) porque el usuario aún no tiene sesión activa.
+		await db.insert(userProfile).values({ userId: result.user.id });
 
 		redirect(302, '/verify-email');
 	}
