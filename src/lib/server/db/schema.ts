@@ -1,7 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
-	pgTable,
-	pgEnum,
+	pgSchema,
 	pgPolicy,
 	pgRole,
 	text,
@@ -11,6 +10,12 @@ import {
 	uniqueIndex,
 	index
 } from 'drizzle-orm/pg-core';
+
+// ─── Schema ───────────────────────────────────────────────────────────────────
+// Todas las tablas de la aplicación viven en el schema 'librarian'.
+// Las tablas de better-auth (user, session, account, verification) permanecen
+// en 'public', que es el schema por defecto de better-auth.
+export const librarianSchema = pgSchema('librarian');
 
 export * from './auth.schema';
 import { user } from './auth.schema';
@@ -25,9 +30,9 @@ export const appUser = pgRole('app_user').existing();
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export const groupRoleEnum = pgEnum('group_role', ['owner', 'admin', 'member']);
+export const groupRoleEnum = librarianSchema.enum('group_role', ['owner', 'admin', 'member']);
 
-export const loanStatusEnum = pgEnum('loan_status', [
+export const loanStatusEnum = librarianSchema.enum('loan_status', [
 	'requested',
 	'accepted',
 	'active',
@@ -45,7 +50,7 @@ const currentUserId = sql`current_setting('app.current_user_id', true)`;
 
 // ─── Books ────────────────────────────────────────────────────────────────────
 
-export const books = pgTable(
+export const books = librarianSchema.table(
 	'books',
 	{
 		id: text('id').primaryKey(), // OpenLibrary work ID, ej: "OL45804W"
@@ -72,7 +77,7 @@ export const books = pgTable(
 
 // ─── User Books ───────────────────────────────────────────────────────────────
 
-export const userBooks = pgTable(
+export const userBooks = librarianSchema.table(
 	'user_books',
 	{
 		id: text('id').primaryKey(),
@@ -116,7 +121,7 @@ export const userBooks = pgTable(
 
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
-export const tags = pgTable(
+export const tags = librarianSchema.table(
 	'tags',
 	{
 		id: text('id').primaryKey(),
@@ -155,7 +160,7 @@ export const tags = pgTable(
 
 // ─── User Book Tags ───────────────────────────────────────────────────────────
 
-export const userBookTags = pgTable(
+export const userBookTags = librarianSchema.table(
 	'user_book_tags',
 	{
 		userBookId: text('user_book_id')
@@ -200,7 +205,7 @@ export const userBookTags = pgTable(
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
 
-export const groups = pgTable(
+export const groups = librarianSchema.table(
 	'groups',
 	{
 		id: text('id').primaryKey(),
@@ -253,7 +258,7 @@ export const groups = pgTable(
 
 // ─── Group Members ────────────────────────────────────────────────────────────
 
-export const groupMembers = pgTable(
+export const groupMembers = librarianSchema.table(
 	'group_members',
 	{
 		groupId: text('group_id')
@@ -296,7 +301,7 @@ export const groupMembers = pgTable(
 
 // ─── Shared Tags ──────────────────────────────────────────────────────────────
 
-export const sharedTags = pgTable(
+export const sharedTags = librarianSchema.table(
 	'shared_tags',
 	{
 		id: text('id').primaryKey(),
@@ -349,7 +354,7 @@ export const sharedTags = pgTable(
 
 // ─── Loans ────────────────────────────────────────────────────────────────────
 
-export const loans = pgTable(
+export const loans = librarianSchema.table(
 	'loans',
 	{
 		id: text('id').primaryKey(),
@@ -406,7 +411,7 @@ export const loans = pgTable(
 // Cualquier usuario autenticado puede reseñar cualquier libro del catálogo,
 // independientemente de quién sea el propietario. Una reseña por usuario y libro.
 
-export const bookReviews = pgTable(
+export const bookReviews = librarianSchema.table(
 	'book_reviews',
 	{
 		id: text('id').primaryKey(),

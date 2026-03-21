@@ -16,14 +16,16 @@
 -- 1. Rol de la aplicación (sin contraseña, sin login — se usa vía SET ROLE o políticas RLS)
 CREATE ROLE app_user;
 
--- 2. Permisos sobre el schema público
--- GRANT CONNECT no es necesario: app_user es un rol sin login usado únicamente
--- como target de las políticas RLS. La app se conecta con POSTGRES_USER (superuser).
+-- 2. Schemas
+-- 'public'    → tablas de better-auth (user, session, account, verification)
+-- 'librarian' → tablas de la app Librarian (books, user_books, groups, etc.)
+CREATE SCHEMA librarian;
+
 GRANT USAGE ON SCHEMA public TO app_user;
+GRANT USAGE ON SCHEMA librarian TO app_user;
 
 -- 3. Default privileges: cualquier tabla/secuencia/función creada por POSTGRES_USER
---    en el schema public será accesible por app_user automáticamente.
---    Esto evita tener que hacer GRANT manualmente después de cada migración.
+--    en estos schemas será accesible por app_user automáticamente.
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
 
@@ -32,3 +34,17 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT EXECUTE ON FUNCTIONS TO app_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA librarian
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA librarian
+    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO app_user;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA librarian
+    GRANT EXECUTE ON FUNCTIONS TO app_user;
+
+-- 4. search_path para app_user: las políticas RLS usan nombres sin schema (ej: 'user_books').
+--    Con librarian primero se resuelven a librarian.user_books; public como fallback
+--    para las tablas de better-auth (user, session, etc.).
+ALTER ROLE app_user SET search_path = librarian, public;
