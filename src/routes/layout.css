@@ -2,83 +2,72 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
-/* ─── Sistema de diseño: blanco y negro con fuerte contraste ─────────────────
-   Inspirado en la tipografía editorial. Sin colores de acento salvo negro puro.
-   Los únicos "colores" permitidos son escalas de gris para jerarquía.
-──────────────────────────────────────────────────────────────────────────────── */
+/* Dark mode via clase .dark en <html> */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-	/* Tipografía base: serif para títulos, sans para UI */
-	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-	--font-serif: 'Georgia', 'Times New Roman', ui-serif, serif;
+    /* Tipografía */
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-serif: 'Source Serif 4', Georgia, serif;
 
-	/* Paleta estricta B&W */
-	--color-ink: #0a0a0a; /* negro casi puro — texto principal */
-	--color-ink-2: #3d3d3d; /* gris oscuro — texto secundario */
-	--color-ink-3: #737373; /* gris medio — texto terciario / placeholders */
-	--color-ink-4: #a3a3a3; /* gris claro — deshabilitado / decorativo */
-	--color-paper: #ffffff; /* blanco puro — fondo */
-	--color-paper-2: #fafafa; /* blanco roto — fondo alternativo */
-	--color-paper-3: #f5f5f5; /* gris muy claro — hover / inputs */
-	--color-paper-4: #e5e5e5; /* gris claro — bordes / separadores */
-	--color-paper-5: #d4d4d4; /* gris medio — bordes fuertes */
+    /* Paleta light — warm paper */
+    --color-paper: #f9f7f4;
+    --color-paper-ui: #f0ede8;
+    --color-paper-border: #e8e2da;
 
-	/* Espaciado base */
-	--spacing-page: 1.25rem; /* padding lateral en móvil */
+    --color-ink: #1c1917;
+    --color-ink-muted: #57534e;
+    --color-ink-faint: #a8a29e;
+
+    --color-accent: #7c5c3e;
+    --color-accent-hover: #6b4f35;
+    --color-accent-light: #e8d9c8;
+
+    /* Paleta dark */
+    --color-dark-paper: #1a1917;
+    --color-dark-paper-ui: #141311;
+    --color-dark-paper-border: #2c2926;
+
+    --color-dark-ink: #e8e4dc;
+    --color-dark-ink-muted: #a8a29e;
+    --color-dark-ink-faint: #57534e;
 }
 
-/* ─── Base global ─────────────────────────────────────────────────────────── */
+/* Base */
 html {
-	background-color: var(--color-paper);
-	color: var(--color-ink);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
+    font-family: var(--font-sans);
+    background-color: var(--color-paper-ui);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Tipografía editorial ────────────────────────────────────────────────── */
-h1,
-h2,
-h3 {
-	font-family: var(--font-serif);
-	letter-spacing: -0.02em;
+html.dark {
+    background-color: var(--color-dark-paper-ui);
+    color: var(--color-dark-ink);
 }
 
-/* ─── Inputs: override del plugin forms para estilo B&W ──────────────────── */
-[type='text'],
-[type='email'],
-[type='password'],
-[type='search'],
-textarea,
-select {
-	border-color: var(--color-paper-4);
-	background-color: var(--color-paper);
-	color: var(--color-ink);
-	border-radius: 0.375rem;
+/* Safe area para PWA en iOS (home indicator) */
+.pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
-[type='text']:focus,
-[type='email']:focus,
-[type='password']:focus,
-[type='search']:focus,
-textarea:focus,
-select:focus {
-	border-color: var(--color-ink);
-	outline: none;
-	box-shadow: 0 0 0 1px var(--color-ink);
-}
-
-/* ─── Scrollbar sutil ─────────────────────────────────────────────────────── */
+/* Scrollbar discreta */
 ::-webkit-scrollbar {
-	width: 6px;
-	height: 6px;
+    width: 6px;
+    height: 6px;
 }
 ::-webkit-scrollbar-track {
-	background: transparent;
+    background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-	background: var(--color-paper-4);
-	border-radius: 3px;
+    background: var(--color-paper-border);
+    border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-	background: var(--color-ink-4);
+    background: var(--color-ink-faint);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+    background: var(--color-dark-paper-border);
 }
