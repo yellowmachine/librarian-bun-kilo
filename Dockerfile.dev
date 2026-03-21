@@ -1,0 +1,23 @@
+FROM oven/bun:1
+WORKDIR /app
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY . .
+
+# Placeholders para que vite build no falle — los valores reales llegan en runtime
+ENV NODE_ENV=development
+ENV ORIGIN=http://localhost:3001
+ENV BETTER_AUTH_SECRET=build-placeholder
+ENV DATABASE_URL=postgres://placeholder
+ENV MIGRATION_DATABASE_URL=postgres://placeholder
+
+RUN bun run build
+
+COPY scripts/entrypoint.sh ./entrypoint.sh
+RUN chmod +x entrypoint.sh
+
+EXPOSE 3000
+
+CMD ["sh", "entrypoint.sh"]

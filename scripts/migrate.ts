@@ -11,12 +11,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Las migraciones están en /app/drizzle cuando se ejecuta desde el build
 const migrationsFolder = path.join(__dirname, '..', 'drizzle');
 
-if (!process.env.DATABASE_URL) {
-	console.error('[migrate] ERROR: DATABASE_URL no está definida');
+// MIGRATION_DATABASE_URL debe tener privilegios para CREATE SCHEMA, ALTER TABLE, etc.
+// Si no se define, se usa DATABASE_URL como fallback.
+const migrationUrl = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL;
+
+if (!migrationUrl) {
+	console.error('[migrate] ERROR: MIGRATION_DATABASE_URL o DATABASE_URL no están definidas');
 	process.exit(1);
 }
 
-const client = postgres(process.env.DATABASE_URL, { max: 1 });
+const client = postgres(migrationUrl, { max: 1 });
 const db = drizzle(client);
 
 console.log('[migrate] Aplicando migraciones desde', migrationsFolder);
