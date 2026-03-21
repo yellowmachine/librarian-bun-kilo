@@ -29,7 +29,9 @@ export const actions = {
 		});
 
 		if (!result || result.user == null) {
-			return fail(400, { error: 'No se pudo crear la cuenta. El email puede estar en uso.' });
+			return fail(400, {
+				error: 'No se pudo crear la cuenta. Si ya tienes cuenta en Scholio, inicia sesión para acceder.'
+			});
 		}
 
 		// Marcar que este usuario se registró a través de Librarian.
