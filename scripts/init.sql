@@ -19,7 +19,7 @@ CREATE ROLE app_user;
 -- 2. Schemas
 -- 'public'    → tablas de better-auth (user, session, account, verification)
 -- 'librarian' → tablas de la app Librarian (books, user_books, groups, etc.)
-CREATE SCHEMA librarian;
+CREATE SCHEMA IF NOT EXISTS librarian;
 
 GRANT USAGE ON SCHEMA public TO app_user;
 GRANT USAGE ON SCHEMA librarian TO app_user;

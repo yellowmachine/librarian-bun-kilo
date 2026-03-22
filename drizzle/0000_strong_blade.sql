@@ -1,4 +1,4 @@
-CREATE SCHEMA "librarian";
+CREATE SCHEMA IF NOT EXISTS "librarian";
 --> statement-breakpoint
 CREATE TYPE "librarian"."group_role" AS ENUM('owner', 'admin', 'member');--> statement-breakpoint
 CREATE TYPE "librarian"."loan_status" AS ENUM('requested', 'accepted', 'active', 'return_requested', 'returned', 'rejected', 'cancelled');--> statement-breakpoint
