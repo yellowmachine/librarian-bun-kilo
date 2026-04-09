@@ -129,6 +129,17 @@ export const userBooks = librarianSchema.table(
       to: appUser,
       using: sql`${table.userId} = ${currentUserId}`
     }),
+    pgPolicy('user_books_select_in_group', {
+      for: 'select',
+      to: appUser,
+      using: sql`exists (
+				select 1 from "librarian".user_book_tags ubt
+				join "librarian".shared_tags st on st.tag_id = ubt.tag_id
+				join "librarian".group_members gm on gm.group_id = st.group_id
+				where ubt.user_book_id = ${table.id}
+				  and gm.user_id = ${currentUserId}
+			)`
+    }),
     pgPolicy('user_books_insert', {
       for: 'insert',
       to: appUser,
@@ -168,6 +179,16 @@ export const tags = librarianSchema.table(
       to: appUser,
       using: sql`${table.userId} = ${currentUserId}`
     }),
+    pgPolicy('tags_select_in_group', {
+      for: 'select',
+      to: appUser,
+      using: sql`exists (
+				select 1 from "librarian".shared_tags st
+				join "librarian".group_members gm on gm.group_id = st.group_id
+				where st.tag_id = ${table.id}
+				  and gm.user_id = ${currentUserId}
+			)`
+    }),
     pgPolicy('tags_insert', {
       for: 'insert',
       to: appUser,
@@ -205,9 +226,19 @@ export const userBookTags = librarianSchema.table(
       for: 'select',
       to: appUser,
       using: sql`exists (
-				select 1 from "librarian".user_books ub
-				where ub.id = ${table.userBookId}
-				  and ub.user_id = ${currentUserId}
+				select 1 from "librarian".tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			)`
+    }),
+    pgPolicy('user_book_tags_select_in_group', {
+      for: 'select',
+      to: appUser,
+      using: sql`exists (
+				select 1 from "librarian".shared_tags st
+				join "librarian".group_members gm on gm.group_id = st.group_id
+				where st.tag_id = ${table.tagId}
+				  and gm.user_id = ${currentUserId}
 			)`
     }),
     pgPolicy('user_book_tags_insert', {

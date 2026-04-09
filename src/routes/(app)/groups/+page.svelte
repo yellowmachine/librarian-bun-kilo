@@ -12,7 +12,7 @@
 <div class="space-y-8">
 	<div class="flex items-end justify-between">
 		<div>
-			<h1 class="font-serif text-3xl font-normal text-neutral-900">Grupos</h1>
+			<h1 class="font-serif text-3xl font-normal text-neutral-900">Group</h1>
 			<p class="mt-1 text-sm text-neutral-400">
 				{userGroups.length}
 				{userGroups.length === 1 ? 'group' : 'groups'}
@@ -29,7 +29,7 @@
 				href="/groups/new"
 				class="flex items-center gap-1.5 border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
 			>
-				<Plus size={16} weight="bold" /> Nuevo
+				<Plus size={16} weight="bold" /> New
 			</a>
 		</div>
 	</div>

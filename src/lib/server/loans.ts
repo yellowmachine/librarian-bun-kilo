@@ -48,45 +48,43 @@ export async function requestLoan(
   userBookId: string,
   notes?: string
 ): Promise<string> {
-  // Obtener el propietario del libro sin RLS (lectura pública de userBooks necesaria)
-  const ubRows = await db
-    .select({ userId: userBooks.userId, isAvailable: userBooks.isAvailable })
-    .from(userBooks)
-    .where(eq(userBooks.id, userBookId));
+  return withRLS(borrowerId, async (tx) => {
+    // user_books_select_in_group policy allows borrower to read the book via shared tags
+    const ubRows = await tx
+      .select({ userId: userBooks.userId, isAvailable: userBooks.isAvailable })
+      .from(userBooks)
+      .where(eq(userBooks.id, userBookId));
 
-  if (ubRows.length === 0) throw new Error('Book not found');
-  const { userId: ownerId, isAvailable } = ubRows[0];
+    if (ubRows.length === 0) throw new Error(‘Book not found’);
+    const { userId: ownerId, isAvailable } = ubRows[0];
 
-  if (!isAvailable) throw new Error('Book is not available');
-  if (ownerId === borrowerId) throw new Error('You can’t request your own book.');
+    if (!isAvailable) throw new Error(‘Book is not available’);
+    if (ownerId === borrowerId) throw new Error("You can’t request your own book.");
 
-  // Comprobar que no hay ya un préstamo activo o pendiente para este libro
-  const existing = await db
-    .select({ id: loans.id })
-    .from(loans)
-    .where(
-      and(
-        eq(loans.userBookId, userBookId),
-        inArray(loans.status, ['requested', 'accepted', 'active'])
-      )
-    );
-  if (existing.length > 0) throw new Error('There is already an active request for this book.');
+    // Check for existing active/pending loan (loans are visible to both parties via RLS)
+    const existing = await tx
+      .select({ id: loans.id })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.userBookId, userBookId),
+          inArray(loans.status, [‘requested’, ‘accepted’, ‘active’])
+        )
+      );
+    if (existing.length > 0) throw new Error(‘There is already an active request for this book.’);
 
-  const id = nanoid();
-
-  // El INSERT con RLS requiere borrower_id = current_user
-  await withRLS(borrowerId, (tx) =>
-    tx.insert(loans).values({
+    const id = nanoid();
+    await tx.insert(loans).values({
       id,
       userBookId,
       borrowerId,
       ownerId,
-      status: 'requested',
+      status: ‘requested’,
       notes: notes ?? null
-    })
-  );
+    });
 
-  return id;
+    return id;
+  });
 }
 
 // ─── Listar préstamos del usuario ─────────────────────────────────────────────
