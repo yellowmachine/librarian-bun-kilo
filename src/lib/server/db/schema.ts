@@ -245,18 +245,18 @@ export const userBookTags = librarianSchema.table(
       for: 'insert',
       to: appUser,
       withCheck: sql`exists (
-				select 1 from "librarian".user_books ub
-				where ub.id = ${table.userBookId}
-				  and ub.user_id = ${currentUserId}
+				select 1 from "librarian".tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
 			)`
     }),
     pgPolicy('user_book_tags_delete', {
       for: 'delete',
       to: appUser,
       using: sql`exists (
-				select 1 from "librarian".user_books ub
-				where ub.id = ${table.userBookId}
-				  and ub.user_id = ${currentUserId}
+				select 1 from "librarian".tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
 			)`
     })
   ]
