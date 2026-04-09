@@ -1,55 +1,57 @@
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
-# Instala solo las dependencias de producción + las de build.
-# Usamos la imagen oficial de Bun para respetar el lockfile.
 FROM oven/bun:1 AS deps
 WORKDIR /app
 
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json bun.lock ./
-# Instalar todas las deps (necesitamos las devDeps para el build)
 RUN bun install --frozen-lockfile
 
-# ─── Stage 2: build ───────────────────────────────────────────────────────────
+# ─── Stage 2: prod-deps ───────────────────────────────────────────────────────
+FROM oven/bun:1 AS prod-deps
+WORKDIR /app
+
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+# ─── Stage 3: build ───────────────────────────────────────────────────────────
 FROM oven/bun:1 AS build
 WORKDIR /app
 
-# Copiar deps instaladas del stage anterior
-COPY --from=deps /app/node_modules ./node_modules
+ARG PUBLIC_SENTRY_DSN=""
 
-# Copiar todo el código fuente
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Variables de entorno mínimas necesarias para que vite build no falle.
-# Los valores reales se inyectan en runtime via Coolify.
 ENV NODE_ENV=production
 ENV ORIGIN=https://placeholder.local
 ENV BETTER_AUTH_SECRET=build-placeholder
 ENV DATABASE_URL=postgres://placeholder
+ENV PUBLIC_SENTRY_DSN=${PUBLIC_SENTRY_DSN}
 
-# Build SvelteKit → genera /app/build
 RUN bun run build
 
-# ─── Stage 3: prod ────────────────────────────────────────────────────────────
-# Imagen final con Bun: svelte-adapter-bun genera un servidor Bun nativo.
+# ─── Stage 4: prod ────────────────────────────────────────────────────────────
 FROM oven/bun:1 AS prod
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Output del build, migraciones SQL, scripts y entrypoint
 COPY --from=build /app/build ./build
 COPY --from=build /app/package.json ./
 COPY --from=build /app/drizzle ./drizzle
 COPY scripts/entrypoint.sh ./entrypoint.sh
-COPY scripts/migrate.ts ./scripts/migrate.ts
 
-# Deps de runtime
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
 
 RUN chmod +x entrypoint.sh
 
-# Healthcheck: Coolify no redirige tráfico hasta que este pase.
-# Permite que las migraciones terminen antes de que el contenedor
-# se marque como "ready".
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD wget -qO- http://localhost:3000/ || exit 1
 
