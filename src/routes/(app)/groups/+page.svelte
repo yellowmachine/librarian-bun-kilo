@@ -15,7 +15,7 @@
 			<h1 class="font-serif text-3xl font-normal text-neutral-900">Grupos</h1>
 			<p class="mt-1 text-sm text-neutral-400">
 				{userGroups.length}
-				{userGroups.length === 1 ? 'grupo' : 'grupos'}
+				{userGroups.length === 1 ? 'group' : 'groups'}
 			</p>
 		</div>
 		<div class="flex gap-2">
@@ -38,7 +38,7 @@
 	{#if showJoinForm}
 		<div class="border border-neutral-200 p-5">
 			<p class="mb-3 text-xs font-medium tracking-widest text-neutral-500 uppercase">
-				Código de invitación
+				Invitation code
 			</p>
 			<form method="POST" action="?/join" use:enhance class="flex gap-2">
 				<input
@@ -54,7 +54,7 @@
 					type="submit"
 					class="border border-neutral-900 bg-neutral-900 px-5 py-2 text-sm text-white hover:bg-neutral-800"
 				>
-					Entrar
+					Enter
 				</button>
 			</form>
 			{#if form?.joinError}
@@ -75,7 +75,7 @@
 					onclick={() => (showJoinForm = true)}
 					class="text-neutral-900 underline underline-offset-2"
 				>
-					Unirse con código
+					Join with code
 				</button>
 			</div>
 		</div>
@@ -104,7 +104,7 @@
 								class="text-xs text-neutral-300
 								{group.role === 'owner' ? 'text-neutral-600' : ''}"
 							>
-								{group.role === 'owner' ? 'propietario' : group.role === 'admin' ? 'admin' : ''}
+								{group.role === 'owner' ? 'owner' : group.role === 'admin' ? 'admin' : ''}
 							</span>
 							<ArrowRight size={16} class="text-neutral-300" />
 						</div>

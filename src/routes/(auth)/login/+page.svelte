@@ -8,7 +8,7 @@
 		<!-- Marca -->
 		<div class="mb-10 text-center">
 			<h1 class="font-serif text-4xl font-normal tracking-tight text-neutral-900">librarian</h1>
-			<p class="mt-2 text-sm text-neutral-400">Tu biblioteca particular</p>
+			<p class="mt-2 text-sm text-neutral-400">Your personal library</p>
 			{#if data.userCount > 0}
 				<p class="mt-3 text-xs text-neutral-400">
 					{data.userCount}
@@ -47,7 +47,7 @@
 					for="password"
 					class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
 				>
-					Contraseña
+					Password
 				</label>
 				<input
 					id="password"
@@ -65,13 +65,13 @@
 					type="submit"
 					class="w-full border border-neutral-900 bg-neutral-900 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
 				>
-					Entrar
+					Enter
 				</button>
 			</div>
 		</form>
 
 		<p class="mt-8 text-center text-sm text-neutral-400">
-			¿Sin cuenta?
+			Without an account?
 			<a href="/register" class="text-neutral-900 underline underline-offset-2">Regístrate</a>
 		</p>
 	</div>

@@ -54,7 +54,7 @@
 				{/if}
 			</div>
 			<span class="mt-1 text-xs text-neutral-400">
-				{group.role === 'owner' ? 'propietario' : group.role === 'admin' ? 'admin' : 'miembro'}
+				{group.role === 'owner' ? 'owner' : group.role === 'admin' ? 'admin' : 'member'}
 			</span>
 		</div>
 	</div>
@@ -65,7 +65,7 @@
 			<div class="flex items-center gap-4">
 				<div class="flex-1">
 					<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">
-						Código de invitación
+						Invitation code
 					</p>
 					<p class="mt-1 font-mono text-2xl font-normal tracking-[0.3em] text-neutral-900">
 						{group.inviteCode}
@@ -76,13 +76,13 @@
 					class="flex items-center gap-1.5 border border-neutral-200 px-3 py-2 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-900"
 				>
 					<Copy size={14} />
-					{copied ? '¡Copiado!' : 'Copiar'}
+					{copied ? 'Copied!' : 'Copy'}
 				</button>
 				{#if isOwner}
 					<form method="POST" action="?/regenerateCode" use:enhance>
 						<button
 							type="submit"
-							title="Nuevo código"
+							title="New code"
 							class="border border-neutral-200 p-2 text-neutral-400 hover:border-neutral-400 hover:text-neutral-900"
 						>
 							<ArrowsClockwise size={14} />
@@ -100,14 +100,14 @@
 		class="flex items-center gap-3 border border-neutral-200 px-5 py-4 transition-colors hover:border-neutral-900"
 	>
 		<MagnifyingGlass size={20} weight="light" class="text-neutral-400" />
-		<span class="text-sm text-neutral-700">Buscar libros en este grupo</span>
+		<span class="text-sm text-neutral-700">Search books in this group</span>
 		<span class="ml-auto text-neutral-300">→</span>
 	</a>
 
 	<!-- Tabs -->
 	<div class="border-b border-neutral-100">
 		<nav class="flex gap-6">
-			{#each [{ key: 'shared', label: `Etiquetas (${sharedTagsList.length})` }, { key: 'members', label: `Miembros (${members.length})` }] as tab}
+			{#each [{ key: 'shared', label: `Tags (${sharedTagsList.length})` }, { key: 'members', label: `Members (${members.length})` }] as tab}
 				<button
 					onclick={() => (activeTab = tab.key as 'shared' | 'members')}
 					class="border-b-2 pb-3 text-sm transition-colors
@@ -127,9 +127,7 @@
 			<!-- Mis etiquetas -->
 			{#if myTags.length > 0}
 				<div class="space-y-3">
-					<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">
-						Mis etiquetas
-					</p>
+					<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">My tags</p>
 					<div class="flex flex-wrap gap-2">
 						{#each myTags as tag (tag.id)}
 							<form
@@ -160,7 +158,7 @@
 			<!-- Todas las etiquetas del grupo -->
 			{#if sharedTagsList.length === 0}
 				<p class="py-8 text-center text-sm text-neutral-300">
-					Ningún miembro ha compartido etiquetas todavía.
+					No members have shared any tags yet.
 				</p>
 			{:else}
 				<div class="space-y-3">
@@ -200,7 +198,7 @@
 						<p class="text-xs text-neutral-400">{member.email}</p>
 					</div>
 					<span class="text-xs text-neutral-400">
-						{member.role === 'owner' ? 'propietario' : member.role === 'admin' ? 'admin' : ''}
+						{member.role === 'owner' ? 'owner' : member.role === 'admin' ? 'admin' : ''}
 					</span>
 					{#if isOwnerOrAdmin && member.role !== 'owner'}
 						<form method="POST" action="?/removeMember" use:enhance class="inline">
@@ -209,7 +207,7 @@
 								type="submit"
 								class="text-neutral-200 hover:text-red-400"
 								onclick={(e) => {
-									if (!confirm(`¿Expulsar a ${member.name}?`)) e.preventDefault();
+									if (!confirm(`Remove ${member.name}?`)) e.preventDefault();
 								}}
 							>
 								<X size={14} />
@@ -226,11 +224,11 @@
 				action="?/leave"
 				use:enhance
 				onsubmit={(e) => {
-					if (!confirm('¿Salir de este grupo?')) e.preventDefault();
+					if (!confirm('Leave this group?')) e.preventDefault();
 				}}
 			>
 				<button type="submit" class="text-sm text-neutral-300 hover:text-red-500"
-					>Salir del grupo</button
+					>Leave this group?</button
 				>
 			</form>
 		{/if}

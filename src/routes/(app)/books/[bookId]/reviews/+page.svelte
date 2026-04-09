@@ -41,7 +41,7 @@
 			href="/library"
 			class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"
 		>
-			<ArrowLeft size={16} /> Mi biblioteca
+			<ArrowLeft size={16} /> My library
 		</a>
 		<div class="mt-4 flex items-start gap-4">
 			{#if book.coverUrl}
@@ -59,11 +59,11 @@
 							{reviewStats.averageRating?.toFixed(1)}
 							<span class="text-neutral-300">·</span>
 							{reviewStats.totalReviews}
-							{reviewStats.totalReviews === 1 ? 'reseña' : 'reseñas'}
+							{reviewStats.totalReviews === 1 ? 'review' : 'reviews'}
 						</span>
 					</div>
 				{:else}
-					<p class="mt-2 text-xs text-neutral-400">Sin reseñas todavía</p>
+					<p class="mt-2 text-xs text-neutral-400">There are no reviews for this book yet.</p>
 				{/if}
 			</div>
 		</div>
@@ -73,7 +73,8 @@
 	<div class="space-y-4 border-t border-neutral-100 pt-6">
 		<div class="flex items-center gap-2">
 			<Star size={15} class="text-neutral-400" />
-			<span class="text-xs font-medium tracking-widest text-neutral-500 uppercase">Tu reseña</span>
+			<span class="text-xs font-medium tracking-widest text-neutral-500 uppercase">Your review</span
+			>
 		</div>
 
 		{#if !showReviewForm && !myReview}
@@ -82,7 +83,7 @@
 				onclick={() => (showReviewForm = true)}
 				class="text-sm text-neutral-400 underline underline-offset-2 hover:text-neutral-900"
 			>
-				Escribir una reseña
+				Write a review
 			</button>
 		{/if}
 
@@ -98,7 +99,7 @@
 						name="body"
 						bind:value={reviewBody}
 						rows="3"
-						placeholder="Cuéntanos qué te pareció... (opcional)"
+						placeholder="Tell us what you thought… (optional)"
 						class="w-full border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
 					></textarea>
 					<div class="flex items-center gap-3">
@@ -110,7 +111,7 @@
 							{myReview ? 'Actualizar' : 'Publicar'}
 						</button>
 						{#if reviewSavedOk}
-							<span class="text-xs text-neutral-400">Guardado</span>
+							<span class="text-xs text-neutral-400">Saved</span>
 						{/if}
 						{#if !myReview}
 							<button
@@ -118,7 +119,7 @@
 								onclick={() => (showReviewForm = false)}
 								class="text-sm text-neutral-300 hover:text-neutral-600"
 							>
-								Cancelar
+								Cancel
 							</button>
 						{/if}
 					</div>
@@ -130,11 +131,11 @@
 						action="?/deleteReview"
 						use:enhance
 						onsubmit={(e) => {
-							if (!confirm('¿Eliminar tu reseña?')) e.preventDefault();
+							if (!confirm('Remove your review?')) e.preventDefault();
 						}}
 					>
 						<button type="submit" class="text-xs text-neutral-300 hover:text-red-500">
-							Eliminar reseña
+							Remove review
 						</button>
 					</form>
 				{/if}
@@ -146,7 +147,7 @@
 	{#if reviews.filter((r) => r.userId !== myReview?.userId).length > 0}
 		<div class="space-y-4 border-t border-neutral-100 pt-6">
 			<span class="text-xs font-medium tracking-widest text-neutral-500 uppercase"
-				>Otras reseñas</span
+				>Other reviews</span
 			>
 			{#each reviews as review (review.id)}
 				{#if review.userId !== myReview?.userId}

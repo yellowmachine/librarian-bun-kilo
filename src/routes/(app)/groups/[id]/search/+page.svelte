@@ -54,7 +54,7 @@
 	{/if}
 	{#if form?.loanId}
 		<p class="border border-neutral-900 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900">
-			Solicitud enviada. <a href="/loans/{form.loanId}" class="underline underline-offset-2"
+			Request sent. <a href="/loans/{form.loanId}" class="underline underline-offset-2"
 				>Ver préstamo →</a
 			>
 		</p>
@@ -70,7 +70,7 @@
 			<input
 				type="text"
 				bind:value={searchQuery}
-				placeholder="Título, autor o propietario..."
+				placeholder="Title, author or owner..."
 				onkeydown={(e) => e.key === 'Enter' && applyFilters()}
 				class="w-full border border-neutral-200 py-2 pr-4 pl-9 text-sm focus:border-neutral-900 focus:ring-0"
 			/>
@@ -79,7 +79,7 @@
 			onclick={applyFilters}
 			class="border border-neutral-900 bg-neutral-900 px-5 py-2 text-sm text-white hover:bg-neutral-800"
 		>
-			Buscar
+			Search
 		</button>
 	</div>
 
@@ -112,7 +112,7 @@
 					}}
 					class="text-xs text-neutral-400 hover:text-neutral-700"
 				>
-					limpiar ×
+					clean ×
 				</button>
 			{/if}
 		</div>
@@ -121,25 +121,23 @@
 	<!-- Resultados -->
 	{#if sharedTagsList.length === 0}
 		<div class="flex flex-col items-center py-20 text-center">
-			<p class="text-sm text-neutral-400">Ningún miembro ha compartido etiquetas en este grupo.</p>
+			<p class="text-sm text-neutral-400">No member has shared tags in this group.</p>
 			<a
 				href="/groups/{group.id}"
 				class="mt-3 text-sm text-neutral-900 underline underline-offset-2"
 			>
-				Gestionar etiquetas
+				Manage tags
 			</a>
 		</div>
 	{:else if results.length === 0}
 		<p class="py-12 text-center text-sm text-neutral-300">
-			{query || tagId
-				? 'Sin resultados para los filtros actuales.'
-				: 'Los libros compartidos aparecerán aquí.'}
+			{query || tagId ? 'No results for the current filters.' : 'Shared books will appear here.'}
 		</p>
 	{:else}
 		<div class="space-y-1">
 			<p class="text-xs text-neutral-400">
 				{results.length}
-				{results.length === 1 ? 'libro' : 'libros'}
+				{results.length === 1 ? 'book' : 'books'}
 			</p>
 			<ul class="divide-y divide-neutral-100">
 				{#each results as book (book.userBookId)}
@@ -202,7 +200,7 @@
 											href="/books/{book.bookId}/reviews"
 											class="block text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-700"
 										>
-											Ver todas las reseñas →
+											See all reviews →
 										</a>
 									</div>
 								{/if}
@@ -211,7 +209,7 @@
 									href="/books/{book.bookId}/reviews"
 									class="mt-1 block text-xs text-neutral-300 hover:text-neutral-600"
 								>
-									Sin reseñas · Sé el primero →
+									No reviews · Be the first →
 								</a>
 							{/if}
 							<div class="mt-1.5 flex flex-wrap items-center gap-2">
@@ -238,12 +236,12 @@
 											type="submit"
 											class="border border-neutral-900 bg-neutral-900 px-3 py-1 text-xs text-white hover:bg-neutral-800"
 										>
-											Solicitar
+											Request
 										</button>
 									</form>
 								{/if}
 							{:else}
-								<span class="text-xs text-neutral-300">prestado</span>
+								<span class="text-xs text-neutral-300">lent</span>
 							{/if}
 						</div>
 					</li>

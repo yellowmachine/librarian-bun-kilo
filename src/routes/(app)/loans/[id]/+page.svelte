@@ -23,54 +23,54 @@
 		if (isOwner) {
 			if (s === 'requested')
 				return [
-					{ label: 'Aceptar solicitud', toStatus: 'accepted', variant: 'primary' },
+					{ label: 'Accept request', toStatus: 'accepted', variant: 'primary' },
 					{
-						label: 'Rechazar',
+						label: 'Reject',
 						toStatus: 'rejected',
 						variant: 'danger',
-						confirm: '¿Rechazar esta solicitud?'
+						confirm: 'Reject this request?'
 					}
 				];
 			if (s === 'accepted')
-				return [{ label: 'Marcar como entregado', toStatus: 'active', variant: 'primary' }];
+				return [{ label: 'Mark as delivered', toStatus: 'active', variant: 'primary' }];
 			if (s === 'return_requested')
 				return [
-					{ label: 'Confirmar devolución', toStatus: 'returned', variant: 'primary' },
-					{ label: 'Mantener préstamo', toStatus: 'active', variant: 'ghost' }
+					{ label: 'Confirm return', toStatus: 'returned', variant: 'primary' },
+					{ label: 'keep loan', toStatus: 'active', variant: 'ghost' }
 				];
 		}
 		if (isBorrower) {
 			if (s === 'requested')
 				return [
 					{
-						label: 'Cancelar solicitud',
+						label: 'Cancel the request?',
 						toStatus: 'cancelled',
 						variant: 'danger',
-						confirm: '¿Cancelar?'
+						confirm: '¿Cancel?'
 					}
 				];
 			if (s === 'accepted')
 				return [
 					{
-						label: 'Cancelar',
+						label: 'Cancel',
 						toStatus: 'cancelled',
 						variant: 'danger',
-						confirm: '¿Cancelar el préstamo?'
+						confirm: 'Cancel the loan?'
 					}
 				];
 			if (s === 'active')
-				return [{ label: 'Solicitar devolución', toStatus: 'return_requested', variant: 'ghost' }];
+				return [{ label: 'Request return', toStatus: 'return_requested', variant: 'ghost' }];
 		}
 		return [];
 	});
 
 	const timeline = $derived(() =>
 		[
-			{ label: 'Solicitado', date: loan.requestedAt },
-			{ label: 'Aceptado', date: loan.acceptedAt },
-			{ label: 'Entregado', date: loan.activeAt },
-			{ label: 'Dev. solicitada', date: loan.returnRequestedAt },
-			{ label: 'Devuelto', date: loan.returnedAt }
+			{ label: 'Requested', date: loan.requestedAt },
+			{ label: 'Accepted', date: loan.acceptedAt },
+			{ label: 'Delivered', date: loan.activeAt },
+			{ label: 'Return requested', date: loan.returnRequestedAt },
+			{ label: 'Returned', date: loan.returnedAt }
 		].filter((e) => e.date !== null)
 	);
 

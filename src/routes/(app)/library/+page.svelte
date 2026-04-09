@@ -37,7 +37,7 @@
 	<!-- Cabecera -->
 	<div class="flex items-end justify-between">
 		<div>
-			<h1 class="font-serif text-3xl font-normal text-neutral-900">Mi biblioteca</h1>
+			<h1 class="font-serif text-3xl font-normal text-neutral-900">My library</h1>
 			<p class="mt-1 text-sm text-neutral-400">
 				{userBooks.length}
 				{userBooks.length === 1 ? 'libro' : 'libros'}
@@ -48,7 +48,7 @@
 			class="flex items-center gap-1.5 border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm text-white transition-colors hover:bg-neutral-800"
 		>
 			<Plus size={16} weight="bold" />
-			Añadir
+			Add
 		</a>
 	</div>
 
@@ -78,7 +78,7 @@
 							? 'border-neutral-900 bg-neutral-900 text-white'
 							: 'border-neutral-200 text-neutral-500 hover:border-neutral-400'}"
 					>
-						Todas
+						All
 					</button>
 					{#each allTags() as tag (tag.id)}
 						<button
@@ -97,7 +97,7 @@
 
 		<!-- Grid de libros -->
 		{#if filtered().length === 0}
-			<p class="py-12 text-center text-sm text-neutral-400">Sin resultados.</p>
+			<p class="py-12 text-center text-sm text-neutral-400">Without results.</p>
 		{:else}
 			<BookGrid
 				books={filtered().map((b) => ({
@@ -117,7 +117,7 @@
 			<div class="mb-6 font-serif text-6xl text-neutral-200">·</div>
 			<p class="text-sm text-neutral-400">Tu biblioteca está vacía.</p>
 			<a href="/library/add" class="mt-4 text-sm text-neutral-900 underline underline-offset-2">
-				Añade tu primer libro
+				Add your first book
 			</a>
 		</div>
 	{/if}

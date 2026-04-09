@@ -65,12 +65,12 @@
 			const res = await fetch(`/api/books/search?isbn=${encodeURIComponent(isbn)}`);
 			const data = await res.json();
 			searchResults = data;
-			if (searchResults.length === 0) errorMsg = `Sin resultados para ISBN ${isbn}`;
+			if (searchResults.length === 0) errorMsg = `Without results with ISBN ${isbn}`;
 			else if (searchResults.length === 1) {
 				await selectBook(searchResults[0]);
 			}
 		} catch {
-			errorMsg = 'Error al buscar. Comprueba tu conexión.';
+			errorMsg = 'Search error. Check your connection.';
 		} finally {
 			searching = false;
 		}
@@ -86,9 +86,9 @@
 		try {
 			const res = await fetch(`/api/books/search?q=${encodeURIComponent(manualQuery)}`);
 			searchResults = await res.json();
-			if (searchResults.length === 0) errorMsg = 'Sin resultados.';
+			if (searchResults.length === 0) errorMsg = 'Without results.';
 		} catch {
-			errorMsg = 'Error al buscar.';
+			errorMsg = 'Search error.';
 		} finally {
 			searching = false;
 		}
@@ -116,7 +116,7 @@
 			}
 			goto('/library');
 		} catch {
-			errorMsg = 'Error de red.';
+			errorMsg = 'Network error.';
 			mode = 'confirm';
 		}
 	}
@@ -126,7 +126,7 @@
 	<!-- Cabecera -->
 	<div class="flex items-center gap-3">
 		<a href="/library" class="text-neutral-400 hover:text-neutral-900"><ArrowLeft size={20} /></a>
-		<h1 class="font-serif text-2xl font-normal text-neutral-900">Añadir libro</h1>
+		<h1 class="font-serif text-2xl font-normal text-neutral-900">Add book</h1>
 	</div>
 
 	{#if errorMsg}
@@ -143,7 +143,7 @@
 				class="group flex flex-col items-center gap-4 border border-neutral-200 p-8 transition-colors hover:border-neutral-900"
 			>
 				<Barcode size={40} weight="thin" class="text-neutral-400 group-hover:text-neutral-900" />
-				<span class="text-sm text-neutral-600">Escanear ISBN</span>
+				<span class="text-sm text-neutral-600">ISBN scan</span>
 			</button>
 			<button
 				onclick={() => (mode = 'manual')}
@@ -154,7 +154,7 @@
 					weight="thin"
 					class="text-neutral-400 group-hover:text-neutral-900"
 				/>
-				<span class="text-sm text-neutral-600">Buscar manual</span>
+				<span class="text-sm text-neutral-600">Manual Search</span>
 			</button>
 		</div>
 
@@ -182,7 +182,7 @@
 				type="submit"
 				class="border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
 			>
-				Buscar
+				Search
 			</button>
 		</form>
 
@@ -195,7 +195,7 @@
 					onclick={() => (mode = 'manual')}
 					class="text-xs text-neutral-900 underline underline-offset-2"
 				>
-					Nueva búsqueda
+					New search
 				</button>
 			</div>
 			{#if searching}
@@ -239,7 +239,7 @@
 			{#if descriptionVisible}
 				<div class="space-y-2">
 					<span class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
-						>Sinopsis</span
+						>Synopsis</span
 					>
 					<p class="text-sm leading-relaxed text-neutral-600">
 						{descriptionVisible}{#if descriptionTruncated && !descriptionExpanded}…{/if}
@@ -250,7 +250,7 @@
 							onclick={() => (descriptionExpanded = !descriptionExpanded)}
 							class="text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-700"
 						>
-							{descriptionExpanded ? 'Leer menos' : 'Leer más'}
+							{descriptionExpanded ? 'Less' : 'More'}
 						</button>
 					{/if}
 				</div>
@@ -261,7 +261,7 @@
 					for="notes"
 					class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
 				>
-					Notas <span class="tracking-normal normal-case">(opcional)</span>
+					Notes <span class="tracking-normal normal-case">(opcional)</span>
 				</label>
 				<textarea
 					id="notes"
@@ -277,13 +277,13 @@
 					onclick={() => (mode = 'results')}
 					class="flex-1 border border-neutral-200 py-2.5 text-sm text-neutral-600 hover:border-neutral-400"
 				>
-					Cancelar
+					Cancel
 				</button>
 				<button
 					onclick={addBook}
 					class="flex-1 border border-neutral-900 bg-neutral-900 py-2.5 text-sm text-white hover:bg-neutral-800"
 				>
-					Añadir a mi biblioteca
+					Add to my library
 				</button>
 			</div>
 		</div>

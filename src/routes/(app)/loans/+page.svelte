@@ -65,8 +65,8 @@
 				<ArrowsLeftRight size={40} weight="thin" class="mb-4 text-neutral-200" />
 				<p class="text-sm text-neutral-400">
 					{role === 'borrower'
-						? 'No has solicitado ningún préstamo.'
-						: 'Nadie te ha pedido ningún libro.'}
+						? 'You have not applied for any loan.'
+						: 'No one has asked you for any books.'}
 				</p>
 			</div>
 		{:else}

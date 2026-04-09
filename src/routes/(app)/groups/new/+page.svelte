@@ -22,7 +22,7 @@
 				for="name"
 				class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
 			>
-				Nombre del grupo
+				Group name
 			</label>
 			<input
 				id="name"
@@ -40,7 +40,7 @@
 				for="description"
 				class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
 			>
-				Descripción <span class="tracking-normal text-neutral-400 normal-case">(opcional)</span>
+				Description <span class="tracking-normal text-neutral-400 normal-case">(opcional)</span>
 			</label>
 			<textarea
 				id="description"
@@ -55,7 +55,7 @@
 				type="submit"
 				class="w-full border border-neutral-900 bg-neutral-900 py-2.5 text-sm text-white hover:bg-neutral-800"
 			>
-				Crear grupo
+				Create group
 			</button>
 		</div>
 	</form>
