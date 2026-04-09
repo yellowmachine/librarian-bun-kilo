@@ -175,7 +175,7 @@
 									{st.tagName}
 								</span>
 								<span class="text-sm text-neutral-600">{st.ownerName}</span>
-								<span class="ml-auto text-xs text-neutral-300">{st.bookCount} libros</span>
+								<span class="ml-auto text-xs text-neutral-300">{st.bookCount} books</span>
 							</li>
 						{/each}
 					</ul>

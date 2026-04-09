@@ -40,7 +40,7 @@
 			<h1 class="font-serif text-3xl font-normal text-neutral-900">My library</h1>
 			<p class="mt-1 text-sm text-neutral-400">
 				{userBooks.length}
-				{userBooks.length === 1 ? 'libro' : 'libros'}
+				{userBooks.length === 1 ? 'book' : 'books'}
 			</p>
 		</div>
 		<a
@@ -63,7 +63,7 @@
 				<input
 					type="search"
 					bind:value={search}
-					placeholder="Buscar por título o autor..."
+					placeholder="Search by title or author..."
 					class="w-full border border-neutral-200 bg-neutral-50 py-2 pr-4 pl-9 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:bg-white focus:ring-0"
 				/>
 			</div>
@@ -115,7 +115,7 @@
 		<!-- Estado vacío -->
 		<div class="flex flex-col items-center justify-center py-24 text-center">
 			<div class="mb-6 font-serif text-6xl text-neutral-200">·</div>
-			<p class="text-sm text-neutral-400">Tu biblioteca está vacía.</p>
+			<p class="text-sm text-neutral-400">Your library is empty.</p>
 			<a href="/library/add" class="mt-4 text-sm text-neutral-900 underline underline-offset-2">
 				Add your first book
 			</a>

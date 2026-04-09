@@ -32,13 +32,13 @@
 
 <div class="space-y-8">
 	<div>
-		<h1 class="font-serif text-3xl font-normal text-neutral-900">Préstamos</h1>
+		<h1 class="font-serif text-3xl font-normal text-neutral-900">Loans</h1>
 	</div>
 
 	<!-- Tabs -->
 	<div class="border-b border-neutral-100">
 		<nav class="flex gap-6">
-			{#each [{ key: 'borrower', label: 'Libros que pido', count: pendingBorrower }, { key: 'owner', label: 'Libros que presto', count: pendingOwner }] as tab}
+			{#each [{ key: 'borrower', label: 'Books I request', count: pendingBorrower }, { key: 'owner', label: 'Books I lend', count: pendingOwner }] as tab}
 				<button
 					onclick={() => (activeTab = tab.key as 'borrower' | 'owner')}
 					class="flex items-center gap-2 border-b-2 pb-3 text-sm transition-colors

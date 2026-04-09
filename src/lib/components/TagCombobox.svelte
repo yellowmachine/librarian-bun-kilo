@@ -114,13 +114,13 @@
 				type="submit"
 				class="border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs text-white hover:bg-neutral-800"
 			>
-				Crear
+				Create
 			</button>
 			<button
 				type="button"
 				onclick={cancelCreate}
 				class="text-neutral-300 hover:text-neutral-600"
-				aria-label="Cancelar"
+				aria-label="Cancel"
 			>
 				×
 			</button>
@@ -131,7 +131,7 @@
 			bind:this={inputEl}
 			bind:value={inputValue}
 			type="text"
-			placeholder="Buscar o crear etiqueta..."
+			placeholder="Search or create tag..."
 			autocomplete="off"
 			onfocus={openDropdown}
 			oninput={openDropdown}
@@ -183,7 +183,7 @@
 							class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50"
 						>
 							<span class="text-neutral-300">+</span>
-							Crear <strong class="text-neutral-700">«{inputValue.trim()}»</strong>
+							Create <strong class="text-neutral-700">«{inputValue.trim()}»</strong>
 						</button>
 					</li>
 				{/if}

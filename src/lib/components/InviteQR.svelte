@@ -23,7 +23,7 @@
 		class="flex items-center gap-1.5 border border-neutral-200 px-3 py-2 text-xs text-neutral-500 transition-colors hover:border-neutral-400 hover:text-neutral-900"
 	>
 		<QrCode size={14} />
-		{visible ? 'Ocultar QR' : 'Mostrar QR'}
+		{visible ? 'Hide QR' : 'Show QR'}
 	</button>
 
 	{#if visible}
@@ -32,7 +32,7 @@
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 				{@html qrSvg}
 			</div>
-			<p class="text-center text-xs text-neutral-400">Escanea para unirte al grupo</p>
+			<p class="text-center text-xs text-neutral-400">Scan to join the group</p>
 			<p class="text-center font-mono text-xs break-all text-neutral-300">{joinUrl}</p>
 		</div>
 	{/if}

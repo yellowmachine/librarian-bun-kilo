@@ -52,7 +52,7 @@
 				(err: unknown) => {
 					if (err) {
 						const msg = err instanceof Error ? err.message : String(err);
-						errorMsg = `No se pudo acceder a la cámara: ${msg}`;
+						errorMsg = `Could not access the camera: ${msg}`;
 						onError?.(errorMsg);
 						return;
 					}
@@ -79,7 +79,7 @@
 			});
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
-			errorMsg = `Error al iniciar escáner: ${msg}`;
+			errorMsg = `Error starting scanner: ${msg}`;
 			onError?.(errorMsg);
 		}
 	}
@@ -141,7 +141,7 @@
 			onclick={stop}
 			class="w-full border border-neutral-200 py-2.5 text-sm text-neutral-600 hover:border-neutral-400"
 		>
-			Cancelar
+			Cancel
 		</button>
 	{/if}
 </div>

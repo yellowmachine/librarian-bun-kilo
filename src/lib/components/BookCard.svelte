@@ -136,7 +136,7 @@
 					rel="noopener noreferrer"
 					class="inline-flex items-center gap-1 text-xs text-neutral-400 underline underline-offset-2 transition-colors hover:text-neutral-700"
 				>
-					Ver en Open Library ↗
+					View on Open Library ↗
 				</a>
 			{/if}
 		</div>

@@ -46,7 +46,7 @@
 			<ArrowLeft size={16} />
 			{group.name}
 		</a>
-		<h1 class="mt-2 font-serif text-2xl font-normal text-neutral-900">Buscar libros</h1>
+		<h1 class="mt-2 font-serif text-2xl font-normal text-neutral-900">Search books</h1>
 	</div>
 
 	{#if form?.loanError}

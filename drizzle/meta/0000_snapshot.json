@@ -1,5 +1,5 @@
 {
-  "id": "13f06bb1-147b-4454-be3d-228ee276c374",
+  "id": "a19d27ee-6d12-436c-a367-fddd58ae9220",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -420,14 +420,14 @@
           ],
           "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
-        "group_members_insert": {
-          "name": "group_members_insert",
+        "group_members_insert_self": {
+          "name": "group_members_insert_self",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
             "scholio_app"
           ],
-          "withCheck": "exists (\n\t\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\t\twhere gm.group_id = \"librarian\".\"group_members\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+          "withCheck": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
         "group_members_delete": {
           "name": "group_members_delete",
@@ -1407,6 +1407,15 @@
             "scholio_app"
           ],
           "using": "\"librarian\".\"user_profile\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "user_profile_insert": {
+          "name": "user_profile_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "scholio_app"
+          ],
+          "withCheck": "\"librarian\".\"user_profile\".\"user_id\" = current_setting('app.current_user_id', true)"
         }
       },
       "checkConstraints": {},

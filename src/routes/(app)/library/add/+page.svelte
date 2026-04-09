@@ -174,7 +174,7 @@
 			<input
 				type="text"
 				bind:value={manualQuery}
-				placeholder="Título, autor o ISBN..."
+				placeholder="Title, author or ISBN..."
 				autofocus
 				class="min-w-0 flex-1 border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
 			/>
@@ -190,7 +190,7 @@
 	{:else if mode === 'results'}
 		<div>
 			<div class="mb-4 flex items-center justify-between">
-				<span class="text-xs tracking-widest text-neutral-400 uppercase">Resultados</span>
+				<span class="text-xs tracking-widest text-neutral-400 uppercase">Results</span>
 				<button
 					onclick={() => (mode = 'manual')}
 					class="text-xs text-neutral-900 underline underline-offset-2"
@@ -267,7 +267,7 @@
 					id="notes"
 					bind:value={notes}
 					rows="2"
-					placeholder="Edición, estado del libro..."
+					placeholder="Edition, book condition..."
 					class="mt-1.5 w-full border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
 				></textarea>
 			</div>

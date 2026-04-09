@@ -18,7 +18,7 @@ import {
 export const librarianSchema = pgSchema('librarian');
 
 import { user } from './auth.schema';
-export { user } from './auth.schema';
+//export { user } from './auth.schema';
 
 // ─── App role ─────────────────────────────────────────────────────────────────
 // Rol de BD para queries de la aplicación. El superuser (root) tiene BYPASSRLS
@@ -309,16 +309,22 @@ export const groupMembers = librarianSchema.table(
     // Solo owners/admins pueden añadir miembros.
     // El flujo joinGroupByCode corre como superuser (bypass RLS) por lo que
     // no necesita pasar por esta política.
-    pgPolicy('group_members_insert', {
+    pgPolicy('group_members_insert_self', {
+      for: 'insert',
+      to: appUser,
+      withCheck: sql`${table.userId} = ${currentUserId}`
+    }),
+    /*pgPolicy('group_members_insert', {
       for: 'insert',
       to: appUser,
       withCheck: sql`exists (
-					select 1 from "librarian".group_members gm
-					where gm.group_id = ${table.groupId}
-					  and gm.user_id = ${currentUserId}
-					  and gm.role in ('owner', 'admin')
-				)`
+          select 1 from "librarian".group_members gm
+          where gm.group_id = ${table.groupId}
+            and gm.user_id = ${currentUserId}
+            and gm.role in ('owner', 'admin')
+        )`
     }),
+    */
     pgPolicy('group_members_delete', {
       for: 'delete',
       to: appUser,

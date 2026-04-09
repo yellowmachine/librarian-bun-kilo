@@ -67,9 +67,9 @@
 	{#if userGroups.length === 0}
 		<div class="flex flex-col items-center justify-center py-24 text-center">
 			<Users size={48} weight="thin" class="mb-4 text-neutral-200" />
-			<p class="text-sm text-neutral-400">Todavía no perteneces a ningún grupo.</p>
+			<p class="text-sm text-neutral-400">You don’t belong to any groups yet.</p>
 			<div class="mt-4 flex gap-4 text-sm">
-				<a href="/groups/new" class="text-neutral-900 underline underline-offset-2">Crear grupo</a>
+				<a href="/groups/new" class="text-neutral-900 underline underline-offset-2">Create group</a>
 				<span class="text-neutral-200">|</span>
 				<button
 					onclick={() => (showJoinForm = true)}

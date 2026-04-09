@@ -89,7 +89,7 @@
 		href="/loans"
 		class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"
 	>
-		<ArrowLeft size={16} /> Préstamos
+		<ArrowLeft size={16} /> Loans
 	</a>
 
 	{#if form?.error}

@@ -11,9 +11,9 @@
 	}
 
 	const NAV = [
-		{ href: '/library', label: 'Biblioteca', icon: BookOpen },
-		{ href: '/groups', label: 'Grupos', icon: Books },
-		{ href: '/loans', label: 'Préstamos', icon: ArrowsLeftRight }
+		{ href: '/library', label: 'Library', icon: BookOpen },
+		{ href: '/groups', label: 'Groups', icon: Books },
+		{ href: '/loans', label: 'Loans', icon: ArrowsLeftRight }
 	];
 </script>
 
@@ -64,7 +64,7 @@
 				<form method="POST" action="/logout">
 					<button
 						type="submit"
-						title="Cerrar sesión"
+						title="Close session"
 						class="flex items-center rounded-md p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
 					>
 						<SignOut size={18} />

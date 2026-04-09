@@ -125,7 +125,7 @@
 				name="notes"
 				bind:value={notes}
 				rows="3"
-				placeholder="Edición, estado del libro..."
+				placeholder="Edition, book condition..."
 				class="mt-1.5 w-full border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
 			></textarea>
 		</div>

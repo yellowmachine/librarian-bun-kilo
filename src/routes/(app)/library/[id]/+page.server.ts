@@ -6,142 +6,142 @@ import { getUserBook, updateUserBook, removeFromLibrary } from '$lib/server/book
 import { withRLS } from '$lib/server/db/rls';
 import { tags, userBookTags, loans } from '$lib/server/db/schema';
 import {
-	getMyReview,
-	getBookReviews,
-	getBookReviewStats,
-	upsertReview,
-	deleteReview
+  getMyReview,
+  getBookReviews,
+  getBookReviewStats,
+  upsertReview,
+  deleteReview
 } from '$lib/server/reviews';
 
 export const load = async ({ locals, params }: RequestEvent) => {
-	const book = await getUserBook(locals.user!.id, params.id!);
-	if (!book) error(404, 'Libro no encontrado en tu biblioteca');
+  const book = await getUserBook(locals.user!.id, params.id!);
+  if (!book) error(404, 'Book not found in your library');
 
-	const [userTags, myReview, reviews, reviewStats] = await Promise.all([
-		withRLS(locals.user!.id, (tx) =>
-			tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
-		),
-		getMyReview(locals.user!.id, book.bookId),
-		getBookReviews(locals.user!.id, book.bookId),
-		getBookReviewStats(locals.user!.id, book.bookId)
-	]);
+  const [userTags, myReview, reviews, reviewStats] = await Promise.all([
+    withRLS(locals.user!.id, (tx) =>
+      tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
+    ),
+    getMyReview(locals.user!.id, book.bookId),
+    getBookReviews(locals.user!.id, book.bookId),
+    getBookReviewStats(locals.user!.id, book.bookId)
+  ]);
 
-	return { book, userTags, myReview, reviews, reviewStats };
+  return { book, userTags, myReview, reviews, reviewStats };
 };
 
 export const actions = {
-	// Actualizar notas y disponibilidad
-	update: async ({ locals, params, request }: RequestEvent) => {
-		const data = await request.formData();
-		const notes = data.get('notes') as string | null;
-		const isAvailable = data.get('isAvailable') === 'true';
+  // Actualizar notas y disponibilidad
+  update: async ({ locals, params, request }: RequestEvent) => {
+    const data = await request.formData();
+    const notes = data.get('notes') as string | null;
+    const isAvailable = data.get('isAvailable') === 'true';
 
-		await updateUserBook(locals.user!.id, params.id!, {
-			notes: notes ?? undefined,
-			isAvailable
-		});
+    await updateUserBook(locals.user!.id, params.id!, {
+      notes: notes ?? undefined,
+      isAvailable
+    });
 
-		return { success: true };
-	},
+    return { success: true };
+  },
 
-	// Crear etiqueta nueva y asignarla al libro
-	createTag: async ({ locals, params, request }: RequestEvent) => {
-		const data = await request.formData();
-		const name = (data.get('name') as string)?.trim();
-		const color = (data.get('color') as string)?.trim() || null;
+  // Crear etiqueta nueva y asignarla al libro
+  createTag: async ({ locals, params, request }: RequestEvent) => {
+    const data = await request.formData();
+    const name = (data.get('name') as string)?.trim();
+    const color = (data.get('color') as string)?.trim() || null;
 
-		if (!name) return fail(400, { error: 'El nombre es obligatorio' });
+    if (!name) return fail(400, { error: 'Name is required' });
 
-		const tagId = nanoid();
-		await withRLS(locals.user!.id, async (tx) => {
-			await tx.insert(tags).values({ id: tagId, userId: locals.user!.id, name, color });
-			await tx.insert(userBookTags).values({ userBookId: params.id!, tagId });
-		});
+    const tagId = nanoid();
+    await withRLS(locals.user!.id, async (tx) => {
+      await tx.insert(tags).values({ id: tagId, userId: locals.user!.id, name, color });
+      await tx.insert(userBookTags).values({ userBookId: params.id!, tagId });
+    });
 
-		return { success: true };
-	},
+    return { success: true };
+  },
 
-	// Asignar etiqueta existente al libro
-	addTag: async ({ locals, params, request }: RequestEvent) => {
-		const data = await request.formData();
-		const tagId = data.get('tagId') as string;
-		if (!tagId) return fail(400, { error: 'tagId requerido' });
+  // Asignar etiqueta existente al libro
+  addTag: async ({ locals, params, request }: RequestEvent) => {
+    const data = await request.formData();
+    const tagId = data.get('tagId') as string;
+    if (!tagId) return fail(400, { error: 'tagId is required' });
 
-		await withRLS(locals.user!.id, (tx) =>
-			tx.insert(userBookTags).values({ userBookId: params.id!, tagId }).onConflictDoNothing()
-		);
-		return { success: true };
-	},
+    await withRLS(locals.user!.id, (tx) =>
+      tx.insert(userBookTags).values({ userBookId: params.id!, tagId }).onConflictDoNothing()
+    );
+    return { success: true };
+  },
 
-	// Quitar etiqueta del libro
-	removeTag: async ({ locals, params, request }: RequestEvent) => {
-		const data = await request.formData();
-		const tagId = data.get('tagId') as string;
-		if (!tagId) return fail(400, { error: 'tagId requerido' });
+  // Quitar etiqueta del libro
+  removeTag: async ({ locals, params, request }: RequestEvent) => {
+    const data = await request.formData();
+    const tagId = data.get('tagId') as string;
+    if (!tagId) return fail(400, { error: 'tagId is required' });
 
-		await withRLS(locals.user!.id, (tx) =>
-			tx
-				.delete(userBookTags)
-				.where(and(eq(userBookTags.userBookId, params.id!), eq(userBookTags.tagId, tagId)))
-		);
-		return { success: true };
-	},
+    await withRLS(locals.user!.id, (tx) =>
+      tx
+        .delete(userBookTags)
+        .where(and(eq(userBookTags.userBookId, params.id!), eq(userBookTags.tagId, tagId)))
+    );
+    return { success: true };
+  },
 
-	// Guardar (crear o actualizar) reseña propia
-	saveReview: async ({ locals, params, request }: RequestEvent) => {
-		const book = await getUserBook(locals.user!.id, params.id!);
-		if (!book) return fail(404, { reviewError: 'Libro no encontrado' });
+  // Guardar (crear o actualizar) reseña propia
+  saveReview: async ({ locals, params, request }: RequestEvent) => {
+    const book = await getUserBook(locals.user!.id, params.id!);
+    if (!book) return fail(404, { reviewError: 'Book not found.' });
 
-		const data = await request.formData();
-		const ratingRaw = data.get('rating') as string;
-		const body = (data.get('body') as string | null)?.trim() || undefined;
+    const data = await request.formData();
+    const ratingRaw = data.get('rating') as string;
+    const body = (data.get('body') as string | null)?.trim() || undefined;
 
-		const rating = parseInt(ratingRaw, 10);
-		if (!rating || rating < 1 || rating > 5) {
-			return fail(400, { reviewError: 'La puntuación debe ser entre 1 y 5 estrellas' });
-		}
+    const rating = parseInt(ratingRaw, 10);
+    if (!rating || rating < 1 || rating > 5) {
+      return fail(400, { reviewError: 'The rating must be between 1 and 5 stars' });
+    }
 
-		try {
-			await upsertReview(locals.user!.id, book.bookId, { rating, body });
-		} catch (e) {
-			return fail(400, { reviewError: e instanceof Error ? e.message : 'Error al guardar' });
-		}
+    try {
+      await upsertReview(locals.user!.id, book.bookId, { rating, body });
+    } catch (e) {
+      return fail(400, { reviewError: e instanceof Error ? e.message : 'Saving error.' });
+    }
 
-		return { reviewSaved: true };
-	},
+    return { reviewSaved: true };
+  },
 
-	// Eliminar reseña propia
-	deleteReview: async ({ locals, params }: RequestEvent) => {
-		const book = await getUserBook(locals.user!.id, params.id!);
-		if (!book) return fail(404, { reviewError: 'Libro no encontrado' });
+  // Eliminar reseña propia
+  deleteReview: async ({ locals, params }: RequestEvent) => {
+    const book = await getUserBook(locals.user!.id, params.id!);
+    if (!book) return fail(404, { reviewError: 'Book not found.' });
 
-		await deleteReview(locals.user!.id, book.bookId);
-		return { reviewDeleted: true };
-	},
+    await deleteReview(locals.user!.id, book.bookId);
+    return { reviewDeleted: true };
+  },
 
-	// Eliminar libro de la biblioteca
-	remove: async ({ locals, params }: RequestEvent) => {
-		// Verificar que no hay préstamos activos antes de eliminar
-		// (la FK onDelete:restrict lanzaría un error de DB sin este guard)
-		const activeLoans = await withRLS(locals.user!.id, (tx) =>
-			tx
-				.select({ id: loans.id })
-				.from(loans)
-				.where(
-					and(
-						eq(loans.userBookId, params.id!),
-						inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
-					)
-				)
-		);
+  // Eliminar libro de la biblioteca
+  remove: async ({ locals, params }: RequestEvent) => {
+    // Verificar que no hay préstamos activos antes de eliminar
+    // (la FK onDelete:restrict lanzaría un error de DB sin este guard)
+    const activeLoans = await withRLS(locals.user!.id, (tx) =>
+      tx
+        .select({ id: loans.id })
+        .from(loans)
+        .where(
+          and(
+            eq(loans.userBookId, params.id!),
+            inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+          )
+        )
+    );
 
-		if (activeLoans.length > 0) {
-			return fail(400, {
-				error: 'No puedes eliminar este libro porque tiene un préstamo en curso.'
-			});
-		}
+    if (activeLoans.length > 0) {
+      return fail(400, {
+        error: 'You can’t remove this book because it has an active loan.'
+      });
+    }
 
-		await removeFromLibrary(locals.user!.id, params.id!);
-		return { removed: true };
-	}
+    await removeFromLibrary(locals.user!.id, params.id!);
+    return { removed: true };
+  }
 };
