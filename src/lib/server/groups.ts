@@ -325,17 +325,21 @@ export async function getSharedTagsInGroup(
 		.innerJoin(user, eq(sharedTags.sharedBy, user.id))
 		.where(eq(sharedTags.groupId, groupId));
 
-	// Contar libros por etiqueta compartida
-	const result: SharedTagWithBooks[] = [];
-	for (const row of rows) {
-		const bookCount = await db
-			.select({ id: userBookTags.userBookId })
+	// Contar libros por etiqueta compartida en una sola query
+	const tagIds = rows.map((r) => r.tagId);
+	const allBookTags = tagIds.length > 0
+		? await db
+			.select({ tagId: userBookTags.tagId })
 			.from(userBookTags)
-			.where(eq(userBookTags.tagId, row.tagId));
+			.where(inArray(userBookTags.tagId, tagIds))
+		: [];
 
-		result.push({ ...row, bookCount: bookCount.length });
+	const bookCountMap = new Map<string, number>();
+	for (const bt of allBookTags) {
+		bookCountMap.set(bt.tagId, (bookCountMap.get(bt.tagId) ?? 0) + 1);
 	}
-	return result;
+
+	return rows.map((row) => ({ ...row, bookCount: bookCountMap.get(row.tagId) ?? 0 }));
 }
 
 // ─── Etiquetas propias del usuario que puede compartir en un grupo ────────────
@@ -424,34 +428,43 @@ export async function searchBooksInGroup(
 			filtered = detailRows.filter(
 				(r) =>
 					r.title.toLowerCase().includes(q) ||
-					(r.authors ?? []).some((a) => a.toLowerCase().includes(q)) ||
+					(r.authors ?? []).some((a: string) => a.toLowerCase().includes(q)) ||
 					r.ownerName.toLowerCase().includes(q)
 			);
 		}
 
-		// 5. Obtener etiquetas de cada libro (solo las compartidas en este grupo)
+		// 5. Obtener etiquetas de todos los libros en una sola query y agrupar en JS
 		const sharedTagIdSet = new Set(sharedTagRows.map((r) => r.tagId));
-		const result: GroupBookResult[] = [];
+		const filteredIds = filtered.map((r) => r.userBookId);
 
-		for (const row of filtered) {
-			const bookTagRows = await tx
-				.select({ id: tags.id, name: tags.name, color: tags.color })
+		const allBookTagRows = filteredIds.length > 0
+			? await tx
+				.select({
+					userBookId: userBookTags.userBookId,
+					id: tags.id,
+					name: tags.name,
+					color: tags.color
+				})
 				.from(userBookTags)
 				.innerJoin(tags, eq(userBookTags.tagId, tags.id))
 				.where(
 					and(
-						eq(userBookTags.userBookId, row.userBookId),
+						inArray(userBookTags.userBookId, filteredIds),
 						inArray(userBookTags.tagId, [...sharedTagIdSet])
 					)
-				);
+				)
+			: [];
 
-			result.push({
-				...row,
-				authors: row.authors ?? [],
-				tags: bookTagRows
-			});
+		const tagsMap = new Map<string, { id: string; name: string; color: string | null }[]>();
+		for (const bt of allBookTagRows) {
+			if (!tagsMap.has(bt.userBookId)) tagsMap.set(bt.userBookId, []);
+			tagsMap.get(bt.userBookId)!.push({ id: bt.id, name: bt.name, color: bt.color });
 		}
 
-		return result;
+		return filtered.map((row) => ({
+			...row,
+			authors: row.authors ?? [],
+			tags: tagsMap.get(row.userBookId) ?? []
+		}));
 	});
 }

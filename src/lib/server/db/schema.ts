@@ -17,8 +17,8 @@ import {
 // en 'public', que es el schema por defecto de better-auth.
 export const librarianSchema = pgSchema('librarian');
 
-//export * from './auth.schema';
 import { user } from './auth.schema';
+export { user } from './auth.schema';
 
 // ─── App role ─────────────────────────────────────────────────────────────────
 // Rol de BD para queries de la aplicación. El superuser (root) tiene BYPASSRLS
