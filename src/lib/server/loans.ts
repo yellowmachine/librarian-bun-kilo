@@ -55,11 +55,11 @@ export async function requestLoan(
       .from(userBooks)
       .where(eq(userBooks.id, userBookId));
 
-    if (ubRows.length === 0) throw new Error(‘Book not found’);
+    if (ubRows.length === 0) throw new Error('Book not found');
     const { userId: ownerId, isAvailable } = ubRows[0];
 
-    if (!isAvailable) throw new Error(‘Book is not available’);
-    if (ownerId === borrowerId) throw new Error("You can’t request your own book.");
+    if (!isAvailable) throw new Error('Book is not available');
+    if (ownerId === borrowerId) throw new Error("You can't request your own book.");
 
     // Check for existing active/pending loan (loans are visible to both parties via RLS)
     const existing = await tx
@@ -68,10 +68,10 @@ export async function requestLoan(
       .where(
         and(
           eq(loans.userBookId, userBookId),
-          inArray(loans.status, [‘requested’, ‘accepted’, ‘active’])
+          inArray(loans.status, ['requested', 'accepted', 'active'])
         )
       );
-    if (existing.length > 0) throw new Error(‘There is already an active request for this book.’);
+    if (existing.length > 0) throw new Error('There is already an active request for this book.');
 
     const id = nanoid();
     await tx.insert(loans).values({
@@ -79,7 +79,7 @@ export async function requestLoan(
       userBookId,
       borrowerId,
       ownerId,
-      status: ‘requested’,
+      status: 'requested',
       notes: notes ?? null
     });
 
