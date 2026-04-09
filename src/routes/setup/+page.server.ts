@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import { db } from '$lib/server/db/index';
-import { user } from '$lib/server/db/schema';
+import { user } from '$lib/server/db/auth.schema';
 import { auth } from '$lib/server/auth';
 
 // Si ya hay usuarios, esta ruta no debe ser accesible

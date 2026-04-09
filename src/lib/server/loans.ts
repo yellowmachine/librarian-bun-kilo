@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import { eq, and, or, inArray } from 'drizzle-orm';
 import { db } from './db/index';
 import { loans, userBooks, books } from './db/schema';
+import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -94,8 +95,6 @@ export async function getUserLoans(userId: string): Promise<{
   asOwner: LoanWithDetails[];
   asBorrower: LoanWithDetails[];
 }> {
-  const { user } = await import('./db/schema');
-
   const rows = await withRLS(userId, async (tx) => {
     // Dos queries separadas porque Drizzle no soporta bien self-joins con alias
     const ownerLoans = await tx
@@ -150,7 +149,6 @@ export async function getUserLoans(userId: string): Promise<{
   });
 
   // Resolver nombres de usuarios implicados
-  const { user: userTable } = await import('./db/schema');
   const allUserIds = [
     ...new Set([
       ...rows.ownerLoans.map((r) => r.borrowerId),
@@ -161,18 +159,18 @@ export async function getUserLoans(userId: string): Promise<{
   const userRows =
     allUserIds.length > 0
       ? await db
-        .select({ id: userTable.id, name: userTable.name, email: userTable.email })
-        .from(userTable)
-        .where(inArray(userTable.id, allUserIds))
+        .select({ id: user.id, name: user.name, email: user.email })
+        .from(user)
+        .where(inArray(user.id, allUserIds))
       : [];
 
   const userMap = new Map(userRows.map((u) => [u.id, u]));
 
   // Datos del propio usuario
   const selfRows = await db
-    .select({ id: userTable.id, name: userTable.name, email: userTable.email })
-    .from(userTable)
-    .where(eq(userTable.id, userId));
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(user)
+    .where(eq(user.id, userId));
   const self = selfRows[0] ?? { id: userId, name: 'Tú', email: '' };
 
   function enrich(row: (typeof rows.ownerLoans)[0], asOwner: boolean): LoanWithDetails {
@@ -198,7 +196,6 @@ export async function getUserLoans(userId: string): Promise<{
 // ─── Obtener préstamo por ID ──────────────────────────────────────────────────
 
 export async function getLoan(userId: string, loanId: string): Promise<LoanWithDetails | null> {
-  const { user: userTable } = await import('./db/schema');
 
   const rows = await withRLS(userId, (tx) =>
     tx
@@ -231,9 +228,9 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
 
   const involvedIds = [...new Set([row.borrowerId, row.ownerId])];
   const userRows = await db
-    .select({ id: userTable.id, name: userTable.name, email: userTable.email })
-    .from(userTable)
-    .where(inArray(userTable.id, involvedIds));
+    .select({ id: user.id, name: user.name, email: user.email })
+    .from(user)
+    .where(inArray(user.id, involvedIds));
 
   const userMap = new Map(userRows.map((u) => [u.id, u]));
   const borrower = userMap.get(row.borrowerId) ?? { name: '?', email: '' };

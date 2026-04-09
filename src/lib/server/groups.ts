@@ -10,6 +10,7 @@ import {
   books,
   userBookTags
 } from './db/schema';
+import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -67,31 +68,22 @@ export async function createGroup(
   const id = nanoid();
   const inviteCode = nanoid(8).toUpperCase();
 
-  console.log(id, inviteCode);
-
-  // Insertar el grupo con RLS (la política valida que createdBy = currentUser)
-  await withRLS(userId, (tx) =>
-    tx.insert(groups).values({
+  await withRLS(userId, async (tx) => {
+    await tx.insert(groups).values({
       id,
       name: data.name,
       description: data.description ?? null,
       inviteCode,
       createdBy: userId
-    })
-  );
-
-  console.log("after");
-  // Añadir al creador como owner sin RLS: en el momento de insertar el primer
-  // miembro todavía no hay ningún admin en el grupo, así que la política
-  // group_members_insert (que requiere ser admin preexistente) bloquearía
-  // esta operación si se hiciera con app_user. El superuser bypasea RLS.
-  await db.insert(groupMembers).values({
-    groupId: id,
-    userId,
-    role: 'owner'
+    });
+    // group_members_insert_self solo exige userId = currentUserId,
+    // por lo que no hace falta bypass de RLS para el primer miembro.
+    await tx.insert(groupMembers).values({
+      groupId: id,
+      userId,
+      role: 'owner'
+    });
   });
-
-  console.log("after2", id);
 
   return id;
 }
@@ -99,8 +91,6 @@ export async function createGroup(
 // ─── Listar grupos del usuario ────────────────────────────────────────────────
 
 export async function getUserGroups(userId: string): Promise<GroupWithRole[]> {
-  // Importar user desde auth schema para el join
-  const { user } = await import('./db/schema');
 
   return withRLS(userId, async (tx) => {
     // Obtener membresías del usuario
@@ -170,7 +160,6 @@ export async function getGroup(userId: string, groupId: string): Promise<GroupWi
 // ─── Listar miembros de un grupo ──────────────────────────────────────────────
 
 export async function getGroupMembers(userId: string, groupId: string): Promise<GroupMember[]> {
-  const { user } = await import('./db/schema');
 
   // Primero verificar que el solicitante es miembro del grupo (con RLS)
   const membership = await withRLS(userId, (tx) =>
@@ -301,7 +290,6 @@ export async function getSharedTagsInGroup(
   userId: string,
   groupId: string
 ): Promise<SharedTagWithBooks[]> {
-  const { user } = await import('./db/schema');
 
   // Verificar que el solicitante es miembro del grupo (con RLS)
   const membership = await withRLS(userId, (tx) =>
@@ -382,7 +370,6 @@ export async function searchBooksInGroup(
   groupId: string,
   opts: { query?: string; tagId?: string } = {}
 ): Promise<GroupBookResult[]> {
-  const { user } = await import('./db/schema');
 
   return withRLS(userId, async (tx) => {
     // 1. Obtener las etiquetas compartidas en el grupo
