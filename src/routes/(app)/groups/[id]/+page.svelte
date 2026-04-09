@@ -60,37 +60,48 @@
 	</div>
 
 	<!-- Código de invitación -->
-	{#if isOwnerOrAdmin && group.inviteCode}
+	{#if isOwnerOrAdmin}
 		<div class="space-y-3 border border-neutral-200 px-5 py-4">
-			<div class="flex items-center gap-4">
-				<div class="flex-1">
-					<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">
-						Invitation code
-					</p>
-					<p class="mt-1 font-mono text-2xl font-normal tracking-[0.3em] text-neutral-900">
-						{group.inviteCode}
-					</p>
+			{#if group.inviteCode}
+				<div class="flex items-center gap-4">
+					<div class="flex-1">
+						<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">
+							Invitation code
+						</p>
+						<p class="mt-1 font-mono text-2xl font-normal tracking-[0.3em] text-neutral-900">
+							{group.inviteCode}
+						</p>
+					</div>
+					<button
+						onclick={copyInviteCode}
+						class="flex items-center gap-1.5 border border-neutral-200 px-3 py-2 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-900"
+					>
+						<Copy size={14} />
+						{copied ? 'Copied!' : 'Copy'}
+					</button>
+					{#if isOwner}
+						<form method="POST" action="?/regenerateCode" use:enhance>
+							<button
+								type="submit"
+								title="New code"
+								class="border border-neutral-200 p-2 text-neutral-400 hover:border-neutral-400 hover:text-neutral-900"
+							>
+								<ArrowsClockwise size={14} />
+							</button>
+						</form>
+					{/if}
 				</div>
-				<button
-					onclick={copyInviteCode}
-					class="flex items-center gap-1.5 border border-neutral-200 px-3 py-2 text-xs text-neutral-500 hover:border-neutral-400 hover:text-neutral-900"
-				>
-					<Copy size={14} />
-					{copied ? 'Copied!' : 'Copy'}
-				</button>
-				{#if isOwner}
-					<form method="POST" action="?/regenerateCode" use:enhance>
-						<button
-							type="submit"
-							title="New code"
-							class="border border-neutral-200 p-2 text-neutral-400 hover:border-neutral-400 hover:text-neutral-900"
-						>
-							<ArrowsClockwise size={14} />
-						</button>
-					</form>
-				{/if}
-			</div>
-			<InviteQR inviteCode={group.inviteCode} />
+				<InviteQR inviteCode={group.inviteCode} />
+			{:else if isOwner}
+				<form method="POST" action="?/regenerateCode" use:enhance>
+					<button
+						type="submit"
+						class="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"
+					>
+						<ArrowsClockwise size={14} /> Generate invitation code
+					</button>
+				</form>
+			{/if}
 		</div>
 	{/if}
 
