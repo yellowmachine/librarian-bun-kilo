@@ -53,7 +53,6 @@ const currentUserId = sql`current_setting('app.current_user_id', true)`;
 // Se crea en el momento del signup (antes de verificar el email).
 // Si un usuario tiene public.user pero no este registro, vino de Scholio
 // y no tiene acceso a Librarian.
-
 export const userProfile = librarianSchema.table(
   'user_profile',
   {
@@ -67,9 +66,15 @@ export const userProfile = librarianSchema.table(
       for: 'select',
       to: appUser,
       using: sql`${table.userId} = ${currentUserId}`
+    }),
+    pgPolicy('user_profile_insert', {
+      for: 'insert',
+      to: appUser,
+      withCheck: sql`${table.userId} = ${currentUserId}`
     })
   ]
 );
+
 
 // ─── Books ────────────────────────────────────────────────────────────────────
 

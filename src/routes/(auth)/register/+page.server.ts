@@ -1,43 +1,10 @@
-import { fail, redirect } from '@sveltejs/kit';
-import { auth } from '$lib/server/auth';
-import { db } from '$lib/server/db';
-import { userProfile } from '$lib/server/db/schema';
+import { redirect } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import type { RequestEvent } from '@sveltejs/kit';
 
+// El registro de nuevos usuarios se hace a través de Scholio.
+// Una vez aceptados allí, el acceso a Librarian se autoprovision automáticamente.
 export const load = ({ locals }: RequestEvent) => {
-	if (locals.user) redirect(302, '/library');
-};
-
-export const actions = {
-	default: async ({ request }: RequestEvent) => {
-		const data = await request.formData();
-		const name = String(data.get('name') ?? '').trim();
-		const email = String(data.get('email') ?? '').trim();
-		const password = String(data.get('password') ?? '');
-
-		if (!name || !email || !password) {
-			return fail(400, { error: 'Todos los campos son obligatorios' });
-		}
-
-		if (password.length < 8) {
-			return fail(400, { error: 'La contraseña debe tener al menos 8 caracteres' });
-		}
-
-		const result = await auth.api.signUpEmail({
-			body: { name, email, password },
-			headers: request.headers
-		});
-
-		if (!result || result.user == null) {
-			return fail(400, {
-				error: 'No se pudo crear la cuenta. Si ya tienes cuenta en Scholio, inicia sesión para acceder.'
-			});
-		}
-
-		// Marcar que este usuario se registró a través de Librarian.
-		// Se usa el db superuser (bypass RLS) porque el usuario aún no tiene sesión activa.
-		await db.insert(userProfile).values({ userId: result.user.id });
-
-		redirect(302, '/verify-email');
-	}
+  if (locals.user && locals.hasLibrarianProfile) redirect(302, '/library');
+  redirect(302, env.SCHOLIO_REDIRECT ?? 'https://scholio.review/waitlist');
 };

@@ -1,0 +1,1 @@
+CREATE POLICY "user_profile_insert" ON "librarian"."user_profile" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian"."user_profile"."user_id" = current_setting('app.current_user_id', true));
