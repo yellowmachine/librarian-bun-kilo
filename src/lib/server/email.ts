@@ -1,12 +1,15 @@
 import { Resend } from 'resend';
 import { env } from '$env/dynamic/private';
 
-const resend = new Resend(env.RESEND_API_KEY);
+// Inicialización lazy: evita que new Resend() se ejecute en tiempo de build
+// cuando RESEND_API_KEY no está disponible.
+let _resend: Resend | null = null;
+const getResend = () => (_resend ??= new Resend(env.RESEND_API_KEY));
 
 const FROM = 'The Svelte Librarian <noreply@thesveltelibrarian.org>';
 
 export async function sendVerificationEmail(to: string, url: string): Promise<void> {
-	await resend.emails.send({
+	await getResend().emails.send({
 		from: FROM,
 		to,
 		subject: 'Confirma tu cuenta en The Svelte Librarian',
