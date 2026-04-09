@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, inArray } from 'drizzle-orm';
 import { db } from './db/index';
 import { books, userBooks, tags, userBookTags } from './db/schema';
 import { withRLS } from './db/rls';
@@ -66,6 +66,7 @@ export type UserBookWithDetails = {
 	authors: string[];
 	coverUrl: string | null;
 	publishYear: number | null;
+	description: string | null;
 	isAvailable: boolean;
 	notes: string | null;
 	addedAt: Date;
@@ -82,6 +83,7 @@ export async function getUserBooks(userId: string): Promise<UserBookWithDetails[
 				authors: books.authors,
 				coverUrl: books.coverUrl,
 				publishYear: books.publishYear,
+				description: books.description,
 				isAvailable: userBooks.isAvailable,
 				notes: userBooks.notes,
 				addedAt: userBooks.addedAt
@@ -90,18 +92,34 @@ export async function getUserBooks(userId: string): Promise<UserBookWithDetails[
 			.innerJoin(books, eq(userBooks.bookId, books.id))
 			.orderBy(desc(userBooks.addedAt));
 
-		// Para cada libro obtener sus etiquetas
-		const result: UserBookWithDetails[] = [];
-		for (const row of rows) {
-			const bookTags = await tx
-				.select({ id: tags.id, name: tags.name, color: tags.color })
-				.from(userBookTags)
-				.innerJoin(tags, eq(userBookTags.tagId, tags.id))
-				.where(eq(userBookTags.userBookId, row.userBookId));
+		if (rows.length === 0) return [];
 
-			result.push({ ...row, authors: row.authors ?? [], tags: bookTags });
+		// Una sola query para todas las etiquetas (evita N+1)
+		const userBookIds = rows.map((r) => r.userBookId);
+		const allTags = await tx
+			.select({
+				userBookId: userBookTags.userBookId,
+				id: tags.id,
+				name: tags.name,
+				color: tags.color
+			})
+			.from(userBookTags)
+			.innerJoin(tags, eq(userBookTags.tagId, tags.id))
+			.where(inArray(userBookTags.userBookId, userBookIds));
+
+		// Agrupar etiquetas por userBookId
+		const tagsByBook = new Map<string, { id: string; name: string; color: string | null }[]>();
+		for (const tag of allTags) {
+			const list = tagsByBook.get(tag.userBookId) ?? [];
+			list.push({ id: tag.id, name: tag.name, color: tag.color });
+			tagsByBook.set(tag.userBookId, list);
 		}
-		return result;
+
+		return rows.map((row) => ({
+			...row,
+			authors: row.authors ?? [],
+			tags: tagsByBook.get(row.userBookId) ?? []
+		}));
 	});
 }
 
@@ -120,6 +138,7 @@ export async function getUserBook(
 				authors: books.authors,
 				coverUrl: books.coverUrl,
 				publishYear: books.publishYear,
+				description: books.description,
 				isAvailable: userBooks.isAvailable,
 				notes: userBooks.notes,
 				addedAt: userBooks.addedAt

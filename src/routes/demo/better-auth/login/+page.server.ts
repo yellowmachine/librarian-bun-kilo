@@ -1,10 +1,12 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, error } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 import type { Actions } from './$types';
 import type { PageServerLoad } from './$types';
 import { auth } from '$lib/server/auth';
 import { APIError } from 'better-auth/api';
 
 export const load: PageServerLoad = async (event) => {
+	if (!dev) error(404, 'Not found');
 	if (event.locals.user) {
 		return redirect(302, '/demo/better-auth');
 	}

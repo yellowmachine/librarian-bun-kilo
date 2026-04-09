@@ -10,9 +10,23 @@
 	let manualQuery = $state('');
 	let searchResults = $state<SearchResult[]>([]);
 	let selectedBook = $state<SearchResult | null>(null);
+	let selectedDescription = $state<string | null>(null);
 	let notes = $state('');
 	let errorMsg = $state('');
 	let searching = $state(false);
+
+	const DESCRIPTION_LIMIT = 300;
+	let descriptionExpanded = $state(false);
+	let descriptionTruncated = $derived(
+		selectedDescription && selectedDescription.length > DESCRIPTION_LIMIT
+	);
+	let descriptionVisible = $derived(
+		selectedDescription
+			? descriptionExpanded
+				? selectedDescription
+				: selectedDescription.slice(0, DESCRIPTION_LIMIT)
+			: null
+	);
 
 	interface SearchResult {
 		id: string;
@@ -21,6 +35,25 @@
 		authors: string[];
 		coverUrl: string | null;
 		publishYear: number | null;
+	}
+
+	async function fetchDescription(workId: string): Promise<string | null> {
+		try {
+			const res = await fetch(`/api/books/detail?workId=${encodeURIComponent(workId)}`);
+			if (!res.ok) return null;
+			const data = await res.json();
+			return data.description ?? null;
+		} catch {
+			return null;
+		}
+	}
+
+	async function selectBook(book: SearchResult) {
+		selectedBook = book;
+		descriptionExpanded = false;
+		selectedDescription = null;
+		mode = 'confirm';
+		selectedDescription = await fetchDescription(book.id);
 	}
 
 	async function onIsbnDetected(isbn: string) {
@@ -34,8 +67,7 @@
 			searchResults = data;
 			if (searchResults.length === 0) errorMsg = `Sin resultados para ISBN ${isbn}`;
 			else if (searchResults.length === 1) {
-				selectedBook = searchResults[0];
-				mode = 'confirm';
+				await selectBook(searchResults[0]);
 			}
 		} catch {
 			errorMsg = 'Error al buscar. Comprueba tu conexión.';
@@ -180,10 +212,7 @@
 								coverUrl={book.coverUrl}
 								publishYear={book.publishYear}
 								variant="list"
-								onclick={() => {
-									selectedBook = book;
-									mode = 'confirm';
-								}}
+								onclick={() => selectBook(book)}
 							/>
 						</li>
 					{/each}
@@ -206,6 +235,26 @@
 					<p class="mt-3 text-xs text-neutral-300">ISBN {selectedBook.isbn}</p>
 				{/if}
 			</div>
+
+			{#if descriptionVisible}
+				<div class="space-y-2">
+					<span class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
+						>Sinopsis</span
+					>
+					<p class="text-sm leading-relaxed text-neutral-600">
+						{descriptionVisible}{#if descriptionTruncated && !descriptionExpanded}…{/if}
+					</p>
+					{#if descriptionTruncated}
+						<button
+							type="button"
+							onclick={() => (descriptionExpanded = !descriptionExpanded)}
+							class="text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-700"
+						>
+							{descriptionExpanded ? 'Leer menos' : 'Leer más'}
+						</button>
+					{/if}
+				</div>
+			{/if}
 
 			<div>
 				<label

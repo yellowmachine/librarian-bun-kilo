@@ -97,11 +97,8 @@ export async function getUserLoans(userId: string): Promise<{
 	const { user } = await import('./db/schema');
 
 	const rows = await withRLS(userId, async (tx) => {
-		const borrower = user; // alias para claridad
-
-		// Drizzle no soporta bien self-joins, usamos db directamente con alias via SQL
-		// Hacemos dos queries separadas y las combinamos
-		const ownerLoans = await db
+		// Dos queries separadas porque Drizzle no soporta bien self-joins con alias
+		const ownerLoans = await tx
 			.select({
 				id: loans.id,
 				status: loans.status,
@@ -125,7 +122,7 @@ export async function getUserLoans(userId: string): Promise<{
 			.innerJoin(books, eq(userBooks.bookId, books.id))
 			.where(eq(loans.ownerId, userId));
 
-		const borrowerLoans = await db
+		const borrowerLoans = await tx
 			.select({
 				id: loans.id,
 				status: loans.status,
@@ -204,7 +201,7 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
 	const { user: userTable } = await import('./db/schema');
 
 	const rows = await withRLS(userId, (tx) =>
-		db
+		tx
 			.select({
 				id: loans.id,
 				status: loans.status,
@@ -311,28 +308,28 @@ export async function transitionLoan(
 	if (toStatus === 'return_requested') extraFields.returnRequestedAt = new Date();
 	if (toStatus === 'returned') extraFields.returnedAt = new Date();
 
-	await withRLS(userId, (tx) =>
-		tx
+	await withRLS(userId, async (tx) => {
+		await tx
 			.update(loans)
 			.set({ status: toStatus, ...extraFields })
-			.where(eq(loans.id, loanId))
-	);
+			.where(eq(loans.id, loanId));
 
-	// Si el préstamo se activa, marcar el libro como no disponible
-	if (toStatus === 'active') {
-		await db
-			.update(userBooks)
-			.set({ isAvailable: false, updatedAt: new Date() })
-			.where(eq(userBooks.id, loan.userBookId));
-	}
+		// Si el préstamo se activa, marcar el libro como no disponible
+		if (toStatus === 'active') {
+			await tx
+				.update(userBooks)
+				.set({ isAvailable: false, updatedAt: new Date() })
+				.where(eq(userBooks.id, loan.userBookId));
+		}
 
-	// Si se devuelve, cancelar o rechazar → libro disponible de nuevo
-	if (['returned', 'rejected', 'cancelled'].includes(toStatus)) {
-		await db
-			.update(userBooks)
-			.set({ isAvailable: true, updatedAt: new Date() })
-			.where(eq(userBooks.id, loan.userBookId));
-	}
+		// Si se devuelve, cancela o rechaza → libro disponible de nuevo
+		if (['returned', 'rejected', 'cancelled'].includes(toStatus)) {
+			await tx
+				.update(userBooks)
+				.set({ isAvailable: true, updatedAt: new Date() })
+				.where(eq(userBooks.id, loan.userBookId));
+		}
+	});
 
 	return { success: true };
 }
@@ -342,7 +339,7 @@ export async function transitionLoan(
 
 export async function getPendingCount(userId: string): Promise<number> {
 	const rows = await withRLS(userId, (tx) =>
-		db
+		tx
 			.select({
 				id: loans.id,
 				status: loans.status,

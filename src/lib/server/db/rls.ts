@@ -9,12 +9,13 @@ import { sql } from 'drizzle-orm';
  *   const result = await withRLS(userId, (tx) => tx.select().from(userBooks));
  */
 export async function withRLS<T>(
-	userId: string,
-	callback: (tx: typeof db) => Promise<T>
+  userId: string,
+  callback: (tx: typeof db) => Promise<T>
 ): Promise<T> {
-	return db.transaction(async (tx) => {
-		await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
-		await tx.execute(sql`SET LOCAL ROLE app_user`);
-		return callback(tx as unknown as typeof db);
-	});
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
+    await tx.execute(sql`SET LOCAL ROLE scholio_app`);
+    await tx.execute(sql`SET LOCAL search_path = librarian, public`);
+    return callback(tx as unknown as typeof db);
+  });
 }

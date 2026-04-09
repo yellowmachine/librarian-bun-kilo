@@ -2,18 +2,38 @@
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import { ArrowLeft, MagnifyingGlass, Tag } from 'phosphor-svelte';
+	import StarRating from '$lib/components/StarRating.svelte';
 
 	let { data, form } = $props();
-	let { group, sharedTagsList, results, query, tagId, currentUserId } = $derived(data);
+	let { group, sharedTagsList, results, reviewStats, reviewsByBook, query, tagId, currentUserId } =
+		$derived(data);
 
 	let searchQuery = $state(query);
 	let selectedTagId = $state(tagId);
+
+	// bookId → expandido o no
+	let expandedReviews = $state(new Set<string>());
+
+	function toggleReviews(bookId: string) {
+		const next = new Set(expandedReviews);
+		if (next.has(bookId)) next.delete(bookId);
+		else next.add(bookId);
+		expandedReviews = next;
+	}
 
 	function applyFilters() {
 		const params = new URLSearchParams();
 		if (searchQuery.trim()) params.set('q', searchQuery.trim());
 		if (selectedTagId) params.set('tag', selectedTagId);
 		goto(`?${params.toString()}`, { replaceState: true });
+	}
+
+	function formatDate(date: Date | string) {
+		return new Date(date).toLocaleDateString('es-ES', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
 	}
 </script>
 
@@ -141,6 +161,58 @@
 							<p class="font-medium text-neutral-900">{book.title}</p>
 							{#if book.authors.length > 0}
 								<p class="truncate text-xs text-neutral-400">{book.authors.join(', ')}</p>
+							{/if}
+							{#if reviewStats[book.bookId]?.totalReviews > 0}
+								<div class="mt-1 flex items-center gap-1.5">
+									<StarRating
+										value={Math.round(reviewStats[book.bookId].averageRating ?? 0)}
+										readonly
+										size={12}
+									/>
+									<button
+										type="button"
+										onclick={() => toggleReviews(book.bookId)}
+										class="text-xs text-neutral-400 hover:text-neutral-700"
+									>
+										{reviewStats[book.bookId].averageRating?.toFixed(1)}
+										({reviewStats[book.bookId].totalReviews}
+										{reviewStats[book.bookId].totalReviews === 1 ? 'reseña' : 'reseñas'})
+										{expandedReviews.has(book.bookId) ? '▲' : '▼'}
+									</button>
+								</div>
+
+								{#if expandedReviews.has(book.bookId)}
+									<div class="mt-2 space-y-2 border-l-2 border-neutral-100 pl-3">
+										{#each reviewsByBook[book.bookId] ?? [] as review (review.id)}
+											<div class="space-y-0.5">
+												<div class="flex items-center gap-2">
+													<span class="text-xs font-medium text-neutral-600">{review.userName}</span
+													>
+													<StarRating value={review.rating} readonly size={11} />
+													<span class="text-xs text-neutral-300"
+														>{formatDate(review.createdAt)}</span
+													>
+												</div>
+												{#if review.body}
+													<p class="text-xs leading-relaxed text-neutral-500">{review.body}</p>
+												{/if}
+											</div>
+										{/each}
+										<a
+											href="/books/{book.bookId}/reviews"
+											class="block text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-700"
+										>
+											Ver todas las reseñas →
+										</a>
+									</div>
+								{/if}
+							{:else}
+								<a
+									href="/books/{book.bookId}/reviews"
+									class="mt-1 block text-xs text-neutral-300 hover:text-neutral-600"
+								>
+									Sin reseñas · Sé el primero →
+								</a>
 							{/if}
 							<div class="mt-1.5 flex flex-wrap items-center gap-2">
 								<span class="text-xs text-neutral-400">de {book.ownerName}</span>

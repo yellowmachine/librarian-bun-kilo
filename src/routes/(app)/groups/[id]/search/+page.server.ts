@@ -2,6 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import { getGroup, getSharedTagsInGroup, searchBooksInGroup } from '$lib/server/groups';
 import { requestLoan } from '$lib/server/loans';
+import { getReviewStatsForBooks, getBookReviews } from '$lib/server/reviews';
 
 export const load = async ({ locals, params, url }: RequestEvent) => {
 	const group = await getGroup(locals.user!.id, params.id!);
@@ -15,10 +16,26 @@ export const load = async ({ locals, params, url }: RequestEvent) => {
 		searchBooksInGroup(locals.user!.id, params.id!, { query: query || undefined, tagId })
 	]);
 
+	// Obtener stats y reseñas completas para todos los libros encontrados
+	const bookIds = [...new Set(results.map((r) => r.bookId))];
+	const reviewStatsMap = await getReviewStatsForBooks(locals.user!.id, bookIds);
+	const reviewStats = Object.fromEntries(reviewStatsMap);
+
+	// Reseñas completas agrupadas por bookId (solo las de libros con reseñas)
+	const reviewsByBook: Record<string, Awaited<ReturnType<typeof getBookReviews>>> = {};
+	for (const bookId of bookIds) {
+		const stats = reviewStatsMap.get(bookId);
+		if (stats && stats.totalReviews > 0) {
+			reviewsByBook[bookId] = await getBookReviews(locals.user!.id, bookId);
+		}
+	}
+
 	return {
 		group,
 		sharedTagsList,
 		results,
+		reviewStats,
+		reviewsByBook,
 		query,
 		tagId: tagId ?? null,
 		currentUserId: locals.user!.id
