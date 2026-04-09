@@ -15,7 +15,7 @@ import {
 // Todas las tablas de la aplicación viven en el schema 'librarian'.
 // Las tablas de better-auth (user, session, account, verification) permanecen
 // en 'public', que es el schema por defecto de better-auth.
-const librarianSchema = pgSchema('librarian');
+export const librarianSchema = pgSchema('librarian');
 
 import { user } from './auth.schema';
 //export { user } from './auth.schema';

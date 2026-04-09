@@ -8,6 +8,13 @@
       "when": 1775746135918,
       "tag": "0000_fresh_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775772465859,
+      "tag": "0001_common_lizard",
+      "breakpoints": true
     }
   ]
 }
