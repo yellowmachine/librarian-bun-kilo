@@ -4,6 +4,7 @@ import { db } from './db/index';
 import {
   groups,
   groupMembers,
+  groupInviteCodes,
   sharedTags,
   tags,
   userBooks,
@@ -66,23 +67,18 @@ export async function createGroup(
   data: { name: string; description?: string }
 ): Promise<string> {
   const id = nanoid();
-  const inviteCode = nanoid(8).toUpperCase();
 
   await withRLS(userId, async (tx) => {
     await tx.insert(groups).values({
       id,
       name: data.name,
       description: data.description ?? null,
-      inviteCode,
       createdBy: userId
     });
-    // group_members_insert_self solo exige userId = currentUserId,
-    // por lo que no hace falta bypass de RLS para el primer miembro.
-    await tx.insert(groupMembers).values({
-      groupId: id,
-      userId,
-      role: 'owner'
-    });
+    await tx.insert(groupMembers).values({ groupId: id, userId, role: 'owner' });
+    // El invite code se inserta después del member para que la policy
+    // group_invite_codes_insert (requiere ser owner/admin) lo encuentre.
+    await tx.insert(groupInviteCodes).values({ groupId: id, code: nanoid(8).toUpperCase() });
   });
 
   return id;
@@ -107,8 +103,20 @@ export async function getUserGroups(userId: string): Promise<GroupWithRole[]> {
     const groupIds = memberships.map((m) => m.groupId);
     const roleMap = new Map(memberships.map((m) => [m.groupId, m.role]));
 
-    // Obtener los grupos
-    const groupRows = await tx.select().from(groups).where(inArray(groups.id, groupIds));
+    // Obtener grupos con su invite code
+    const groupRows = await tx
+      .select({
+        id: groups.id,
+        name: groups.name,
+        description: groups.description,
+        createdBy: groups.createdBy,
+        createdAt: groups.createdAt,
+        updatedAt: groups.updatedAt,
+        inviteCode: groupInviteCodes.code
+      })
+      .from(groups)
+      .leftJoin(groupInviteCodes, eq(groups.id, groupInviteCodes.groupId))
+      .where(inArray(groups.id, groupIds));
 
     // Contar miembros por grupo (sin RLS para conteo global)
     const memberCounts = await db
@@ -133,7 +141,19 @@ export async function getUserGroups(userId: string): Promise<GroupWithRole[]> {
 
 export async function getGroup(userId: string, groupId: string): Promise<GroupWithRole | null> {
   return withRLS(userId, async (tx) => {
-    const rows = await tx.select().from(groups).where(eq(groups.id, groupId));
+    const rows = await tx
+      .select({
+        id: groups.id,
+        name: groups.name,
+        description: groups.description,
+        createdBy: groups.createdBy,
+        createdAt: groups.createdAt,
+        updatedAt: groups.updatedAt,
+        inviteCode: groupInviteCodes.code
+      })
+      .from(groups)
+      .leftJoin(groupInviteCodes, eq(groups.id, groupInviteCodes.groupId))
+      .where(eq(groups.id, groupId));
 
     if (rows.length === 0) return null;
 
@@ -198,34 +218,34 @@ export async function joinGroupByCode(
   userId: string,
   inviteCode: string
 ): Promise<{ success: boolean; groupId?: string; error?: string }> {
-  // Buscar el grupo por código (sin RLS — el grupo puede no ser visible aún)
-  const groupRows = await db
-    .select({ id: groups.id, name: groups.name })
-    .from(groups)
-    .where(eq(groups.inviteCode, inviteCode.toUpperCase().trim()));
+  return withRLS(userId, async (tx) => {
+    // group_invite_codes tiene USING(true) — cualquier usuario autenticado puede leer
+    const codeRows = await tx
+      .select({ groupId: groupInviteCodes.groupId })
+      .from(groupInviteCodes)
+      .where(eq(groupInviteCodes.code, inviteCode.toUpperCase().trim()));
 
-  if (groupRows.length === 0) {
-    return { success: false, error: 'Código de invitación no válido' };
-  }
+    if (codeRows.length === 0) {
+      return { success: false, error: 'Invitation code not valid' };
+    }
 
-  const group = groupRows[0];
+    const { groupId } = codeRows[0];
 
-  // Comprobar si ya es miembro
-  const existing = await db
-    .select({ userId: groupMembers.userId })
-    .from(groupMembers)
-    .where(and(eq(groupMembers.groupId, group.id), eq(groupMembers.userId, userId)));
+    // group_members_select: user_id = current_user_id — comprueba si ya es miembro
+    const existing = await tx
+      .select({ userId: groupMembers.userId })
+      .from(groupMembers)
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
 
-  if (existing.length > 0) {
-    return { success: false, groupId: group.id, error: 'Ya eres miembro de este grupo' };
-  }
+    if (existing.length > 0) {
+      return { success: false, groupId, error: 'You are already member of this group.' };
+    }
 
-  // Insertar sin RLS: el usuario aún no es miembro, así que la política
-  // group_members_insert (que requiere ser owner/admin) bloquearía este insert.
-  // La validación del código de invitación ya garantiza que el join es legítimo.
-  await db.insert(groupMembers).values({ groupId: group.id, userId, role: 'member' });
+    // group_members_insert_self: user_id = current_user_id — válido para unirse
+    await tx.insert(groupMembers).values({ groupId, userId, role: 'member' });
 
-  return { success: true, groupId: group.id };
+    return { success: true, groupId };
+  });
 }
 
 // ─── Expulsar / salir de un grupo ────────────────────────────────────────────
@@ -256,9 +276,9 @@ export async function regenerateInviteCode(userId: string, groupId: string): Pro
   const newCode = nanoid(8).toUpperCase();
   await withRLS(userId, (tx) =>
     tx
-      .update(groups)
-      .set({ inviteCode: newCode, updatedAt: new Date() })
-      .where(eq(groups.id, groupId))
+      .insert(groupInviteCodes)
+      .values({ groupId, code: newCode })
+      .onConflictDoUpdate({ target: groupInviteCodes.groupId, set: { code: newCode, createdAt: new Date() } })
   );
   return newCode;
 }

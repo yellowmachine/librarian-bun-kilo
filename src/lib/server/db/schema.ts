@@ -239,7 +239,6 @@ export const groups = librarianSchema.table(
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     description: text('description'),
-    inviteCode: text('invite_code').unique(),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
@@ -329,6 +328,59 @@ export const groupMembers = librarianSchema.table(
       for: 'delete',
       to: appUser,
       using: sql`${table.userId} = ${currentUserId}`
+    })
+  ]
+);
+
+// ─── Group Invite Codes ───────────────────────────────────────────────────────
+// Tabla separada para los códigos de invitación de grupos.
+// Política de lectura abierta (true): los códigos están diseñados para compartirse.
+// Escritura restringida a owner/admin del grupo.
+
+export const groupInviteCodes = librarianSchema.table(
+  'group_invite_codes',
+  {
+    groupId: text('group_id')
+      .primaryKey()
+      .references(() => groups.id, { onDelete: 'cascade' }),
+    code: text('code').notNull().unique(),
+    createdAt: timestamp('created_at').defaultNow().notNull()
+  },
+  (table) => [
+    pgPolicy('group_invite_codes_select', {
+      for: 'select',
+      to: appUser,
+      using: sql`true`
+    }),
+    pgPolicy('group_invite_codes_insert', {
+      for: 'insert',
+      to: appUser,
+      withCheck: sql`exists (
+        select 1 from "librarian".group_members gm
+        where gm.group_id = ${table.groupId}
+          and gm.user_id = ${currentUserId}
+          and gm.role in ('owner', 'admin')
+      )`
+    }),
+    pgPolicy('group_invite_codes_update', {
+      for: 'update',
+      to: appUser,
+      using: sql`exists (
+        select 1 from "librarian".group_members gm
+        where gm.group_id = ${table.groupId}
+          and gm.user_id = ${currentUserId}
+          and gm.role in ('owner', 'admin')
+      )`
+    }),
+    pgPolicy('group_invite_codes_delete', {
+      for: 'delete',
+      to: appUser,
+      using: sql`exists (
+        select 1 from "librarian".group_members gm
+        where gm.group_id = ${table.groupId}
+          and gm.user_id = ${currentUserId}
+          and gm.role in ('owner', 'admin')
+      )`
     })
   ]
 );
@@ -520,7 +572,12 @@ export const userBookTagsRelations = relations(userBookTags, ({ one }) => ({
 export const groupsRelations = relations(groups, ({ one, many }) => ({
   createdBy: one(user, { fields: [groups.createdBy], references: [user.id] }),
   members: many(groupMembers),
-  sharedTags: many(sharedTags)
+  sharedTags: many(sharedTags),
+  inviteCode: one(groupInviteCodes, { fields: [groups.id], references: [groupInviteCodes.groupId] })
+}));
+
+export const groupInviteCodesRelations = relations(groupInviteCodes, ({ one }) => ({
+  group: one(groups, { fields: [groupInviteCodes.groupId], references: [groups.id] })
 }));
 
 export const groupMembersRelations = relations(groupMembers, ({ one }) => ({
