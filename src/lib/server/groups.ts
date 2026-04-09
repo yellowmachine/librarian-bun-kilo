@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import {
   groups,
