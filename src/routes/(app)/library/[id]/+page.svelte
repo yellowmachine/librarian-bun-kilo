@@ -74,7 +74,7 @@
 
 	<a
 		href="/library"
-		class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"
+		class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
 	>
 		<ArrowLeft size={16} /> Mi biblioteca
 	</a>
@@ -93,17 +93,17 @@
 	<!-- Descripción -->
 	{#if descriptionVisible}
 		<div class="space-y-2">
-			<span class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
-				>Sinopsis</span
+			<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+				>Synopsis</span
 			>
-			<p class="text-sm leading-relaxed text-neutral-600">
+			<p class="text-sm leading-relaxed text-ink-muted">
 				{descriptionVisible}{#if descriptionTruncated && !descriptionExpanded}…{/if}
 			</p>
 			{#if descriptionTruncated}
 				<button
 					type="button"
 					onclick={() => (descriptionExpanded = !descriptionExpanded)}
-					class="text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-700"
+					class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink-muted"
 				>
 					{descriptionExpanded ? 'Leer menos' : 'Leer más'}
 				</button>
@@ -116,17 +116,17 @@
 		<div>
 			<label
 				for="notes"
-				class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
+				class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
 			>
-				Notas
+				Notes
 			</label>
 			<textarea
 				id="notes"
 				name="notes"
 				bind:value={notes}
 				rows="3"
-				placeholder="Edición, estado del libro..."
-				class="mt-1.5 w-full border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
+				placeholder="Edition, book condition..."
+				class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 			></textarea>
 		</div>
 
@@ -141,35 +141,35 @@
 				/>
 				<div
 					class="h-5 w-9 rounded-full border-2 transition-colors
-					{isAvailable ? 'border-neutral-900 bg-neutral-900' : 'border-neutral-300 bg-white'}"
+					{isAvailable ? 'border-ink bg-ink' : 'border-paper-border bg-paper'}"
 				>
 					<div
 						class="h-3 w-3 translate-x-0.5 translate-y-0.5 rounded-full transition-transform
-						{isAvailable ? 'translate-x-4 bg-white' : 'bg-neutral-300'}"
+						{isAvailable ? 'translate-x-4 bg-paper' : 'bg-paper-border'}"
 					></div>
 				</div>
 			</div>
-			<span class="text-sm text-neutral-700">Disponible para préstamo</span>
+			<span class="text-sm text-ink-muted">Available for loan</span>
 		</label>
 
 		<div class="flex items-center gap-3">
 			<button
 				type="submit"
-				class="border border-neutral-900 bg-neutral-900 px-5 py-2 text-sm text-white hover:bg-neutral-800"
+				class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90"
 			>
-				Guardar
+				Save
 			</button>
 			{#if savedOk}
-				<span class="text-xs text-neutral-400">Guardado</span>
+				<span class="text-xs text-ink-faint">Saved</span>
 			{/if}
 		</div>
 	</form>
 
 	<!-- Etiquetas -->
-	<div class="space-y-4 border-t border-neutral-100 pt-6">
+	<div class="space-y-4 border-t border-paper-border pt-6">
 		<div class="flex items-center gap-2">
-			<Tag size={16} class="text-neutral-400" />
-			<span class="text-xs font-medium tracking-widest text-neutral-500 uppercase">Etiquetas</span>
+			<Tag size={16} class="text-ink-faint" />
+			<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Tags</span>
 		</div>
 
 		<!-- Asignadas -->
@@ -183,7 +183,7 @@
 							class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-500"
 							style={tag.color
 								? `border-color: ${tag.color}44; color: ${tag.color}`
-								: 'border-color: #e5e5e5; color: #3d3d3d'}
+								: 'border-color: #e8e2da; color: #3d3d3d'}
 						>
 							{tag.name}
 							<span class="opacity-0 group-hover:opacity-100">×</span>
@@ -198,17 +198,17 @@
 	</div>
 
 	<!-- Reseñas -->
-	<div class="space-y-6 border-t border-neutral-100 pt-6">
+	<div class="space-y-6 border-t border-paper-border pt-6">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-2">
-				<Star size={16} class="text-neutral-400" />
-				<span class="text-xs font-medium tracking-widest text-neutral-500 uppercase">Reseñas</span>
+				<Star size={16} class="text-ink-faint" />
+				<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Reviews</span>
 			</div>
 			<div class="flex items-center gap-3">
 				{#if reviewStats.totalReviews > 0}
 					<div class="flex items-center gap-2">
 						<StarRating value={Math.round(reviewStats.averageRating ?? 0)} readonly size={16} />
-						<span class="text-xs text-neutral-500">
+						<span class="text-xs text-ink-muted">
 							{reviewStats.averageRating?.toFixed(1)} · {reviewStats.totalReviews}
 							{reviewStats.totalReviews === 1 ? 'reseña' : 'reseñas'}
 						</span>
@@ -216,9 +216,9 @@
 				{/if}
 				<a
 					href="/books/{book.bookId}/reviews"
-					class="text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-900"
+					class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
 				>
-					Ver todas →
+					See all →
 				</a>
 			</div>
 		</div>
@@ -228,15 +228,15 @@
 			<button
 				type="button"
 				onclick={() => (showReviewForm = true)}
-				class="text-sm text-neutral-400 underline underline-offset-2 hover:text-neutral-900"
+				class="text-sm text-ink-faint underline underline-offset-2 hover:text-ink"
 			>
-				Escribir una reseña
+				Write a review
 			</button>
 		{/if}
 
 		{#if showReviewForm || myReview}
-			<div class="space-y-3 border border-neutral-100 p-4">
-				<p class="text-xs font-medium tracking-widest text-neutral-500 uppercase">Tu reseña</p>
+			<div class="space-y-3 border border-paper-border p-4">
+				<p class="text-xs font-medium tracking-widest text-ink-muted uppercase">Your review</p>
 
 				{#if form?.reviewError}
 					<p class="text-xs text-red-600">{form.reviewError}</p>
@@ -250,27 +250,27 @@
 						name="body"
 						bind:value={reviewBody}
 						rows="3"
-						placeholder="Cuéntanos qué te pareció... (opcional)"
-						class="w-full border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
+						placeholder="Tell us what you thought… (optional)"
+						class="w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 					></textarea>
 					<div class="flex items-center gap-3">
 						<button
 							type="submit"
 							disabled={reviewRating === 0}
-							class="border border-neutral-900 bg-neutral-900 px-4 py-1.5 text-sm text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+							class="border border-ink bg-ink px-4 py-1.5 text-sm text-paper hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
 						>
-							{myReview ? 'Actualizar' : 'Publicar'}
+							{myReview ? 'Update' : 'Publish'}
 						</button>
 						{#if reviewSavedOk}
-							<span class="text-xs text-neutral-400">Guardado</span>
+							<span class="text-xs text-ink-faint">Saved</span>
 						{/if}
 						{#if !myReview}
 							<button
 								type="button"
 								onclick={() => (showReviewForm = false)}
-								class="text-sm text-neutral-300 hover:text-neutral-600"
+								class="text-sm text-ink-faint hover:text-ink-muted"
 							>
-								Cancelar
+								Cancel
 							</button>
 						{/if}
 					</div>
@@ -285,8 +285,8 @@
 							if (!confirm('¿Eliminar tu reseña?')) e.preventDefault();
 						}}
 					>
-						<button type="submit" class="text-xs text-neutral-300 hover:text-red-500">
-							Eliminar reseña
+						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
+							Remove review
 						</button>
 					</form>
 				{/if}
@@ -298,39 +298,39 @@
 			<div class="space-y-4">
 				{#each reviews as review (review.id)}
 					{#if review.userId !== myReview?.userId}
-						<div class="space-y-1.5 border-b border-neutral-50 pb-4 last:border-0">
+						<div class="space-y-1.5 border-b border-paper-ui pb-4 last:border-0">
 							<div class="flex items-center justify-between">
-								<span class="text-xs font-medium text-neutral-700">{review.userName}</span>
-								<span class="text-xs text-neutral-400">{formatDate(review.createdAt)}</span>
+								<span class="text-xs font-medium text-ink-muted">{review.userName}</span>
+								<span class="text-xs text-ink-faint">{formatDate(review.createdAt)}</span>
 							</div>
 							<StarRating value={review.rating} readonly size={14} />
 							{#if review.body}
-								<p class="text-sm leading-relaxed text-neutral-600">{review.body}</p>
+								<p class="text-sm leading-relaxed text-ink-muted">{review.body}</p>
 							{/if}
 						</div>
 					{/if}
 				{/each}
 			</div>
 		{:else if !myReview}
-			<p class="text-xs text-neutral-400">Aún no hay reseñas para este libro.</p>
+			<p class="text-xs text-ink-faint">There are no reviews for this book yet.</p>
 		{/if}
 	</div>
 
 	<!-- Eliminar -->
-	<div class="border-t border-neutral-100 pt-4">
+	<div class="border-t border-paper-border pt-4">
 		<form
 			method="POST"
 			action="?/remove"
 			use:enhance
 			onsubmit={(e) => {
-				if (!confirm('¿Eliminar este libro de tu biblioteca?')) e.preventDefault();
+				if (!confirm('Remove this book from your library?')) e.preventDefault();
 			}}
 		>
 			<button
 				type="submit"
-				class="flex items-center gap-1.5 text-sm text-neutral-300 hover:text-red-500"
+				class="flex items-center gap-1.5 text-sm text-ink-faint hover:text-red-500"
 			>
-				<Trash size={14} /> Eliminar de mi biblioteca
+				<Trash size={14} /> Remove from my library
 			</button>
 		</form>
 	</div>

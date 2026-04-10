@@ -43,10 +43,10 @@ export const LOAN_STATUS: Record<LoanStatus, LoanStatusConfig> = {
 		labelLong: 'Rechazado',
 		classes: 'bg-red-50 text-red-600 ring-red-200'
 	},
-	// Terminal neutro — gris
+	// Terminal neutro — paper
 	cancelled: {
 		label: 'Cancelado',
 		labelLong: 'Cancelado',
-		classes: 'bg-neutral-100 text-neutral-400 ring-neutral-200'
+		classes: 'bg-paper-ui text-ink-faint ring-paper-border'
 	}
 };

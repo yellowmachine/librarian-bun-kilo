@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { auth } from '$lib/server/auth';
 
 export const load = async ({ locals }: RequestEvent) => {
@@ -14,6 +15,6 @@ export const load = async ({ locals }: RequestEvent) => {
 export const actions = {
 	logout: async ({ request }: RequestEvent) => {
 		await auth.api.signOut({ headers: request.headers });
-		redirect(302, '/login');
+		redirect(302, env.SCHOLIO_REDIRECT ?? 'https://scholio.review');
 	}
 };

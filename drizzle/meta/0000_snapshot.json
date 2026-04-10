@@ -1,5 +1,5 @@
 {
-  "id": "13f06bb1-147b-4454-be3d-228ee276c374",
+  "id": "29f58cdb-db53-4819-adf8-269407672f6c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -309,6 +309,98 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "librarian.group_invite_codes": {
+      "name": "group_invite_codes",
+      "schema": "librarian",
+      "columns": {
+        "group_id": {
+          "name": "group_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "group_invite_codes_group_id_groups_id_fk": {
+          "name": "group_invite_codes_group_id_groups_id_fk",
+          "tableFrom": "group_invite_codes",
+          "tableTo": "groups",
+          "schemaTo": "librarian",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "group_invite_codes_code_unique": {
+          "name": "group_invite_codes_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {
+        "group_invite_codes_select": {
+          "name": "group_invite_codes_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "true"
+        },
+        "group_invite_codes_insert": {
+          "name": "group_invite_codes_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "scholio_app"
+          ],
+          "withCheck": "exists (\n        select 1 from \"librarian\".group_members gm\n        where gm.group_id = \"librarian\".\"group_invite_codes\".\"group_id\"\n          and gm.user_id = current_setting('app.current_user_id', true)\n          and gm.role in ('owner', 'admin')\n      )"
+        },
+        "group_invite_codes_update": {
+          "name": "group_invite_codes_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n        select 1 from \"librarian\".group_members gm\n        where gm.group_id = \"librarian\".\"group_invite_codes\".\"group_id\"\n          and gm.user_id = current_setting('app.current_user_id', true)\n          and gm.role in ('owner', 'admin')\n      )"
+        },
+        "group_invite_codes_delete": {
+          "name": "group_invite_codes_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n        select 1 from \"librarian\".group_members gm\n        where gm.group_id = \"librarian\".\"group_invite_codes\".\"group_id\"\n          and gm.user_id = current_setting('app.current_user_id', true)\n          and gm.role in ('owner', 'admin')\n      )"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "librarian.group_members": {
       "name": "group_members",
       "schema": "librarian",
@@ -420,14 +512,14 @@
           ],
           "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
-        "group_members_insert": {
-          "name": "group_members_insert",
+        "group_members_insert_self": {
+          "name": "group_members_insert_self",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
             "scholio_app"
           ],
-          "withCheck": "exists (\n\t\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\t\twhere gm.group_id = \"librarian\".\"group_members\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+          "withCheck": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
         "group_members_delete": {
           "name": "group_members_delete",
@@ -460,12 +552,6 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "invite_code": {
-          "name": "invite_code",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -508,15 +594,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "groups_invite_code_unique": {
-          "name": "groups_invite_code_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "invite_code"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {
         "groups_select": {
           "name": "groups_select",
@@ -1037,6 +1115,15 @@
           ],
           "using": "\"librarian\".\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
+        "tags_select_in_group": {
+          "name": "tags_select_in_group",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".shared_tags st\n\t\t\t\tjoin \"librarian\".group_members gm on gm.group_id = st.group_id\n\t\t\t\twhere st.tag_id = \"librarian\".\"tags\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
         "tags_insert": {
           "name": "tags_insert",
           "as": "PERMISSIVE",
@@ -1163,7 +1250,16 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".user_books ub\n\t\t\t\twhere ub.id = \"librarian\".\"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".tags t\n\t\t\t\twhere t.id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and t.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
+        "user_book_tags_select_in_group": {
+          "name": "user_book_tags_select_in_group",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".shared_tags st\n\t\t\t\tjoin \"librarian\".group_members gm on gm.group_id = st.group_id\n\t\t\t\twhere st.tag_id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         },
         "user_book_tags_insert": {
           "name": "user_book_tags_insert",
@@ -1172,7 +1268,7 @@
           "to": [
             "scholio_app"
           ],
-          "withCheck": "exists (\n\t\t\t\tselect 1 from \"librarian\".user_books ub\n\t\t\t\twhere ub.id = \"librarian\".\"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "withCheck": "exists (\n\t\t\t\tselect 1 from \"librarian\".tags t\n\t\t\t\twhere t.id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and t.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         },
         "user_book_tags_delete": {
           "name": "user_book_tags_delete",
@@ -1181,7 +1277,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".user_books ub\n\t\t\t\twhere ub.id = \"librarian\".\"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".tags t\n\t\t\t\twhere t.id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and t.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         }
       },
       "checkConstraints": {},
@@ -1331,6 +1427,15 @@
           ],
           "using": "\"librarian\".\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
+        "user_books_select_in_group": {
+          "name": "user_books_select_in_group",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".user_book_tags ubt\n\t\t\t\tjoin \"librarian\".shared_tags st on st.tag_id = ubt.tag_id\n\t\t\t\tjoin \"librarian\".group_members gm on gm.group_id = st.group_id\n\t\t\t\twhere ubt.user_book_id = \"librarian\".\"user_books\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
         "user_books_insert": {
           "name": "user_books_insert",
           "as": "PERMISSIVE",
@@ -1407,6 +1512,15 @@
             "scholio_app"
           ],
           "using": "\"librarian\".\"user_profile\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "user_profile_insert": {
+          "name": "user_profile_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "scholio_app"
+          ],
+          "withCheck": "\"librarian\".\"user_profile\".\"user_id\" = current_setting('app.current_user_id', true)"
         }
       },
       "checkConstraints": {},
@@ -1437,9 +1551,7 @@
       ]
     }
   },
-  "schemas": {
-    "librarian": "librarian"
-  },
+  "schemas": {},
   "sequences": {},
   "roles": {},
   "policies": {},

@@ -15,10 +15,10 @@ import {
 // Todas las tablas de la aplicación viven en el schema 'librarian'.
 // Las tablas de better-auth (user, session, account, verification) permanecen
 // en 'public', que es el schema por defecto de better-auth.
-export const librarianSchema = pgSchema('librarian');
+const librarianSchema = pgSchema('librarian');
 
 import { user } from './auth.schema';
-export { user } from './auth.schema';
+//export { user } from './auth.schema';
 
 // ─── App role ─────────────────────────────────────────────────────────────────
 // Rol de BD para queries de la aplicación. El superuser (root) tiene BYPASSRLS
@@ -129,6 +129,17 @@ export const userBooks = librarianSchema.table(
       to: appUser,
       using: sql`${table.userId} = ${currentUserId}`
     }),
+    pgPolicy('user_books_select_in_group', {
+      for: 'select',
+      to: appUser,
+      using: sql`exists (
+				select 1 from "librarian".user_book_tags ubt
+				join "librarian".shared_tags st on st.tag_id = ubt.tag_id
+				join "librarian".group_members gm on gm.group_id = st.group_id
+				where ubt.user_book_id = ${table.id}
+				  and gm.user_id = ${currentUserId}
+			)`
+    }),
     pgPolicy('user_books_insert', {
       for: 'insert',
       to: appUser,
@@ -168,6 +179,16 @@ export const tags = librarianSchema.table(
       to: appUser,
       using: sql`${table.userId} = ${currentUserId}`
     }),
+    pgPolicy('tags_select_in_group', {
+      for: 'select',
+      to: appUser,
+      using: sql`exists (
+				select 1 from "librarian".shared_tags st
+				join "librarian".group_members gm on gm.group_id = st.group_id
+				where st.tag_id = ${table.id}
+				  and gm.user_id = ${currentUserId}
+			)`
+    }),
     pgPolicy('tags_insert', {
       for: 'insert',
       to: appUser,
@@ -205,27 +226,37 @@ export const userBookTags = librarianSchema.table(
       for: 'select',
       to: appUser,
       using: sql`exists (
-				select 1 from "librarian".user_books ub
-				where ub.id = ${table.userBookId}
-				  and ub.user_id = ${currentUserId}
+				select 1 from "librarian".tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			)`
+    }),
+    pgPolicy('user_book_tags_select_in_group', {
+      for: 'select',
+      to: appUser,
+      using: sql`exists (
+				select 1 from "librarian".shared_tags st
+				join "librarian".group_members gm on gm.group_id = st.group_id
+				where st.tag_id = ${table.tagId}
+				  and gm.user_id = ${currentUserId}
 			)`
     }),
     pgPolicy('user_book_tags_insert', {
       for: 'insert',
       to: appUser,
       withCheck: sql`exists (
-				select 1 from "librarian".user_books ub
-				where ub.id = ${table.userBookId}
-				  and ub.user_id = ${currentUserId}
+				select 1 from "librarian".tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
 			)`
     }),
     pgPolicy('user_book_tags_delete', {
       for: 'delete',
       to: appUser,
       using: sql`exists (
-				select 1 from "librarian".user_books ub
-				where ub.id = ${table.userBookId}
-				  and ub.user_id = ${currentUserId}
+				select 1 from "librarian".tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
 			)`
     })
   ]
@@ -239,7 +270,6 @@ export const groups = librarianSchema.table(
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     description: text('description'),
-    inviteCode: text('invite_code').unique(),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
@@ -309,20 +339,79 @@ export const groupMembers = librarianSchema.table(
     // Solo owners/admins pueden añadir miembros.
     // El flujo joinGroupByCode corre como superuser (bypass RLS) por lo que
     // no necesita pasar por esta política.
-    pgPolicy('group_members_insert', {
+    pgPolicy('group_members_insert_self', {
+      for: 'insert',
+      to: appUser,
+      withCheck: sql`${table.userId} = ${currentUserId}`
+    }),
+    /*pgPolicy('group_members_insert', {
       for: 'insert',
       to: appUser,
       withCheck: sql`exists (
-					select 1 from "librarian".group_members gm
-					where gm.group_id = ${table.groupId}
-					  and gm.user_id = ${currentUserId}
-					  and gm.role in ('owner', 'admin')
-				)`
+          select 1 from "librarian".group_members gm
+          where gm.group_id = ${table.groupId}
+            and gm.user_id = ${currentUserId}
+            and gm.role in ('owner', 'admin')
+        )`
     }),
+    */
     pgPolicy('group_members_delete', {
       for: 'delete',
       to: appUser,
       using: sql`${table.userId} = ${currentUserId}`
+    })
+  ]
+);
+
+// ─── Group Invite Codes ───────────────────────────────────────────────────────
+// Tabla separada para los códigos de invitación de grupos.
+// Política de lectura abierta (true): los códigos están diseñados para compartirse.
+// Escritura restringida a owner/admin del grupo.
+
+export const groupInviteCodes = librarianSchema.table(
+  'group_invite_codes',
+  {
+    groupId: text('group_id')
+      .primaryKey()
+      .references(() => groups.id, { onDelete: 'cascade' }),
+    code: text('code').notNull().unique(),
+    createdAt: timestamp('created_at').defaultNow().notNull()
+  },
+  (table) => [
+    pgPolicy('group_invite_codes_select', {
+      for: 'select',
+      to: appUser,
+      using: sql`true`
+    }),
+    pgPolicy('group_invite_codes_insert', {
+      for: 'insert',
+      to: appUser,
+      withCheck: sql`exists (
+        select 1 from "librarian".group_members gm
+        where gm.group_id = ${table.groupId}
+          and gm.user_id = ${currentUserId}
+          and gm.role in ('owner', 'admin')
+      )`
+    }),
+    pgPolicy('group_invite_codes_update', {
+      for: 'update',
+      to: appUser,
+      using: sql`exists (
+        select 1 from "librarian".group_members gm
+        where gm.group_id = ${table.groupId}
+          and gm.user_id = ${currentUserId}
+          and gm.role in ('owner', 'admin')
+      )`
+    }),
+    pgPolicy('group_invite_codes_delete', {
+      for: 'delete',
+      to: appUser,
+      using: sql`exists (
+        select 1 from "librarian".group_members gm
+        where gm.group_id = ${table.groupId}
+          and gm.user_id = ${currentUserId}
+          and gm.role in ('owner', 'admin')
+      )`
     })
   ]
 );
@@ -514,7 +603,12 @@ export const userBookTagsRelations = relations(userBookTags, ({ one }) => ({
 export const groupsRelations = relations(groups, ({ one, many }) => ({
   createdBy: one(user, { fields: [groups.createdBy], references: [user.id] }),
   members: many(groupMembers),
-  sharedTags: many(sharedTags)
+  sharedTags: many(sharedTags),
+  inviteCode: one(groupInviteCodes, { fields: [groups.id], references: [groupInviteCodes.groupId] })
+}));
+
+export const groupInviteCodesRelations = relations(groupInviteCodes, ({ one }) => ({
+  group: one(groups, { fields: [groupInviteCodes.groupId], references: [groups.id] })
 }));
 
 export const groupMembersRelations = relations(groupMembers, ({ one }) => ({

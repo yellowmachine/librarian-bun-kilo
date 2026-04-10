@@ -5,13 +5,13 @@ import { resolveBook } from '$lib/server/books';
 // GET /api/books/detail?workId=OL45804W
 // Devuelve la descripción y datos completos de un work sin añadirlo a la biblioteca.
 export async function GET({ locals, url }: RequestEvent) {
-	if (!locals.user) error(401, 'No autenticado');
+  if (!locals.user) error(401, 'Not authenticated');
 
-	const workId = url.searchParams.get('workId')?.trim();
-	if (!workId) error(400, 'Se requiere workId');
+  const workId = url.searchParams.get('workId')?.trim();
+  if (!workId) error(400, 'workId required');
 
-	const book = await resolveBook(workId);
-	if (!book) error(404, 'Libro no encontrado');
+  const book = await resolveBook(workId);
+  if (!book) error(404, 'Book not found');
 
-	return json({ description: book.description });
+  return json({ description: book.description });
 }

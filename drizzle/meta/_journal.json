@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775643238370,
-      "tag": "0000_minor_micromax",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775668769818,
-      "tag": "0001_ordinary_puck",
+      "when": 1775773589211,
+      "tag": "0000_salty_jean_grey",
       "breakpoints": true
     }
   ]

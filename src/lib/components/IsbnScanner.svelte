@@ -52,7 +52,7 @@
 				(err: unknown) => {
 					if (err) {
 						const msg = err instanceof Error ? err.message : String(err);
-						errorMsg = `No se pudo acceder a la cámara: ${msg}`;
+						errorMsg = `Could not access the camera: ${msg}`;
 						onError?.(errorMsg);
 						return;
 					}
@@ -79,7 +79,7 @@
 			});
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
-			errorMsg = `Error al iniciar escáner: ${msg}`;
+			errorMsg = `Error starting scanner: ${msg}`;
 			onError?.(errorMsg);
 		}
 	}
@@ -97,7 +97,7 @@
 
 <div class="space-y-4">
 	{#if errorMsg}
-		<p class="border border-neutral-900 bg-neutral-50 px-4 py-3 text-sm text-neutral-900">
+		<p class="border border-ink bg-paper-ui px-4 py-3 text-sm text-ink">
 			{errorMsg}
 		</p>
 	{/if}
@@ -105,12 +105,12 @@
 	<!-- Viewport de la cámara -->
 	<div
 		bind:this={viewportEl}
-		class="relative overflow-hidden bg-neutral-900"
+		class="relative overflow-hidden bg-ink"
 		style="aspect-ratio: 4/3; max-height: 70svh;"
 	>
 		{#if !running && !errorMsg}
 			<div class="flex h-full items-center justify-center">
-				<span class="text-sm text-neutral-500">Iniciando cámara...</span>
+				<span class="text-sm text-ink-muted">Iniciando cámara...</span>
 			</div>
 		{/if}
 
@@ -135,13 +135,13 @@
 	</div>
 
 	{#if running}
-		<p class="text-center text-xs text-neutral-400">Centra el código de barras en el marco</p>
+		<p class="text-center text-xs text-ink-faint">Centra el código de barras en el marco</p>
 		<button
 			type="button"
 			onclick={stop}
-			class="w-full border border-neutral-200 py-2.5 text-sm text-neutral-600 hover:border-neutral-400"
+			class="w-full border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
 		>
-			Cancelar
+			Cancel
 		</button>
 	{/if}
 </div>
