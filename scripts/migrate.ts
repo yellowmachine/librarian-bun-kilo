@@ -26,7 +26,7 @@ const db = drizzle(client);
 console.log('[migrate] Aplicando migraciones desde', migrationsFolder);
 
 try {
-	await migrate(db, { migrationsFolder });
+	await migrate(db, { migrationsFolder, migrationsTable: '__librarian_migrations' });
 	console.log('[migrate] OK');
 } catch (e) {
 	console.error('[migrate] ERROR:', e);
