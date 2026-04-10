@@ -47,6 +47,7 @@ COPY --from=build /app/build ./build
 COPY --from=build /app/package.json ./
 COPY --from=build /app/drizzle ./drizzle
 COPY scripts/entrypoint.sh ./entrypoint.sh
+COPY scripts/migrate.ts ./scripts/migrate.ts
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 
