@@ -125,12 +125,12 @@
 <div class="mx-auto max-w-md space-y-8">
 	<!-- Cabecera -->
 	<div class="flex items-center gap-3">
-		<a href="/library" class="text-neutral-400 hover:text-neutral-900"><ArrowLeft size={20} /></a>
-		<h1 class="font-serif text-2xl font-normal text-neutral-900">Add book</h1>
+		<a href="/library" class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
+		<h1 class="font-serif text-2xl font-normal text-ink">Add book</h1>
 	</div>
 
 	{#if errorMsg}
-		<p class="border border-neutral-900 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-900">
+		<p class="border border-ink bg-paper-ui px-4 py-2.5 text-sm text-ink">
 			{errorMsg}
 		</p>
 	{/if}
@@ -140,21 +140,21 @@
 		<div class="grid grid-cols-2 gap-4">
 			<button
 				onclick={() => (mode = 'scan')}
-				class="group flex flex-col items-center gap-4 border border-neutral-200 p-8 transition-colors hover:border-neutral-900"
+				class="group flex flex-col items-center gap-4 border border-paper-border p-8 transition-colors hover:border-ink"
 			>
-				<Barcode size={40} weight="thin" class="text-neutral-400 group-hover:text-neutral-900" />
-				<span class="text-sm text-neutral-600">ISBN scan</span>
+				<Barcode size={40} weight="thin" class="text-ink-faint group-hover:text-ink" />
+				<span class="text-sm text-ink-muted">ISBN scan</span>
 			</button>
 			<button
 				onclick={() => (mode = 'manual')}
-				class="group flex flex-col items-center gap-4 border border-neutral-200 p-8 transition-colors hover:border-neutral-900"
+				class="group flex flex-col items-center gap-4 border border-paper-border p-8 transition-colors hover:border-ink"
 			>
 				<MagnifyingGlass
 					size={40}
 					weight="thin"
-					class="text-neutral-400 group-hover:text-neutral-900"
+					class="text-ink-faint group-hover:text-ink"
 				/>
-				<span class="text-sm text-neutral-600">Manual Search</span>
+				<span class="text-sm text-ink-muted">Manual Search</span>
 			</button>
 		</div>
 
@@ -176,11 +176,11 @@
 				bind:value={manualQuery}
 				placeholder="Title, author or ISBN..."
 				autofocus
-				class="min-w-0 flex-1 border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
+				class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 			/>
 			<button
 				type="submit"
-				class="border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
+				class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
 			>
 				Search
 			</button>
@@ -190,22 +190,22 @@
 	{:else if mode === 'results'}
 		<div>
 			<div class="mb-4 flex items-center justify-between">
-				<span class="text-xs tracking-widest text-neutral-400 uppercase">Results</span>
+				<span class="text-xs tracking-widest text-ink-faint uppercase">Results</span>
 				<button
 					onclick={() => (mode = 'manual')}
-					class="text-xs text-neutral-900 underline underline-offset-2"
+					class="text-xs text-ink underline underline-offset-2"
 				>
 					New search
 				</button>
 			</div>
 			{#if searching}
 				<div class="flex justify-center py-12">
-					<SpinnerGap size={24} class="animate-spin text-neutral-400" />
+					<SpinnerGap size={24} class="animate-spin text-ink-faint" />
 				</div>
 			{:else}
-				<ul class="grid grid-cols-1 divide-neutral-100 sm:grid-cols-2 sm:gap-2">
+				<ul class="grid grid-cols-1 divide-paper-border sm:grid-cols-2 sm:gap-2">
 					{#each searchResults as book (book.id)}
-						<li class="border-b border-neutral-100 sm:border sm:border-neutral-100">
+						<li class="border-b border-paper-border sm:border sm:border-paper-border">
 							<BookCard
 								title={book.title}
 								authors={book.authors}
@@ -223,7 +223,7 @@
 		<!-- Confirmar -->
 	{:else if mode === 'confirm' && selectedBook}
 		<div class="space-y-6">
-			<div class="border border-neutral-200 p-5">
+			<div class="border border-paper-border p-5">
 				<BookCard
 					title={selectedBook.title}
 					authors={selectedBook.authors}
@@ -232,23 +232,23 @@
 					variant="detail"
 				/>
 				{#if selectedBook.isbn}
-					<p class="mt-3 text-xs text-neutral-300">ISBN {selectedBook.isbn}</p>
+					<p class="mt-3 text-xs text-ink-faint">ISBN {selectedBook.isbn}</p>
 				{/if}
 			</div>
 
 			{#if descriptionVisible}
 				<div class="space-y-2">
-					<span class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
+					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
 						>Synopsis</span
 					>
-					<p class="text-sm leading-relaxed text-neutral-600">
+					<p class="text-sm leading-relaxed text-ink-muted">
 						{descriptionVisible}{#if descriptionTruncated && !descriptionExpanded}…{/if}
 					</p>
 					{#if descriptionTruncated}
 						<button
 							type="button"
 							onclick={() => (descriptionExpanded = !descriptionExpanded)}
-							class="text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-700"
+							class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink-muted"
 						>
 							{descriptionExpanded ? 'Less' : 'More'}
 						</button>
@@ -259,7 +259,7 @@
 			<div>
 				<label
 					for="notes"
-					class="block text-xs font-medium tracking-widest text-neutral-500 uppercase"
+					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
 				>
 					Notes <span class="tracking-normal normal-case">(opcional)</span>
 				</label>
@@ -268,20 +268,20 @@
 					bind:value={notes}
 					rows="2"
 					placeholder="Edition, book condition..."
-					class="mt-1.5 w-full border border-neutral-200 px-3 py-2 text-sm focus:border-neutral-900 focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 				></textarea>
 			</div>
 
 			<div class="flex gap-3">
 				<button
 					onclick={() => (mode = 'results')}
-					class="flex-1 border border-neutral-200 py-2.5 text-sm text-neutral-600 hover:border-neutral-400"
+					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
 				>
 					Cancel
 				</button>
 				<button
 					onclick={addBook}
-					class="flex-1 border border-neutral-900 bg-neutral-900 py-2.5 text-sm text-white hover:bg-neutral-800"
+					class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90"
 				>
 					Add to my library
 				</button>
@@ -291,7 +291,7 @@
 		<!-- Añadiendo -->
 	{:else if mode === 'adding'}
 		<div class="flex justify-center py-16">
-			<SpinnerGap size={28} class="animate-spin text-neutral-400" />
+			<SpinnerGap size={28} class="animate-spin text-ink-faint" />
 		</div>
 	{/if}
 </div>

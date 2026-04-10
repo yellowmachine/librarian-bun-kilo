@@ -37,15 +37,15 @@
 	<!-- Cabecera -->
 	<div class="flex items-end justify-between">
 		<div>
-			<h1 class="font-serif text-3xl font-normal text-neutral-900">My library</h1>
-			<p class="mt-1 text-sm text-neutral-400">
+			<h1 class="font-serif text-3xl font-normal text-ink">My library</h1>
+			<p class="mt-1 text-sm text-ink-faint">
 				{userBooks.length}
 				{userBooks.length === 1 ? 'book' : 'books'}
 			</p>
 		</div>
 		<a
 			href="/library/add"
-			class="flex items-center gap-1.5 border border-neutral-900 bg-neutral-900 px-4 py-2 text-sm text-white transition-colors hover:bg-neutral-800"
+			class="flex items-center gap-1.5 border border-ink bg-ink px-4 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
 		>
 			<Plus size={16} weight="bold" />
 			Add
@@ -58,25 +58,25 @@
 			<div class="relative">
 				<MagnifyingGlass
 					size={16}
-					class="absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400"
+					class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
 				/>
 				<input
 					type="search"
 					bind:value={search}
 					placeholder="Search by title or author..."
-					class="w-full border border-neutral-200 bg-neutral-50 py-2 pr-4 pl-9 text-sm text-neutral-900 placeholder-neutral-400 focus:border-neutral-900 focus:bg-white focus:ring-0"
+					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
 				/>
 			</div>
 
 			{#if allTags().length > 0}
 				<div class="flex flex-wrap items-center gap-2">
-					<Tag size={14} class="text-neutral-400" />
+					<Tag size={14} class="text-ink-faint" />
 					<button
 						onclick={() => (activeTag = null)}
 						class="rounded-full border px-3 py-0.5 text-xs transition-colors
 						{activeTag === null
-							? 'border-neutral-900 bg-neutral-900 text-white'
-							: 'border-neutral-200 text-neutral-500 hover:border-neutral-400'}"
+							? 'border-ink bg-ink text-paper'
+							: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
 					>
 						All
 					</button>
@@ -85,8 +85,8 @@
 							onclick={() => (activeTag = activeTag === tag.id ? null : tag.id)}
 							class="rounded-full border px-3 py-0.5 text-xs transition-colors
 							{activeTag === tag.id
-								? 'border-neutral-900 bg-neutral-900 text-white'
-								: 'border-neutral-200 text-neutral-500 hover:border-neutral-400'}"
+								? 'border-ink bg-ink text-paper'
+								: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
 						>
 							{tag.name}
 						</button>
@@ -97,7 +97,7 @@
 
 		<!-- Grid de libros -->
 		{#if filtered().length === 0}
-			<p class="py-12 text-center text-sm text-neutral-400">Without results.</p>
+			<p class="py-12 text-center text-sm text-ink-faint">Without results.</p>
 		{:else}
 			<BookGrid
 				books={filtered().map((b) => ({
@@ -114,9 +114,9 @@
 	{:else}
 		<!-- Estado vacío -->
 		<div class="flex flex-col items-center justify-center py-24 text-center">
-			<div class="mb-6 font-serif text-6xl text-neutral-200">·</div>
-			<p class="text-sm text-neutral-400">Your library is empty.</p>
-			<a href="/library/add" class="mt-4 text-sm text-neutral-900 underline underline-offset-2">
+			<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
+			<p class="text-sm text-ink-faint">Your library is empty.</p>
+			<a href="/library/add" class="mt-4 text-sm text-ink underline underline-offset-2">
 				Add your first book
 			</a>
 		</div>

@@ -98,7 +98,7 @@
 		>
 			<input type="hidden" name="name" value={pendingName} />
 			<span
-				class="flex-1 truncate border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700"
+				class="flex-1 truncate border border-paper-border px-3 py-1.5 text-sm text-ink-muted"
 				title={pendingName}
 			>
 				{pendingName}
@@ -108,18 +108,18 @@
 				name="color"
 				bind:value={newTagColor}
 				title="Elige un color"
-				class="h-8 w-8 cursor-pointer rounded-none border border-neutral-200 p-0.5"
+				class="h-8 w-8 cursor-pointer rounded-none border border-paper-border p-0.5"
 			/>
 			<button
 				type="submit"
-				class="border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-xs text-white hover:bg-neutral-800"
+				class="border border-ink bg-ink px-3 py-1.5 text-xs text-paper hover:bg-ink/90"
 			>
 				Create
 			</button>
 			<button
 				type="button"
 				onclick={cancelCreate}
-				class="text-neutral-300 hover:text-neutral-600"
+				class="text-ink-faint hover:text-ink-muted"
 				aria-label="Cancel"
 			>
 				×
@@ -135,13 +135,13 @@
 			autocomplete="off"
 			onfocus={openDropdown}
 			oninput={openDropdown}
-			class="w-full border border-neutral-200 px-3 py-1.5 text-sm focus:border-neutral-900 focus:ring-0"
+			class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-ink focus:ring-0"
 		/>
 
 		<!-- Dropdown -->
 		{#if open && (filtered.length > 0 || showCreate)}
 			<ul
-				class="absolute top-full right-0 left-0 z-10 mt-0.5 border border-neutral-200 bg-white shadow-sm"
+				class="absolute top-full right-0 left-0 z-10 mt-0.5 border border-paper-border bg-paper shadow-sm"
 				role="listbox"
 			>
 				{#each filtered as tag (tag.id)}
@@ -161,7 +161,7 @@
 							<input type="hidden" name="tagId" value={tag.id} />
 							<button
 								type="submit"
-								class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-neutral-50"
+								class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-paper-ui"
 							>
 								{#if tag.color}
 									<span
@@ -176,14 +176,14 @@
 				{/each}
 
 				{#if showCreate}
-					<li role="option" aria-selected="false" class="border-t border-neutral-100">
+					<li role="option" aria-selected="false" class="border-t border-paper-border">
 						<button
 							type="button"
 							onclick={startCreate}
-							class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50"
+							class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-muted hover:bg-paper-ui"
 						>
-							<span class="text-neutral-300">+</span>
-							Create <strong class="text-neutral-700">«{inputValue.trim()}»</strong>
+							<span class="text-ink-faint">+</span>
+							Create <strong class="text-ink-muted">«{inputValue.trim()}»</strong>
 						</button>
 					</li>
 				{/if}

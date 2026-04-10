@@ -20,20 +20,20 @@
 	<button
 		type="button"
 		onclick={() => (visible = !visible)}
-		class="flex items-center gap-1.5 border border-neutral-200 px-3 py-2 text-xs text-neutral-500 transition-colors hover:border-neutral-400 hover:text-neutral-900"
+		class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-xs text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
 	>
 		<QrCode size={14} />
 		{visible ? 'Hide QR' : 'Show QR'}
 	</button>
 
 	{#if visible}
-		<div class="mt-4 flex flex-col items-center gap-4 border border-neutral-200 p-6">
+		<div class="mt-4 flex flex-col items-center gap-4 border border-paper-border p-6">
 			<div class="w-48">
 				<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 				{@html qrSvg}
 			</div>
-			<p class="text-center text-xs text-neutral-400">Scan to join the group</p>
-			<p class="text-center font-mono text-xs break-all text-neutral-300">{joinUrl}</p>
+			<p class="text-center text-xs text-ink-faint">Scan to join the group</p>
+			<p class="text-center font-mono text-xs break-all text-ink-faint">{joinUrl}</p>
 		</div>
 	{/if}
 </div>
