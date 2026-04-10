@@ -18,18 +18,9 @@
 					Tu cuenta no tiene acceso a Librarian todavía.
 				{/if}
 			</p>
-			<p class="mt-2 text-sm text-neutral-500">
-				Si quieres acceder, regístrate directamente en Librarian con una nueva cuenta.
-			</p>
-		</div>
+			</div>
 
 		<div class="mt-8 flex flex-col gap-3">
-			<a
-				href="/register"
-				class="block w-full rounded-none border border-neutral-900 bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800"
-			>
-				Crear cuenta en Librarian
-			</a>
 
 			<form method="POST" action="?/logout" use:enhance>
 				<button
