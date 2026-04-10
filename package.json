@@ -46,7 +46,6 @@
 		"@vite-pwa/sveltekit": "^1.1.0",
 		"@vitest/browser-playwright": "^4.1.0",
 		"@vitest/coverage-v8": "^4.1.0",
-		"better-auth": "~1.4.21",
 		"drizzle-kit": "^0.31.8",
 		"eslint": "^9.39.2",
 		"eslint-config-prettier": "^10.1.8",
@@ -74,6 +73,7 @@
 	"dependencies": {
 		"@ericblade/quagga2": "^1.12.1",
 		"@paulmillr/qr": "^0.3.0",
+		"better-auth": "~1.4.21",
 		"drizzle-orm": "^0.45.1",
 		"nanoid": "^5.1.7",
 		"phosphor-svelte": "^3.1.0",
