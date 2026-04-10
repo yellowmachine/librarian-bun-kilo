@@ -9,7 +9,7 @@ const AddBookSchema = v.pipe(
     workId: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(32))),
     notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000)))
   }),
-  v.check(({ isbn, workId }) => Boolean(isbn || workId), 'Se requiere isbn o workId')
+  v.check(({ isbn, workId }) => Boolean(isbn || workId), 'An ISBN or workId is required.')
 );
 
 // GET /api/books — lista los libros del usuario autenticado
@@ -28,7 +28,7 @@ export async function POST({ locals, request }: RequestEvent) {
   if (!locals.user) error(401, 'Not authenticated');
 
   const raw = await request.json().catch(() => null);
-  if (!raw || typeof raw !== 'object') error(400, 'Body JSON inválido');
+  if (!raw || typeof raw !== 'object') error(400, 'Invalid JSON body.');
 
   const result = v.safeParse(AddBookSchema, raw);
   if (!result.success) {
