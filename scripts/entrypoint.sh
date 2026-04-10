@@ -2,7 +2,7 @@
 set -e
 
 echo "→ Ejecutando migraciones..."
-bun run db:migrate
+bun scripts/migrate.ts
 
 echo "→ Iniciando servidor..."
 exec bun run build/index.js
