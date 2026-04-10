@@ -7,6 +7,22 @@ import { db } from '$lib/server/db';
 import { sendVerificationEmail } from '$lib/server/email';
 import * as authSchema from '$lib/server/db/auth.schema';
 
+// Deriva el dominio de cookie desde ORIGIN para compartirla entre subdominios.
+// https://librarian.scholio.review → .scholio.review (comparte cookie con scholio.review)
+// localhost → undefined (cookie sin domain, solo funciona en localhost)
+function cookieDomain(origin: string): string | undefined {
+  try {
+    const { hostname } = new URL(origin);
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return undefined;
+    const parts = hostname.split('.');
+    return parts.length >= 2 ? '.' + parts.slice(-2).join('.') : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const domain = cookieDomain(env.ORIGIN);
+
 export const auth = betterAuth({
   baseURL: env.ORIGIN,
   secret: env.BETTER_AUTH_SECRET,
@@ -39,22 +55,16 @@ export const auth = betterAuth({
       }
       : {})
   },
-  advanced: {
-    // Cookie compartida entre subdominios (ej: .scholio.review).
-    // En dev COOKIE_DOMAIN está vacío → cookie sin domain, solo funciona en localhost.
-    ...(env.COOKIE_DOMAIN
-      ? {
-        cookies: {
-          session_token: {
-            attributes: {
-              domain: env.COOKIE_DOMAIN,
-              sameSite: 'lax' as const,
-              secure: true
+  ...(domain
+    ? {
+        advanced: {
+          cookies: {
+            session_token: {
+              attributes: { domain, sameSite: 'lax' as const, secure: true }
             }
           }
         }
       }
-      : {})
-  },
+    : {}),
   plugins: [sveltekitCookies(getRequestEvent)] // make sure this is the last plugin in the array
 });
