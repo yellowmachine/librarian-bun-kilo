@@ -29,6 +29,12 @@
 
 	// Mostrar errores de acciones en un banner transitorio
 	let actionError = $derived(form?.error as string | undefined);
+
+	// Confirmación de expulsión de miembro
+	let pendingRemove = $state<{ userId: string; name: string } | null>(null);
+
+	// Confirmación de salir del grupo
+	let confirmLeave = $state(false);
 </script>
 
 <div class="mx-auto max-w-2xl space-y-8">
@@ -212,36 +218,83 @@
 						{member.role === 'owner' ? 'owner' : member.role === 'admin' ? 'admin' : ''}
 					</span>
 					{#if isOwnerOrAdmin && member.role !== 'owner'}
-						<form method="POST" action="?/removeMember" use:enhance class="inline">
-							<input type="hidden" name="userId" value={member.userId} />
-							<button
-								type="submit"
-								class="text-ink-faint hover:text-red-400"
-								onclick={(e) => {
-									if (!confirm(`Remove ${member.name}?`)) e.preventDefault();
-								}}
-							>
-								<X size={14} />
-							</button>
-						</form>
+						<button
+							type="button"
+							class="text-ink-faint hover:text-red-400"
+							onclick={() => (pendingRemove = { userId: member.userId, name: member.name })}
+						>
+							<X size={14} />
+						</button>
 					{/if}
 				</li>
 			{/each}
 		</ul>
 
 		{#if !isOwner}
-			<form
-				method="POST"
-				action="?/leave"
-				use:enhance
-				onsubmit={(e) => {
-					if (!confirm('Leave this group?')) e.preventDefault();
-				}}
+			<button
+				type="button"
+				class="text-sm text-ink-faint hover:text-red-500"
+				onclick={() => (confirmLeave = true)}
 			>
-				<button type="submit" class="text-sm text-ink-faint hover:text-red-500"
-					>Leave this group?</button
-				>
-			</form>
+				Leave this group?
+			</button>
 		{/if}
 	{/if}
 </div>
+
+<!-- Modal: confirmar expulsión de miembro -->
+{#if pendingRemove}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-ink/20">
+		<div class="w-full max-w-sm border border-paper-border bg-paper p-6 shadow-sm">
+			<p class="text-sm text-ink">
+				Remove <span class="font-medium">{pendingRemove.name}</span> from this group?
+			</p>
+			<div class="mt-5 flex justify-end gap-3">
+				<button
+					type="button"
+					class="border border-paper-border px-4 py-2 text-sm text-ink-muted hover:border-ink-faint hover:text-ink"
+					onclick={() => (pendingRemove = null)}
+				>
+					Cancel
+				</button>
+				<form method="POST" action="?/removeMember" use:enhance>
+					<input type="hidden" name="userId" value={pendingRemove.userId} />
+					<button
+						type="submit"
+						class="border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100"
+						onclick={() => (pendingRemove = null)}
+					>
+						Remove
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Modal: confirmar salir del grupo -->
+{#if confirmLeave}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-ink/20">
+		<div class="w-full max-w-sm border border-paper-border bg-paper p-6 shadow-sm">
+			<p class="text-sm text-ink">Leave this group? You will need a new invite code to rejoin.</p>
+			<div class="mt-5 flex justify-end gap-3">
+				<button
+					type="button"
+					class="border border-paper-border px-4 py-2 text-sm text-ink-muted hover:border-ink-faint hover:text-ink"
+					onclick={() => (confirmLeave = false)}
+				>
+					Cancel
+				</button>
+				<form method="POST" action="?/leave" use:enhance>
+					<button
+						type="submit"
+						class="border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100"
+						onclick={() => (confirmLeave = false)}
+					>
+						Leave
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+{/if}
