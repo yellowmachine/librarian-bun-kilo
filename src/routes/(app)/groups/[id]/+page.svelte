@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		ArrowLeft,
 		Tag,
@@ -257,7 +258,10 @@
 				>
 					Cancel
 				</button>
-				<form method="POST" action="?/removeMember" use:enhance>
+				<form method="POST" action="?/removeMember" use:enhance={() => async ({ update }) => {
+					await update();
+					await invalidateAll();
+				}}>
 					<input type="hidden" name="userId" value={pendingRemove.userId} />
 					<button
 						type="submit"
