@@ -112,8 +112,8 @@ export async function getUserBooks(
 		} else {
 			// by author: only the first author (index 0) determines the letter
 			rows = await base
-				.where(sql`upper(left(${books.authors}->0, 1)) = ${filter.letter}`)
-				.orderBy(sql`${books.authors}->0`);
+				.where(sql`upper(left(${books.authors}[1], 1)) = ${filter.letter}`)
+				.orderBy(sql`${books.authors}[1]`);
 		}
 
 		if (rows.length === 0) return [];
@@ -161,7 +161,7 @@ export async function getLibraryLetters(
 						order by 1
 					`)
 				: await tx.execute<{ letter: string }>(sql`
-						select distinct upper(left(${books.authors}->0, 1)) as letter
+						select distinct upper(left(${books.authors}[1], 1)) as letter
 						from ${userBooks}
 						inner join ${books} on ${userBooks.bookId} = ${books.id}
 						order by 1
