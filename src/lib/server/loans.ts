@@ -169,7 +169,7 @@ export async function getUserLoans(userId: string): Promise<{
     .select({ id: user.id, name: user.name, email: user.email })
     .from(user)
     .where(eq(user.id, userId));
-  const self = selfRows[0] ?? { id: userId, name: 'Tú', email: '' };
+  const self = selfRows[0] ?? { id: userId, name: 'You', email: '' };
 
   function enrich(row: (typeof rows.ownerLoans)[0], asOwner: boolean): LoanWithDetails {
     const borrowerInfo = asOwner ? (userMap.get(row.borrowerId) ?? { name: '?', email: '' }) : self;

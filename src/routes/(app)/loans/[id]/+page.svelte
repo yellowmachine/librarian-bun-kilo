@@ -119,11 +119,11 @@
 	<div class="grid grid-cols-2 gap-px border border-paper-border bg-paper-border">
 		<div class="bg-paper px-4 py-4">
 			<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Owner</p>
-			<p class="mt-1 font-medium text-ink">{isOwner ? 'Tú' : loan.ownerName}</p>
+			<p class="mt-1 font-medium text-ink">{isOwner ? 'You' : loan.ownerName}</p>
 		</div>
 		<div class="bg-paper px-4 py-4">
 			<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Borrower</p>
-			<p class="mt-1 font-medium text-ink">{isBorrower ? 'Tú' : loan.borrowerName}</p>
+			<p class="mt-1 font-medium text-ink">{isBorrower ? 'You' : loan.borrowerName}</p>
 		</div>
 		{#if loan.dueDate}
 			<div class="col-span-2 bg-paper px-4 py-4">
