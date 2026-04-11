@@ -18,10 +18,7 @@
 
 	<form method="POST" use:enhance class="space-y-5">
 		<div>
-			<label
-				for="name"
-				class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
-			>
+			<label for="name" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
 				Group name
 			</label>
 			<input
@@ -40,14 +37,14 @@
 				for="description"
 				class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
 			>
-				Description <span class="tracking-normal text-ink-faint normal-case">(opcional)</span>
+				Description <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 			</label>
 			<textarea
 				id="description"
 				name="description"
 				rows="2"
 				class="mt-1.5 w-full border-0 border-b border-paper-border bg-transparent px-0 py-2 text-sm text-ink placeholder-ink-faint focus:border-ink focus:ring-0"
-				placeholder="Una breve descripción..."
+				placeholder="A brief description..."
 			></textarea>
 		</div>
 		<div class="pt-2">

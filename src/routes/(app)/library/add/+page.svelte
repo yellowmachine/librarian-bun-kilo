@@ -149,11 +149,7 @@
 				onclick={() => (mode = 'manual')}
 				class="group flex flex-col items-center gap-4 border border-paper-border p-8 transition-colors hover:border-ink"
 			>
-				<MagnifyingGlass
-					size={40}
-					weight="thin"
-					class="text-ink-faint group-hover:text-ink"
-				/>
+				<MagnifyingGlass size={40} weight="thin" class="text-ink-faint group-hover:text-ink" />
 				<span class="text-sm text-ink-muted">Manual Search</span>
 			</button>
 		</div>
@@ -261,7 +257,7 @@
 					for="notes"
 					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
 				>
-					Notes <span class="tracking-normal normal-case">(opcional)</span>
+					Notes <span class="tracking-normal normal-case">(optional)</span>
 				</label>
 				<textarea
 					id="notes"
