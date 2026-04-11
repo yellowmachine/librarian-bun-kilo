@@ -1,4 +1,6 @@
-import { nanoid } from 'nanoid';
+import { customAlphabet } from 'nanoid';
+
+const nanoidCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import {
@@ -78,7 +80,7 @@ export async function createGroup(
     await tx.insert(groupMembers).values({ groupId: id, userId, role: 'owner' });
     // El invite code se inserta después del member para que la policy
     // group_invite_codes_insert (requiere ser owner/admin) lo encuentre.
-    await tx.insert(groupInviteCodes).values({ groupId: id, code: nanoid(8).toUpperCase() });
+    await tx.insert(groupInviteCodes).values({ groupId: id, code: nanoidCode() });
   });
 
   return id;
@@ -264,7 +266,7 @@ export async function removeMember(
 // ─── Regenerar código de invitación ──────────────────────────────────────────
 
 export async function regenerateInviteCode(userId: string, groupId: string): Promise<string> {
-  const newCode = nanoid(8).toUpperCase();
+  const newCode = nanoidCode();
   await withRLS(userId, (tx) =>
     tx
       .insert(groupInviteCodes)
