@@ -259,15 +259,12 @@
 					Cancel
 				</button>
 				<form method="POST" action="?/removeMember" use:enhance={() => async ({ update }) => {
+					pendingRemove = null;
 					await update();
 					await invalidateAll();
 				}}>
 					<input type="hidden" name="userId" value={pendingRemove.userId} />
-					<button
-						type="submit"
-						class="border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100"
-						onclick={() => (pendingRemove = null)}
-					>
+					<button type="submit" class="border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100">
 						Remove
 					</button>
 				</form>
