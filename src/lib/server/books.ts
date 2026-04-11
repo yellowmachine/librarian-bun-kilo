@@ -1,9 +1,11 @@
 import { nanoid } from 'nanoid';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { eq, desc, asc, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import { books, userBooks, tags, userBookTags } from './db/schema';
 import { withRLS } from './db/rls';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
+
+export const LIBRARY_RECENT_LIMIT = 50;
 
 // ─── Upsert libro en catálogo global ─────────────────────────────────────────
 // Si el libro ya existe por workId lo devuelve sin tocar; si no, lo inserta.
@@ -73,9 +75,16 @@ export type UserBookWithDetails = {
 	tags: { id: string; name: string; color: string | null }[];
 };
 
-export async function getUserBooks(userId: string): Promise<UserBookWithDetails[]> {
+export type LibraryFilter =
+	| { type: 'recent'; limit?: number }
+	| { type: 'letter'; letter: string; by: 'title' | 'author' };
+
+export async function getUserBooks(
+	userId: string,
+	filter: LibraryFilter = { type: 'recent', limit: LIBRARY_RECENT_LIMIT }
+): Promise<UserBookWithDetails[]> {
 	return withRLS(userId, async (tx) => {
-		const rows = await tx
+		const base = tx
 			.select({
 				userBookId: userBooks.id,
 				bookId: books.id,
@@ -89,12 +98,28 @@ export async function getUserBooks(userId: string): Promise<UserBookWithDetails[
 				addedAt: userBooks.addedAt
 			})
 			.from(userBooks)
-			.innerJoin(books, eq(userBooks.bookId, books.id))
-			.orderBy(desc(userBooks.addedAt));
+			.innerJoin(books, eq(userBooks.bookId, books.id));
+
+		let rows;
+		if (filter.type === 'recent') {
+			rows = await base
+				.orderBy(desc(userBooks.addedAt))
+				.limit(filter.limit ?? LIBRARY_RECENT_LIMIT);
+		} else if (filter.by === 'title') {
+			rows = await base
+				.where(sql`upper(left(${books.title}, 1)) = ${filter.letter}`)
+				.orderBy(asc(books.title));
+		} else {
+			// by author: any author in the array starts with the letter
+			rows = await base
+				.where(
+					sql`exists(select 1 from unnest(${books.authors}) a where upper(left(a, 1)) = ${filter.letter})`
+				)
+				.orderBy(asc(books.title));
+		}
 
 		if (rows.length === 0) return [];
 
-		// Una sola query para todas las etiquetas (evita N+1)
 		const userBookIds = rows.map((r) => r.userBookId);
 		const allTags = await tx
 			.select({
@@ -107,7 +132,6 @@ export async function getUserBooks(userId: string): Promise<UserBookWithDetails[
 			.innerJoin(tags, eq(userBookTags.tagId, tags.id))
 			.where(inArray(userBookTags.userBookId, userBookIds));
 
-		// Agrupar etiquetas por userBookId
 		const tagsByBook = new Map<string, { id: string; name: string; color: string | null }[]>();
 		for (const tag of allTags) {
 			const list = tagsByBook.get(tag.userBookId) ?? [];
@@ -120,6 +144,32 @@ export async function getUserBooks(userId: string): Promise<UserBookWithDetails[
 			authors: row.authors ?? [],
 			tags: tagsByBook.get(row.userBookId) ?? []
 		}));
+	});
+}
+
+// ─── Letras disponibles en la biblioteca ─────────────────────────────────────
+
+export async function getLibraryLetters(
+	userId: string,
+	by: 'title' | 'author'
+): Promise<string[]> {
+	return withRLS(userId, async (tx) => {
+		const rows =
+			by === 'title'
+				? await tx.execute<{ letter: string }>(sql`
+						select distinct upper(left(${books.title}, 1)) as letter
+						from ${userBooks}
+						inner join ${books} on ${userBooks.bookId} = ${books.id}
+						order by 1
+					`)
+				: await tx.execute<{ letter: string }>(sql`
+						select distinct upper(left(a, 1)) as letter
+						from ${userBooks}
+						inner join ${books} on ${userBooks.bookId} = ${books.id},
+						unnest(${books.authors}) a
+						order by 1
+					`);
+		return rows.map((r) => r.letter).filter((l) => /^[A-Z]$/.test(l));
 	});
 }
 

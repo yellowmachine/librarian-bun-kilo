@@ -4,12 +4,16 @@
 	import BookGrid from '$lib/components/BookGrid.svelte';
 
 	let { data } = $props();
-	const { userBooks } = data;
+	const { userBooks, letter, by, titleLetters, authorLetters } = $derived(data);
 
 	let search = $state('');
 	let activeTag = $state<string | null>(null);
 
-	// Todas las etiquetas únicas del usuario
+	const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+	const activeLetters = $derived(by === 'title' ? titleLetters : authorLetters);
+
+	// Todas las etiquetas únicas del usuario (sobre el subconjunto cargado)
 	const allTags = $derived(() => {
 		const map = new Map<string, { id: string; name: string; color: string | null }>();
 		for (const b of userBooks as UserBookWithDetails[]) {
@@ -31,6 +35,14 @@
 		}
 		return list;
 	});
+
+	function letterHref(l: string) {
+		return `/library?by=${by}&letter=${l}`;
+	}
+
+	function byHref(mode: 'title' | 'author') {
+		return letter ? `/library?by=${mode}&letter=${letter}` : `/library?by=${mode}`;
+	}
 </script>
 
 <div class="space-y-8">
@@ -39,8 +51,12 @@
 		<div>
 			<h1 class="font-serif text-3xl font-normal text-ink">My library</h1>
 			<p class="mt-1 text-sm text-ink-faint">
-				{userBooks.length}
-				{userBooks.length === 1 ? 'book' : 'books'}
+				{#if !letter}
+					{titleLetters.length > 0 ? 'Showing recent books' : ''}
+				{:else}
+					{userBooks.length}
+					{userBooks.length === 1 ? 'book' : 'books'}
+				{/if}
 			</p>
 		</div>
 		<div class="flex items-center gap-2">
@@ -61,8 +77,57 @@
 		</div>
 	</div>
 
-	{#if userBooks.length > 0}
-		<!-- Búsqueda + filtros -->
+	{#if titleLetters.length > 0}
+		<!-- Índice alfabético -->
+		<div class="space-y-3">
+			<!-- Toggle title / author -->
+			<div class="flex gap-1 border-b border-paper-border">
+				<a
+					href={byHref('title')}
+					class="border-b-2 pb-2 text-xs font-medium transition-colors
+					{by === 'title' ? 'border-ink text-ink' : 'border-transparent text-ink-faint hover:text-ink-muted'}"
+				>
+					By title
+				</a>
+				<a
+					href={byHref('author')}
+					class="ml-4 border-b-2 pb-2 text-xs font-medium transition-colors
+					{by === 'author' ? 'border-ink text-ink' : 'border-transparent text-ink-faint hover:text-ink-muted'}"
+				>
+					By author
+				</a>
+			</div>
+
+			<!-- Letras -->
+			<div class="flex flex-wrap gap-1">
+				<a
+					href="/library"
+					class="flex h-7 w-7 items-center justify-center text-xs transition-colors
+					{!letter ? 'bg-ink text-paper' : 'text-ink-muted hover:text-ink'}"
+				>
+					All
+				</a>
+				{#each ALPHABET as l}
+					{@const available = activeLetters.includes(l)}
+					{@const active = letter === l}
+					{#if available}
+						<a
+							href={letterHref(l)}
+							class="flex h-7 w-7 items-center justify-center text-xs font-medium transition-colors
+							{active ? 'bg-ink text-paper' : 'text-ink hover:bg-paper-ui'}"
+						>
+							{l}
+						</a>
+					{:else}
+						<span class="flex h-7 w-7 items-center justify-center text-xs text-ink-faint/30">
+							{l}
+						</span>
+					{/if}
+				{/each}
+			</div>
+		</div>
+
+		<!-- Búsqueda + filtros de tag -->
 		<div class="space-y-3">
 			<div class="relative">
 				<MagnifyingGlass
@@ -106,7 +171,7 @@
 
 		<!-- Grid de libros -->
 		{#if filtered().length === 0}
-			<p class="py-12 text-center text-sm text-ink-faint">Without results.</p>
+			<p class="py-12 text-center text-sm text-ink-faint">No results.</p>
 		{:else}
 			<BookGrid
 				books={filtered().map((b) => ({

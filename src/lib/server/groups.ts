@@ -1,4 +1,4 @@
-import { customAlphabet } from 'nanoid';
+import { nanoid, customAlphabet } from 'nanoid';
 
 const nanoidCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
 import { eq, and, inArray, sql } from 'drizzle-orm';
