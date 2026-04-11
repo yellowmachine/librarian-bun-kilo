@@ -43,13 +43,22 @@
 				{userBooks.length === 1 ? 'book' : 'books'}
 			</p>
 		</div>
-		<a
-			href="/library/add"
-			class="flex items-center gap-1.5 border border-ink bg-ink px-4 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
-		>
-			<Plus size={16} weight="bold" />
-			Add
-		</a>
+		<div class="flex items-center gap-2">
+			<a
+				href="/tags"
+				class="flex items-center gap-1.5 border border-paper-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+			>
+				<Tag size={16} />
+				Tags
+			</a>
+			<a
+				href="/library/add"
+				class="flex items-center gap-1.5 border border-ink bg-ink px-4 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
+			>
+				<Plus size={16} weight="bold" />
+				Add
+			</a>
+		</div>
 	</div>
 
 	{#if userBooks.length > 0}
