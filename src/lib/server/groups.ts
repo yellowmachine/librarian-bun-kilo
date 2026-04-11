@@ -254,21 +254,11 @@ export async function removeMember(
   groupId: string,
   targetUserId: string
 ): Promise<void> {
-  // Check actor is owner/admin via RLS (only sees own membership row)
-  const membership = await withRLS(actorId, (tx) =>
+  await withRLS(actorId, (tx) =>
     tx
-      .select({ role: groupMembers.role })
-      .from(groupMembers)
-      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, actorId)))
+      .delete(groupMembers)
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetUserId)))
   );
-
-  const role = membership[0]?.role;
-  if (role !== 'owner' && role !== 'admin') throw new Error('Not authorized');
-
-  // Use db directly (bypasses RLS) to delete the target member
-  await db
-    .delete(groupMembers)
-    .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetUserId)));
 }
 
 // ─── Regenerar código de invitación ──────────────────────────────────────────

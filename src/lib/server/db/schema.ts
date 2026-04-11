@@ -48,6 +48,15 @@ export const loanStatusEnum = librarianSchema.enum('loan_status', [
 
 const currentUserId = sql`current_setting('app.current_user_id', true)`;
 
+// ─── Helper functions (SECURITY DEFINER) ─────────────────────────────────────
+// Estas funciones bypasean RLS para evitar recursión infinita cuando las
+// políticas de group_members se auto-referencian.
+// Se crean vía migración manual (no generadas por Drizzle).
+const isGroupMember = (groupId: unknown, userId: unknown) =>
+  sql`"librarian".is_group_member(${groupId}, ${userId})`;
+const isGroupAdmin = (groupId: unknown, userId: unknown) =>
+  sql`"librarian".is_group_admin(${groupId}, ${userId})`;
+
 // ─── User Profile ─────────────────────────────────────────────────────────────
 // Marca que un usuario se registró a través de Librarian.
 // Se crea en el momento del signup (antes de verificar el email).
@@ -280,11 +289,7 @@ export const groups = librarianSchema.table(
     pgPolicy('groups_select', {
       for: 'select',
       to: appUser,
-      using: sql`exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = ${table.id}
-				  and gm.user_id = ${currentUserId}
-			)`
+      using: isGroupMember(table.id, currentUserId)
     }),
     pgPolicy('groups_insert', {
       for: 'insert',
@@ -294,22 +299,12 @@ export const groups = librarianSchema.table(
     pgPolicy('groups_update', {
       for: 'update',
       to: appUser,
-      using: sql`exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = ${table.id}
-				  and gm.user_id = ${currentUserId}
-				  and gm.role in ('owner', 'admin')
-			)`
+      using: isGroupAdmin(table.id, currentUserId)
     }),
     pgPolicy('groups_delete', {
       for: 'delete',
       to: appUser,
-      using: sql`exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = ${table.id}
-				  and gm.user_id = ${currentUserId}
-				  and gm.role = 'owner'
-			)`
+      using: isGroupAdmin(table.id, currentUserId)
     })
   ]
 );
@@ -334,36 +329,21 @@ export const groupMembers = librarianSchema.table(
     pgPolicy('group_members_select', {
       for: 'select',
       to: appUser,
-      using: sql`${table.userId} = ${currentUserId}`
+      // Un usuario puede ver su propia fila O las de cualquier miembro de su grupo.
+      // Usa SECURITY DEFINER para evitar recursión auto-referencial.
+      using: sql`${table.userId} = ${currentUserId} or ${isGroupMember(table.groupId, currentUserId)}`
     }),
-    // Solo owners/admins pueden añadir miembros.
-    // El flujo joinGroupByCode corre como superuser (bypass RLS) por lo que
-    // no necesita pasar por esta política.
+    // El flujo joinGroupByCode corre como superuser (bypass RLS).
     pgPolicy('group_members_insert_self', {
       for: 'insert',
       to: appUser,
       withCheck: sql`${table.userId} = ${currentUserId}`
     }),
-    /*pgPolicy('group_members_insert', {
-      for: 'insert',
-      to: appUser,
-      withCheck: sql`exists (
-          select 1 from "librarian".group_members gm
-          where gm.group_id = ${table.groupId}
-            and gm.user_id = ${currentUserId}
-            and gm.role in ('owner', 'admin')
-        )`
-    }),
-    */
     pgPolicy('group_members_delete', {
       for: 'delete',
       to: appUser,
-      using: sql`${table.userId} = ${currentUserId} or exists (
-        select 1 from "librarian".group_members gm
-        where gm.group_id = ${table.groupId}
-          and gm.user_id = ${currentUserId}
-          and gm.role in ('owner', 'admin')
-      )`
+      // Un miembro puede salir (su propia fila) o un owner/admin puede expulsar a otros.
+      using: sql`${table.userId} = ${currentUserId} or ${isGroupAdmin(table.groupId, currentUserId)}`
     })
   ]
 );
@@ -391,32 +371,17 @@ export const groupInviteCodes = librarianSchema.table(
     pgPolicy('group_invite_codes_insert', {
       for: 'insert',
       to: appUser,
-      withCheck: sql`exists (
-        select 1 from "librarian".group_members gm
-        where gm.group_id = ${table.groupId}
-          and gm.user_id = ${currentUserId}
-          and gm.role in ('owner', 'admin')
-      )`
+      withCheck: isGroupAdmin(table.groupId, currentUserId)
     }),
     pgPolicy('group_invite_codes_update', {
       for: 'update',
       to: appUser,
-      using: sql`exists (
-        select 1 from "librarian".group_members gm
-        where gm.group_id = ${table.groupId}
-          and gm.user_id = ${currentUserId}
-          and gm.role in ('owner', 'admin')
-      )`
+      using: isGroupAdmin(table.groupId, currentUserId)
     }),
     pgPolicy('group_invite_codes_delete', {
       for: 'delete',
       to: appUser,
-      using: sql`exists (
-        select 1 from "librarian".group_members gm
-        where gm.group_id = ${table.groupId}
-          and gm.user_id = ${currentUserId}
-          and gm.role in ('owner', 'admin')
-      )`
+      using: isGroupAdmin(table.groupId, currentUserId)
     })
   ]
 );
@@ -444,32 +409,17 @@ export const sharedTags = librarianSchema.table(
     pgPolicy('shared_tags_select', {
       for: 'select',
       to: appUser,
-      using: sql`exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = ${table.groupId}
-				  and gm.user_id = ${currentUserId}
-			)`
+      using: isGroupMember(table.groupId, currentUserId)
     }),
     pgPolicy('shared_tags_insert', {
       for: 'insert',
       to: appUser,
-      withCheck: sql`${table.sharedBy} = ${currentUserId}
-				and exists (
-					select 1 from "librarian".group_members gm
-					where gm.group_id = ${table.groupId}
-					  and gm.user_id = ${currentUserId}
-				)`
+      withCheck: sql`${table.sharedBy} = ${currentUserId} and ${isGroupMember(table.groupId, currentUserId)}`
     }),
     pgPolicy('shared_tags_delete', {
       for: 'delete',
       to: appUser,
-      using: sql`${table.sharedBy} = ${currentUserId}
-				or exists (
-					select 1 from "librarian".group_members gm
-					where gm.group_id = ${table.groupId}
-					  and gm.user_id = ${currentUserId}
-					  and gm.role in ('owner', 'admin')
-				)`
+      using: sql`${table.sharedBy} = ${currentUserId} or ${isGroupAdmin(table.groupId, currentUserId)}`
     })
   ]
 );
