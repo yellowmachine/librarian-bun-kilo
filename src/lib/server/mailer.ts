@@ -51,7 +51,5 @@ export async function sendMail({
 	}
 
 	const from = env.EMAIL_FROM ?? 'Scholio Librarian <no-reply@scholio.review>';
-	console.log(`[mailer] sending to=${to} subject="${subject}"`);
 	await transporter.sendMail({ from, to, subject, html });
-	console.log(`[mailer] sent ok to=${to}`);
 }
