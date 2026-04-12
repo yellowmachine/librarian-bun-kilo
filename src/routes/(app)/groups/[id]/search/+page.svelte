@@ -242,7 +242,7 @@
 												name="notes"
 												placeholder="Message to the owner (optional)"
 												rows="2"
-												class="w-44 resize-none border border-paper-border px-2 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+												class="w-44 resize-none border border-paper-border bg-paper px-2 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
 											></textarea>
 											<div class="flex gap-1">
 												<button
