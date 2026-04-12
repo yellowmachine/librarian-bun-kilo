@@ -286,9 +286,11 @@
 						action="?/deleteReview"
 						use:enhance
 						onsubmit={(e) => {
-							e.preventDefault();
 							const form = e.currentTarget as HTMLFormElement;
-							pending = { message: 'Remove your review?', submitFn: () => form.requestSubmit() };
+							if (!form.dataset.confirmed) {
+								e.preventDefault();
+								pending = { message: 'Remove your review?', submitFn: () => { form.dataset.confirmed = 'true'; form.requestSubmit(); delete form.dataset.confirmed; } };
+							}
 						}}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
@@ -329,9 +331,11 @@
 			action="?/remove"
 			use:enhance
 			onsubmit={(e) => {
-				e.preventDefault();
 				const form = e.currentTarget as HTMLFormElement;
-				pending = { message: 'Remove this book from your library?', submitFn: () => form.requestSubmit() };
+				if (!form.dataset.confirmed) {
+					e.preventDefault();
+					pending = { message: 'Remove this book from your library?', submitFn: () => { form.dataset.confirmed = 'true'; form.requestSubmit(); delete form.dataset.confirmed; } };
+				}
 			}}
 		>
 			<button

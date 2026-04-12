@@ -133,9 +133,11 @@
 						action="?/deleteReview"
 						use:enhance
 						onsubmit={(e) => {
-							e.preventDefault();
 							const form = e.currentTarget as HTMLFormElement;
-							pendingDelete = () => form.requestSubmit();
+							if (!form.dataset.confirmed) {
+								e.preventDefault();
+								pendingDelete = () => { form.dataset.confirmed = 'true'; form.requestSubmit(); delete form.dataset.confirmed; };
+							}
 						}}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">

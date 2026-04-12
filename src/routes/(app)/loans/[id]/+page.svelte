@@ -173,10 +173,17 @@
 					action="?/transition"
 					use:enhance
 					onsubmit={(e) => {
-						if (action.confirm) {
+						const form = e.currentTarget as HTMLFormElement;
+						if (action.confirm && !form.dataset.confirmed) {
 							e.preventDefault();
-							const form = e.currentTarget as HTMLFormElement;
-							pending = { action, submitFn: () => form.requestSubmit() };
+							pending = {
+								action,
+								submitFn: () => {
+									form.dataset.confirmed = 'true';
+									form.requestSubmit();
+									delete form.dataset.confirmed;
+								}
+							};
 						}
 					}}
 				>
