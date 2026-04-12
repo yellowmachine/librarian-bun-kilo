@@ -2,6 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { ArrowLeft, Star } from 'phosphor-svelte';
 	import StarRating from '$lib/components/StarRating.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+
+	let pendingDelete = $state<(() => void) | null>(null);
 
 	let { data, form } = $props();
 	let { book, myReview, reviews, reviewStats } = $derived(data);
@@ -130,7 +133,9 @@
 						action="?/deleteReview"
 						use:enhance
 						onsubmit={(e) => {
-							if (!confirm('Remove your review?')) e.preventDefault();
+							e.preventDefault();
+							const form = e.currentTarget as HTMLFormElement;
+							pendingDelete = () => form.requestSubmit();
 						}}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
@@ -165,3 +170,11 @@
 		</div>
 	{/if}
 </div>
+
+{#if pendingDelete}
+	<ConfirmDialog
+		message="Remove your review?"
+		onconfirm={() => { const s = pendingDelete!; pendingDelete = null; s(); }}
+		oncancel={() => (pendingDelete = null)}
+	/>
+{/if}

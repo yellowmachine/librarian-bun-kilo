@@ -3,10 +3,14 @@
 	import { ArrowLeft, BookOpen } from 'phosphor-svelte';
 	import type { LoanWithDetails } from '$lib/server/loans';
 	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let { data, form } = $props();
 	const loan = $derived(data.loan as LoanWithDetails);
 	const currentUserId = $derived(data.currentUserId as string);
+
+	type PendingSubmit = { action: Action; submitFn: () => void };
+	let pending = $state<PendingSubmit | null>(null);
 
 	const isOwner = $derived(loan.ownerId === currentUserId);
 	const isBorrower = $derived(loan.borrowerId === currentUserId);
@@ -169,7 +173,11 @@
 					action="?/transition"
 					use:enhance
 					onsubmit={(e) => {
-						if (action.confirm && !confirm(action.confirm)) e.preventDefault();
+						if (action.confirm) {
+							e.preventDefault();
+							const form = e.currentTarget as HTMLFormElement;
+							pending = { action, submitFn: () => form.requestSubmit() };
+						}
 					}}
 				>
 					<input type="hidden" name="toStatus" value={action.toStatus} />
@@ -178,7 +186,7 @@
 							name="ownerNotes"
 							placeholder="Message to the borrower (optional)"
 							rows="2"
-							class="mb-2 w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+							class="mb-2 w-full resize-none border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
 						></textarea>
 					{/if}
 					<button
@@ -197,5 +205,13 @@
 				</form>
 			{/each}
 		</div>
+	{/if}
+
+	{#if pending}
+		<ConfirmDialog
+			message={pending.action.confirm ?? ''}
+			onconfirm={() => { const s = pending!.submitFn; pending = null; s(); }}
+			oncancel={() => (pending = null)}
+		/>
 	{/if}
 </div>

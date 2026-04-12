@@ -5,6 +5,10 @@
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
 	import StarRating from '$lib/components/StarRating.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+
+	type PendingSubmit = { message: string; submitFn: () => void };
+	let pending = $state<PendingSubmit | null>(null);
 
 	let { data, form } = $props();
 	let { book, userTags, myReview, reviews, reviewStats } = $derived(data);
@@ -282,7 +286,9 @@
 						action="?/deleteReview"
 						use:enhance
 						onsubmit={(e) => {
-							if (!confirm('¿Eliminar tu reseña?')) e.preventDefault();
+							e.preventDefault();
+							const form = e.currentTarget as HTMLFormElement;
+							pending = { message: 'Remove your review?', submitFn: () => form.requestSubmit() };
 						}}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
@@ -323,7 +329,9 @@
 			action="?/remove"
 			use:enhance
 			onsubmit={(e) => {
-				if (!confirm('Remove this book from your library?')) e.preventDefault();
+				e.preventDefault();
+				const form = e.currentTarget as HTMLFormElement;
+				pending = { message: 'Remove this book from your library?', submitFn: () => form.requestSubmit() };
 			}}
 		>
 			<button
@@ -335,3 +343,11 @@
 		</form>
 	</div>
 </div>
+
+{#if pending}
+	<ConfirmDialog
+		message={pending.message}
+		onconfirm={() => { const s = pending!.submitFn; pending = null; s(); }}
+		oncancel={() => (pending = null)}
+	/>
+{/if}
