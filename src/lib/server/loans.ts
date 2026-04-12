@@ -103,6 +103,12 @@ export async function requestLoan(
       .where(eq(userBooks.id, userBookId))
   ]);
 
+  console.log('[email] requestLoan notify check', {
+    borrowerName: borrowerRow[0]?.name,
+    ownerEmail: ownerRow[0]?.email,
+    bookTitle: bookRow[0]?.title
+  });
+
   if (ownerRow[0]?.email && borrowerRow[0]?.name && bookRow[0]?.title) {
     sendLoanRequestEmail({
       to: ownerRow[0].email,
