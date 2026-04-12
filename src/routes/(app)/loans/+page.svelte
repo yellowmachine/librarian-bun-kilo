@@ -32,15 +32,15 @@
 
 	const q: string = $derived(inputValue.trim().toLowerCase());
 
-	const visibleOwner: LoanWithDetails[] = $derived(
-		q === '' ? asOwner : filterLoans(sortLoans(asOwner))
-	);
-	const visibleBorrower: LoanWithDetails[] = $derived(
-		q === '' ? asBorrower : filterLoans(sortLoans(asBorrower))
-	);
-
 	const sortedBorrower = $derived(sortLoans(asBorrower as LoanWithDetails[]));
 	const sortedOwner = $derived(sortLoans(asOwner as LoanWithDetails[]));
+
+	const visibleOwner: LoanWithDetails[] = $derived(
+		q === '' ? sortedOwner : filterLoans(sortedOwner)
+	);
+	const visibleBorrower: LoanWithDetails[] = $derived(
+		q === '' ? sortedBorrower : filterLoans(sortedBorrower)
+	);
 
 	//const visibleBorrower = $derived(filterLoans(sortedBorrower));
 	//const visibleOwner = $derived(filterLoans(sortedOwner));
