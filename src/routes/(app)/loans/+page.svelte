@@ -7,7 +7,6 @@
 	const { asOwner, asBorrower } = data;
 
 	let activeTab = $state<'borrower' | 'owner'>('borrower');
-	let query = $state('');
 	let inputValue = $state('');
 
 	const ACTIVE = new Set(['requested', 'accepted', 'active', 'return_requested']);
@@ -22,24 +21,25 @@
 		});
 	}
 
+	const query: string = $derived(inputValue.trim().toLowerCase());
+
 	function filterLoans(list: LoanWithDetails[]): LoanWithDetails[] {
-		const q = query.trim().toLowerCase();
-		if (!q) return list.slice(0, LIMIT);
+		if (!query) return list.slice(0, LIMIT);
 		return list.filter(
-			(l) => l.title.toLowerCase().includes(q) || l.authors.some((a) => a.toLowerCase().includes(q))
+			(l) =>
+				l.title.toLowerCase().includes(query) ||
+				l.authors.some((a) => a.toLowerCase().includes(query))
 		);
 	}
-
-	const q: string = $derived(inputValue.trim().toLowerCase());
 
 	const sortedBorrower = $derived(sortLoans(asBorrower as LoanWithDetails[]));
 	const sortedOwner = $derived(sortLoans(asOwner as LoanWithDetails[]));
 
 	const visibleOwner: LoanWithDetails[] = $derived(
-		q === '' ? sortedOwner : filterLoans(sortedOwner)
+		query === '' ? sortedOwner : filterLoans(sortedOwner)
 	);
 	const visibleBorrower: LoanWithDetails[] = $derived(
-		q === '' ? sortedBorrower : filterLoans(sortedBorrower)
+		query === '' ? sortedBorrower : filterLoans(sortedBorrower)
 	);
 
 	const pendingBorrower = $derived(
@@ -59,7 +59,7 @@
 	<form
 		onsubmit={(e) => {
 			e.preventDefault();
-			query = inputValue;
+			//query = inputValue;
 		}}
 		class="flex gap-2"
 	>
