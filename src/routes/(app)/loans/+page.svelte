@@ -26,17 +26,24 @@
 		const q = query.trim().toLowerCase();
 		if (!q) return list.slice(0, LIMIT);
 		return list.filter(
-			(l) =>
-				l.title.toLowerCase().includes(q) ||
-				l.authors.some((a) => a.toLowerCase().includes(q))
+			(l) => l.title.toLowerCase().includes(q) || l.authors.some((a) => a.toLowerCase().includes(q))
 		);
 	}
+
+	const q: string = $derived(inputValue.trim().toLowerCase());
+
+	const visibleOwner: LoanWithDetails[] = $derived(
+		q === '' ? asOwner : filterLoans(sortLoans(asOwner))
+	);
+	const visibleBorrower: LoanWithDetails[] = $derived(
+		q === '' ? asBorrower : filterLoans(sortLoans(asBorrower))
+	);
 
 	const sortedBorrower = $derived(sortLoans(asBorrower as LoanWithDetails[]));
 	const sortedOwner = $derived(sortLoans(asOwner as LoanWithDetails[]));
 
-	const visibleBorrower = $derived(filterLoans(sortedBorrower));
-	const visibleOwner = $derived(filterLoans(sortedOwner));
+	//const visibleBorrower = $derived(filterLoans(sortedBorrower));
+	//const visibleOwner = $derived(filterLoans(sortedOwner));
 
 	const pendingBorrower = $derived(
 		(asBorrower as LoanWithDetails[]).filter((l) => ACTIVE.has(l.status)).length
@@ -53,7 +60,10 @@
 
 	<!-- Búsqueda -->
 	<form
-		onsubmit={(e) => { e.preventDefault(); query = inputValue; }}
+		onsubmit={(e) => {
+			e.preventDefault();
+			query = inputValue;
+		}}
 		class="flex gap-2"
 	>
 		<input
@@ -62,21 +72,27 @@
 			placeholder="Search by title or author…"
 			class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
 		/>
+		<!--
 		<button
 			type="submit"
 			class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
 		>
 			Search
 		</button>
-		{#if query}
+     -->
+		<!--
+    {#if query}
 			<button
 				type="button"
-				onclick={() => { query = ''; inputValue = ''; }}
+				onclick={() => {
+					query = '';
+					inputValue = '';
+				}}
 				class="border border-paper-border px-3 py-2 text-sm text-ink-muted hover:border-ink-faint"
 			>
 				Clear
 			</button>
-		{/if}
+		{/if}-->
 	</form>
 
 	<!-- Tabs -->
