@@ -7,8 +7,11 @@
 	const { asOwner, asBorrower } = data;
 
 	let activeTab = $state<'borrower' | 'owner'>('borrower');
+	let query = $state('');
+	let inputValue = $state('');
 
 	const ACTIVE = new Set(['requested', 'accepted', 'active', 'return_requested']);
+	const LIMIT = 20;
 
 	function sortLoans(list: LoanWithDetails[]): LoanWithDetails[] {
 		return [...list].sort((a, b) => {
@@ -19,8 +22,21 @@
 		});
 	}
 
+	function filterLoans(list: LoanWithDetails[]): LoanWithDetails[] {
+		const q = query.trim().toLowerCase();
+		if (!q) return list.slice(0, LIMIT);
+		return list.filter(
+			(l) =>
+				l.title.toLowerCase().includes(q) ||
+				l.authors.some((a) => a.toLowerCase().includes(q))
+		);
+	}
+
 	const sortedBorrower = $derived(sortLoans(asBorrower as LoanWithDetails[]));
 	const sortedOwner = $derived(sortLoans(asOwner as LoanWithDetails[]));
+
+	const visibleBorrower = $derived(filterLoans(sortedBorrower));
+	const visibleOwner = $derived(filterLoans(sortedOwner));
 
 	const pendingBorrower = $derived(
 		(asBorrower as LoanWithDetails[]).filter((l) => ACTIVE.has(l.status)).length
@@ -34,6 +50,34 @@
 	<div>
 		<h1 class="font-serif text-3xl font-normal text-ink">Loans</h1>
 	</div>
+
+	<!-- Búsqueda -->
+	<form
+		onsubmit={(e) => { e.preventDefault(); query = inputValue; }}
+		class="flex gap-2"
+	>
+		<input
+			type="search"
+			bind:value={inputValue}
+			placeholder="Search by title or author…"
+			class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+		/>
+		<button
+			type="submit"
+			class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
+		>
+			Search
+		</button>
+		{#if query}
+			<button
+				type="button"
+				onclick={() => { query = ''; inputValue = ''; }}
+				class="border border-paper-border px-3 py-2 text-sm text-ink-muted hover:border-ink-faint"
+			>
+				Clear
+			</button>
+		{/if}
+	</form>
 
 	<!-- Tabs -->
 	<div class="border-b border-paper-border">
@@ -59,14 +103,16 @@
 		</nav>
 	</div>
 
-	{#snippet loanList(list: LoanWithDetails[], role: 'borrower' | 'owner')}
+	{#snippet loanList(list: LoanWithDetails[], total: number, role: 'borrower' | 'owner')}
 		{#if list.length === 0}
 			<div class="flex flex-col items-center py-20 text-center">
 				<ArrowsLeftRight size={40} weight="thin" class="mb-4 text-ink-faint" />
 				<p class="text-sm text-ink-faint">
-					{role === 'borrower'
-						? 'You have not applied for any loan.'
-						: 'No one has asked you for any books.'}
+					{query
+						? 'No loans match your search.'
+						: role === 'borrower'
+							? 'You have not applied for any loan.'
+							: 'No one has asked you for any books.'}
 				</p>
 			</div>
 		{:else}
@@ -110,12 +156,17 @@
 					</li>
 				{/each}
 			</ul>
+			{#if !query && total > LIMIT}
+				<p class="pt-3 text-center text-xs text-ink-faint">
+					Showing {LIMIT} of {total}. Search to find older loans.
+				</p>
+			{/if}
 		{/if}
 	{/snippet}
 
 	{#if activeTab === 'borrower'}
-		{@render loanList(sortedBorrower, 'borrower')}
+		{@render loanList(visibleBorrower, sortedBorrower.length, 'borrower')}
 	{:else}
-		{@render loanList(sortedOwner, 'owner')}
+		{@render loanList(visibleOwner, sortedOwner.length, 'owner')}
 	{/if}
 </div>
