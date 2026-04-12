@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Plus, MagnifyingGlass, Tag } from 'phosphor-svelte';
+	import { Plus, MagnifyingGlass, Tag, Export } from 'phosphor-svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import BookGrid from '$lib/components/BookGrid.svelte';
 
@@ -66,6 +66,14 @@
 			>
 				<Tag size={16} />
 				Tags
+			</a>
+			<a
+				href="/api/export"
+				download="library.yaml"
+				class="flex items-center gap-1.5 border border-paper-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+			>
+				<Export size={16} />
+				Export
 			</a>
 			<a
 				href="/library/add"
