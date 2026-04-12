@@ -69,27 +69,6 @@
 			placeholder="Search by title or author…"
 			class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
 		/>
-		<!--
-		<button
-			type="submit"
-			class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-		>
-			Search
-		</button>
-     -->
-		<!--
-    {#if query}
-			<button
-				type="button"
-				onclick={() => {
-					query = '';
-					inputValue = '';
-				}}
-				class="border border-paper-border px-3 py-2 text-sm text-ink-muted hover:border-ink-faint"
-			>
-				Clear
-			</button>
-		{/if}-->
 	</form>
 
 	<!-- Tabs -->
