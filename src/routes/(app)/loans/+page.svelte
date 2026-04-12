@@ -42,9 +42,6 @@
 		q === '' ? sortedBorrower : filterLoans(sortedBorrower)
 	);
 
-	//const visibleBorrower = $derived(filterLoans(sortedBorrower));
-	//const visibleOwner = $derived(filterLoans(sortedOwner));
-
 	const pendingBorrower = $derived(
 		(asBorrower as LoanWithDetails[]).filter((l) => ACTIVE.has(l.status)).length
 	);

@@ -157,7 +157,6 @@ export const userBooks = librarianSchema.table(
 				where l.user_book_id = ${table.id}
 				  and l.borrower_id = ${currentUserId}
 			)`
-      //and l.status not in ('returned', 'rejected', 'cancelled')
     }),
     pgPolicy('user_books_insert', {
       for: 'insert',
