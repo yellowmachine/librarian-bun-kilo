@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { enhance, applyAction, deserialize } from '$app/forms';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Tag, Trash, Star } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
@@ -8,14 +8,27 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let confirmMessage = $state('');
-	let resolveConfirm = $state<((v: boolean) => void) | null>(null);
+	let pendingForm = $state<HTMLFormElement | null>(null);
 
-	function openConfirm(message: string): Promise<boolean> {
+	function openConfirm(message: string, formEl: HTMLFormElement): void {
 		confirmMessage = message;
-		return new Promise((resolve) => {
-			resolveConfirm = resolve;
-		});
+		pendingForm = formEl;
 	}
+
+	async function submitConfirmed() {
+		if (!pendingForm) return;
+		const formEl = pendingForm;
+		pendingForm = null;
+		const response = await fetch(formEl.action, {
+			method: 'POST',
+			body: new FormData(formEl),
+			headers: { 'x-sveltekit-action': 'true' }
+		});
+		const result = deserialize(await response.text());
+		await applyAction(result);
+		invalidateAll();
+	}
+
 
 	let { data, form } = $props();
 	let { book, userTags, myReview, reviews, reviewStats } = $derived(data);
@@ -291,10 +304,7 @@
 					<form
 						method="POST"
 						action="?/deleteReview"
-						use:enhance={async ({ cancel }) => {
-							const ok = await openConfirm('Remove your review?');
-							if (!ok) cancel();
-						}}
+						onsubmit={(e) => { e.preventDefault(); openConfirm('Remove your review?', e.currentTarget as HTMLFormElement); }}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
 							Remove review
@@ -332,10 +342,7 @@
 		<form
 			method="POST"
 			action="?/remove"
-			use:enhance={async ({ cancel }) => {
-				const ok = await openConfirm('Remove this book from your library?');
-				if (!ok) cancel();
-			}}
+			onsubmit={(e) => { e.preventDefault(); openConfirm('Remove this book from your library?', e.currentTarget as HTMLFormElement); }}
 		>
 			<button
 				type="submit"
@@ -347,10 +354,10 @@
 	</div>
 </div>
 
-{#if resolveConfirm}
+{#if pendingForm}
 	<ConfirmDialog
 		message={confirmMessage}
-		onconfirm={() => { resolveConfirm!(true); resolveConfirm = null; }}
-		oncancel={() => { resolveConfirm!(false); resolveConfirm = null; }}
+		onconfirm={submitConfirmed}
+		oncancel={() => { pendingForm = null; }}
 	/>
 {/if}

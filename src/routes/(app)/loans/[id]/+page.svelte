@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { enhance, applyAction, deserialize } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, BookOpen } from 'phosphor-svelte';
 	import type { LoanWithDetails } from '$lib/server/loans';
 	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
@@ -10,13 +11,25 @@
 	const currentUserId = $derived(data.currentUserId as string);
 
 	let confirmMessage = $state('');
-	let resolveConfirm = $state<((v: boolean) => void) | null>(null);
+	let pendingForm = $state<HTMLFormElement | null>(null);
 
-	function openConfirm(message: string): Promise<boolean> {
+	function openConfirm(message: string, formEl: HTMLFormElement): void {
 		confirmMessage = message;
-		return new Promise((resolve) => {
-			resolveConfirm = resolve;
+		pendingForm = formEl;
+	}
+
+	async function submitConfirmed() {
+		if (!pendingForm) return;
+		const formEl = pendingForm;
+		pendingForm = null;
+		const response = await fetch(formEl.action, {
+			method: 'POST',
+			body: new FormData(formEl),
+			headers: { 'x-sveltekit-action': 'true' }
 		});
+		const result = deserialize(await response.text());
+		await applyAction(result);
+		invalidateAll();
 	}
 
 	const isOwner = $derived(loan.ownerId === currentUserId);
@@ -175,16 +188,7 @@
 	{#if actions().length > 0}
 		<div class="space-y-2 border-t border-paper-border pt-4">
 			{#each actions() as action}
-				<form
-					method="POST"
-					action="?/transition"
-					use:enhance={async ({ cancel }) => {
-						if (action.confirm) {
-							const ok = await openConfirm(action.confirm);
-							if (!ok) cancel();
-						}
-					}}
-				>
+				{#snippet formBody()}
 					<input type="hidden" name="toStatus" value={action.toStatus} />
 					{#if action.toStatus === 'accepted'}
 						<textarea
@@ -207,16 +211,30 @@
 					>
 						{action.label}
 					</button>
-				</form>
+				{/snippet}
+
+				{#if action.confirm}
+					<form
+						method="POST"
+						action="?/transition"
+						onsubmit={(e) => { e.preventDefault(); openConfirm(action.confirm!, e.currentTarget as HTMLFormElement); }}
+					>
+						{@render formBody()}
+					</form>
+				{:else}
+					<form method="POST" action="?/transition" use:enhance>
+						{@render formBody()}
+					</form>
+				{/if}
 			{/each}
 		</div>
 	{/if}
 
-	{#if resolveConfirm}
+	{#if pendingForm}
 		<ConfirmDialog
 			message={confirmMessage}
-			onconfirm={() => { resolveConfirm!(true); resolveConfirm = null; }}
-			oncancel={() => { resolveConfirm!(false); resolveConfirm = null; }}
+			onconfirm={submitConfirmed}
+			oncancel={() => { pendingForm = null; }}
 		/>
 	{/if}
 </div>
