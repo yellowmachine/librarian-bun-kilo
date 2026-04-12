@@ -133,8 +133,14 @@
 		{/if}
 		{#if loan.notes}
 			<div class="col-span-2 bg-paper px-4 py-4">
-				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Notes</p>
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Message from borrower</p>
 				<p class="mt-1 text-sm text-ink-muted">{loan.notes}</p>
+			</div>
+		{/if}
+		{#if loan.ownerNotes}
+			<div class="col-span-2 bg-paper px-4 py-4">
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Message from owner</p>
+				<p class="mt-1 text-sm text-ink-muted">{loan.ownerNotes}</p>
 			</div>
 		{/if}
 	</div>
@@ -167,6 +173,14 @@
 					}}
 				>
 					<input type="hidden" name="toStatus" value={action.toStatus} />
+					{#if action.toStatus === 'accepted'}
+						<textarea
+							name="ownerNotes"
+							placeholder="Message to the borrower (optional)"
+							rows="2"
+							class="mb-2 w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+						></textarea>
+					{/if}
 					<button
 						type="submit"
 						class="w-full py-2.5 text-sm transition-colors

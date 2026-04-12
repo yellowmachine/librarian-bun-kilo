@@ -1,0 +1,1 @@
+ALTER TABLE "librarian"."loans" ADD COLUMN "owner_notes" text;

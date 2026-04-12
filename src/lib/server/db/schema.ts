@@ -446,7 +446,8 @@ export const loans = librarianSchema.table(
     returnRequestedAt: timestamp('return_requested_at'),
     returnedAt: timestamp('returned_at'),
     dueDate: timestamp('due_date'),
-    notes: text('notes')
+    notes: text('notes'),
+    ownerNotes: text('owner_notes')
   },
   (table) => [
     index('loans_borrower_idx').on(table.borrowerId),

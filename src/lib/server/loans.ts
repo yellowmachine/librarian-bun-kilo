@@ -4,6 +4,7 @@ import { db } from './db/index';
 import { loans, userBooks, books } from './db/schema';
 import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
+import { sendLoanRequestEmail, sendLoanAcceptedEmail } from './email';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ export type LoanWithDetails = {
   returnedAt: Date | null;
   dueDate: Date | null;
   notes: string | null;
+  ownerNotes: string | null;
   // Libro
   userBookId: string;
   bookId: string;
@@ -48,7 +50,7 @@ export async function requestLoan(
   userBookId: string,
   notes?: string
 ): Promise<string> {
-  return withRLS(borrowerId, async (tx) => {
+  const loanId = await withRLS(borrowerId, async (tx) => {
     // user_books_select_in_group policy allows borrower to read the book via shared tags
     const ubRows = await tx
       .select({ userId: userBooks.userId, isAvailable: userBooks.isAvailable })
@@ -85,6 +87,34 @@ export async function requestLoan(
 
     return id;
   });
+
+  // Notificar al owner fuera de la transacción — un fallo de email no debe revertir el préstamo
+  const [borrowerRow, ownerRow, bookRow] = await Promise.all([
+    db.select({ name: user.name }).from(user).where(eq(user.id, borrowerId)),
+    db
+      .select({ email: user.email, name: user.name })
+      .from(user)
+      .innerJoin(userBooks, eq(userBooks.userId, user.id))
+      .where(eq(userBooks.id, userBookId)),
+    db
+      .select({ title: books.title })
+      .from(books)
+      .innerJoin(userBooks, eq(userBooks.bookId, books.id))
+      .where(eq(userBooks.id, userBookId))
+  ]);
+
+  if (ownerRow[0]?.email && borrowerRow[0]?.name && bookRow[0]?.title) {
+    sendLoanRequestEmail({
+      to: ownerRow[0].email,
+      ownerName: ownerRow[0].name,
+      borrowerName: borrowerRow[0].name,
+      bookTitle: bookRow[0].title,
+      loanId,
+      notes
+    }).catch((err) => console.error('[email] sendLoanRequestEmail failed:', err));
+  }
+
+  return loanId;
 }
 
 // ─── Listar préstamos del usuario ─────────────────────────────────────────────
@@ -106,6 +136,7 @@ export async function getUserLoans(userId: string): Promise<{
         returnedAt: loans.returnedAt,
         dueDate: loans.dueDate,
         notes: loans.notes,
+        ownerNotes: loans.ownerNotes,
         userBookId: loans.userBookId,
         bookId: books.id,
         title: books.title,
@@ -130,6 +161,7 @@ export async function getUserLoans(userId: string): Promise<{
         returnedAt: loans.returnedAt,
         dueDate: loans.dueDate,
         notes: loans.notes,
+        ownerNotes: loans.ownerNotes,
         userBookId: loans.userBookId,
         bookId: books.id,
         title: books.title,
@@ -207,6 +239,7 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
         returnedAt: loans.returnedAt,
         dueDate: loans.dueDate,
         notes: loans.notes,
+        ownerNotes: loans.ownerNotes,
         userBookId: loans.userBookId,
         bookId: books.id,
         title: books.title,
@@ -279,7 +312,8 @@ const TRANSITIONS: StatusTransition[] = [
 export async function transitionLoan(
   userId: string,
   loanId: string,
-  toStatus: LoanStatus
+  toStatus: LoanStatus,
+  ownerNotes?: string
 ): Promise<{ success: boolean; error?: string }> {
   const loan = await getLoan(userId, loanId);
   if (!loan) return { success: false, error: 'Préstamo no encontrado' };
@@ -306,7 +340,11 @@ export async function transitionLoan(
   await withRLS(userId, async (tx) => {
     await tx
       .update(loans)
-      .set({ status: toStatus, ...extraFields })
+      .set({
+        status: toStatus,
+        ...extraFields,
+        ...(toStatus === 'accepted' && ownerNotes ? { ownerNotes } : {})
+      })
       .where(eq(loans.id, loanId));
 
     // Si el préstamo se activa, marcar el libro como no disponible
@@ -325,6 +363,18 @@ export async function transitionLoan(
         .where(eq(userBooks.id, loan.userBookId));
     }
   });
+
+  // Notificar al borrower cuando el owner acepta
+  if (toStatus === 'accepted') {
+    sendLoanAcceptedEmail({
+      to: loan.borrowerEmail,
+      borrowerName: loan.borrowerName,
+      ownerName: loan.ownerName,
+      bookTitle: loan.title,
+      loanId,
+      notes: ownerNotes ?? null
+    }).catch((err) => console.error('[email] sendLoanAcceptedEmail failed:', err));
+  }
 
   return { success: true };
 }

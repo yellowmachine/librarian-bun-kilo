@@ -14,6 +14,9 @@
 	// bookId → expandido o no
 	let expandedReviews = $state(new Set<string>());
 
+	// userBookId del formulario de solicitud expandido (uno a la vez)
+	let expandedRequest = $state<string | null>(null);
+
 	function toggleReviews(bookId: string) {
 		const next = new Set(expandedReviews);
 		if (next.has(bookId)) next.delete(bookId);
@@ -225,17 +228,47 @@
 						</div>
 						<div class="flex shrink-0 flex-col items-end gap-2">
 							{#if book.isAvailable}
-								<span class="text-xs text-ink-faint">disponible</span>
+								<span class="text-xs text-ink-faint">available</span>
 								{#if book.ownerId !== currentUserId}
-									<form method="POST" action="?/requestLoan" use:enhance class="inline">
-										<input type="hidden" name="userBookId" value={book.userBookId} />
+									{#if expandedRequest === book.userBookId}
+										<form
+											method="POST"
+											action="?/requestLoan"
+											use:enhance
+											class="flex flex-col gap-1.5"
+										>
+											<input type="hidden" name="userBookId" value={book.userBookId} />
+											<textarea
+												name="notes"
+												placeholder="Message to the owner (optional)"
+												rows="2"
+												class="w-44 resize-none border border-paper-border px-2 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+											></textarea>
+											<div class="flex gap-1">
+												<button
+													type="button"
+													onclick={() => (expandedRequest = null)}
+													class="flex-1 border border-paper-border py-1 text-xs text-ink-muted hover:border-ink-faint"
+												>
+													Cancel
+												</button>
+												<button
+													type="submit"
+													class="flex-1 border border-ink bg-ink py-1 text-xs text-paper hover:bg-ink/90"
+												>
+													Send
+												</button>
+											</div>
+										</form>
+									{:else}
 										<button
-											type="submit"
+											type="button"
+											onclick={() => (expandedRequest = book.userBookId)}
 											class="border border-ink bg-ink px-3 py-1 text-xs text-paper hover:bg-ink/90"
 										>
 											Request
 										</button>
-									</form>
+									{/if}
 								{/if}
 							{:else}
 								<span class="text-xs text-ink-faint">lent</span>
