@@ -109,11 +109,11 @@ export async function requestLoan(
     bookTitle: bookRow[0]?.title
   });
 
-  if (ownerRow[0]?.email && borrowerRow[0]?.name && bookRow[0]?.title) {
+  if (ownerRow[0]?.email && bookRow[0]?.title) {
     sendLoanRequestEmail({
       to: ownerRow[0].email,
-      ownerName: ownerRow[0].name,
-      borrowerName: borrowerRow[0].name,
+      ownerName: ownerRow[0].name ?? '',
+      borrowerName: borrowerRow[0]?.name ?? '',
       bookTitle: bookRow[0].title,
       loanId,
       notes
