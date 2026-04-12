@@ -50,15 +50,15 @@ export async function requestLoan(
   userBookId: string,
   notes?: string
 ): Promise<string> {
-  const loanId = await withRLS(borrowerId, async (tx) => {
+  const { loanId, ownerId, bookTitle } = await withRLS(borrowerId, async (tx) => {
     // user_books_select_in_group policy allows borrower to read the book via shared tags
     const ubRows = await tx
-      .select({ userId: userBooks.userId, isAvailable: userBooks.isAvailable })
+      .select({ userId: userBooks.userId, isAvailable: userBooks.isAvailable, bookId: userBooks.bookId })
       .from(userBooks)
       .where(eq(userBooks.id, userBookId));
 
     if (ubRows.length === 0) throw new Error('Book not found');
-    const { userId: ownerId, isAvailable } = ubRows[0];
+    const { userId: ownerId, isAvailable, bookId } = ubRows[0];
 
     if (!isAvailable) throw new Error('Book is not available');
     if (ownerId === borrowerId) throw new Error("You can't request your own book.");
@@ -75,6 +75,11 @@ export async function requestLoan(
       );
     if (existing.length > 0) throw new Error('There is already an active request for this book.');
 
+    const bookRows = await tx
+      .select({ title: books.title })
+      .from(books)
+      .where(eq(books.id, bookId));
+
     const id = nanoid();
     await tx.insert(loans).values({
       id,
@@ -85,36 +90,27 @@ export async function requestLoan(
       notes: notes ?? null
     });
 
-    return id;
+    return { loanId: id, ownerId, bookTitle: bookRows[0]?.title ?? '' };
   });
 
-  // Notificar al owner fuera de la transacción — un fallo de email no debe revertir el préstamo
-  const [borrowerRow, ownerRow, bookRow] = await Promise.all([
+  // Notificar al owner — queries solo a la tabla user (sin RLS) para obtener nombres y emails
+  const [borrowerRow, ownerRow] = await Promise.all([
     db.select({ name: user.name }).from(user).where(eq(user.id, borrowerId)),
-    db
-      .select({ email: user.email, name: user.name })
-      .from(user)
-      .innerJoin(userBooks, eq(userBooks.userId, user.id))
-      .where(eq(userBooks.id, userBookId)),
-    db
-      .select({ title: books.title })
-      .from(books)
-      .innerJoin(userBooks, eq(userBooks.bookId, books.id))
-      .where(eq(userBooks.id, userBookId))
+    db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, ownerId))
   ]);
 
   console.log('[email] requestLoan notify check', {
     borrowerName: borrowerRow[0]?.name,
     ownerEmail: ownerRow[0]?.email,
-    bookTitle: bookRow[0]?.title
+    bookTitle
   });
 
-  if (ownerRow[0]?.email && bookRow[0]?.title) {
+  if (ownerRow[0]?.email && bookTitle) {
     sendLoanRequestEmail({
       to: ownerRow[0].email,
       ownerName: ownerRow[0].name ?? '',
       borrowerName: borrowerRow[0]?.name ?? '',
-      bookTitle: bookRow[0].title,
+      bookTitle,
       loanId,
       notes
     }).catch((err) => console.error('[email] sendLoanRequestEmail failed:', err));
