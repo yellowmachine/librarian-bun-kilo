@@ -4,7 +4,15 @@
 	import StarRating from '$lib/components/StarRating.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
-	let pendingDelete = $state<(() => void) | null>(null);
+	let confirmMessage = $state('');
+	let resolveConfirm = $state<((v: boolean) => void) | null>(null);
+
+	function openConfirm(message: string): Promise<boolean> {
+		confirmMessage = message;
+		return new Promise((resolve) => {
+			resolveConfirm = resolve;
+		});
+	}
 
 	let { data, form } = $props();
 	let { book, myReview, reviews, reviewStats } = $derived(data);
@@ -131,13 +139,9 @@
 					<form
 						method="POST"
 						action="?/deleteReview"
-						use:enhance
-						onsubmit={(e) => {
-							const form = e.currentTarget as HTMLFormElement;
-							if (!form.dataset.confirmed) {
-								e.preventDefault();
-								pendingDelete = () => { form.dataset.confirmed = 'true'; form.requestSubmit(); delete form.dataset.confirmed; };
-							}
+						use:enhance={async ({ cancel }) => {
+							const ok = await openConfirm('Remove your review?');
+							if (!ok) cancel();
 						}}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
@@ -173,10 +177,10 @@
 	{/if}
 </div>
 
-{#if pendingDelete}
+{#if resolveConfirm}
 	<ConfirmDialog
-		message="Remove your review?"
-		onconfirm={() => { const s = pendingDelete!; pendingDelete = null; s(); }}
-		oncancel={() => (pendingDelete = null)}
+		message={confirmMessage}
+		onconfirm={() => { resolveConfirm!(true); resolveConfirm = null; }}
+		oncancel={() => { resolveConfirm!(false); resolveConfirm = null; }}
 	/>
 {/if}

@@ -7,8 +7,15 @@
 	import StarRating from '$lib/components/StarRating.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
-	type PendingSubmit = { message: string; submitFn: () => void };
-	let pending = $state<PendingSubmit | null>(null);
+	let confirmMessage = $state('');
+	let resolveConfirm = $state<((v: boolean) => void) | null>(null);
+
+	function openConfirm(message: string): Promise<boolean> {
+		confirmMessage = message;
+		return new Promise((resolve) => {
+			resolveConfirm = resolve;
+		});
+	}
 
 	let { data, form } = $props();
 	let { book, userTags, myReview, reviews, reviewStats } = $derived(data);
@@ -284,13 +291,9 @@
 					<form
 						method="POST"
 						action="?/deleteReview"
-						use:enhance
-						onsubmit={(e) => {
-							const form = e.currentTarget as HTMLFormElement;
-							if (!form.dataset.confirmed) {
-								e.preventDefault();
-								pending = { message: 'Remove your review?', submitFn: () => { form.dataset.confirmed = 'true'; form.requestSubmit(); delete form.dataset.confirmed; } };
-							}
+						use:enhance={async ({ cancel }) => {
+							const ok = await openConfirm('Remove your review?');
+							if (!ok) cancel();
 						}}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
@@ -329,13 +332,9 @@
 		<form
 			method="POST"
 			action="?/remove"
-			use:enhance
-			onsubmit={(e) => {
-				const form = e.currentTarget as HTMLFormElement;
-				if (!form.dataset.confirmed) {
-					e.preventDefault();
-					pending = { message: 'Remove this book from your library?', submitFn: () => { form.dataset.confirmed = 'true'; form.requestSubmit(); delete form.dataset.confirmed; } };
-				}
+			use:enhance={async ({ cancel }) => {
+				const ok = await openConfirm('Remove this book from your library?');
+				if (!ok) cancel();
 			}}
 		>
 			<button
@@ -348,10 +347,10 @@
 	</div>
 </div>
 
-{#if pending}
+{#if resolveConfirm}
 	<ConfirmDialog
-		message={pending.message}
-		onconfirm={() => { const s = pending!.submitFn; pending = null; s(); }}
-		oncancel={() => (pending = null)}
+		message={confirmMessage}
+		onconfirm={() => { resolveConfirm!(true); resolveConfirm = null; }}
+		oncancel={() => { resolveConfirm!(false); resolveConfirm = null; }}
 	/>
 {/if}

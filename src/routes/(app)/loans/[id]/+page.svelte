@@ -9,8 +9,15 @@
 	const loan = $derived(data.loan as LoanWithDetails);
 	const currentUserId = $derived(data.currentUserId as string);
 
-	type PendingSubmit = { action: Action; submitFn: () => void };
-	let pending = $state<PendingSubmit | null>(null);
+	let confirmMessage = $state('');
+	let resolveConfirm = $state<((v: boolean) => void) | null>(null);
+
+	function openConfirm(message: string): Promise<boolean> {
+		confirmMessage = message;
+		return new Promise((resolve) => {
+			resolveConfirm = resolve;
+		});
+	}
 
 	const isOwner = $derived(loan.ownerId === currentUserId);
 	const isBorrower = $derived(loan.borrowerId === currentUserId);
@@ -171,19 +178,10 @@
 				<form
 					method="POST"
 					action="?/transition"
-					use:enhance
-					onsubmit={(e) => {
-						const form = e.currentTarget as HTMLFormElement;
-						if (action.confirm && !form.dataset.confirmed) {
-							e.preventDefault();
-							pending = {
-								action,
-								submitFn: () => {
-									form.dataset.confirmed = 'true';
-									form.requestSubmit();
-									delete form.dataset.confirmed;
-								}
-							};
+					use:enhance={async ({ cancel }) => {
+						if (action.confirm) {
+							const ok = await openConfirm(action.confirm);
+							if (!ok) cancel();
 						}
 					}}
 				>
@@ -214,11 +212,11 @@
 		</div>
 	{/if}
 
-	{#if pending}
+	{#if resolveConfirm}
 		<ConfirmDialog
-			message={pending.action.confirm ?? ''}
-			onconfirm={() => { const s = pending!.submitFn; pending = null; s(); }}
-			oncancel={() => (pending = null)}
+			message={confirmMessage}
+			onconfirm={() => { resolveConfirm!(true); resolveConfirm = null; }}
+			oncancel={() => { resolveConfirm!(false); resolveConfirm = null; }}
 		/>
 	{/if}
 </div>
