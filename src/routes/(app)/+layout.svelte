@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { BookOpen, Books, ArrowsLeftRight, SignOut } from 'phosphor-svelte';
+	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 
 	let { children, data } = $props();
 	const { user, pendingLoans } = data;
@@ -77,6 +78,7 @@
 	<!-- ── Contenido ─────────────────────────────────────────────────────── -->
 	<!-- pb-20 en mobile deja espacio para la barra inferior -->
 	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8 pb-24 sm:pb-8">
+		<Breadcrumb />
 		{@render children()}
 	</main>
 
