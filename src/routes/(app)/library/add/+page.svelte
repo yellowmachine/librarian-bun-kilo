@@ -3,8 +3,15 @@
 	import { Barcode, MagnifyingGlass, ArrowLeft, SpinnerGap } from 'phosphor-svelte';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
+	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 
 	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'adding';
+
+	interface Tag {
+		id: string;
+		name: string;
+		color: string | null;
+	}
 
 	let mode = $state<Mode>('choose');
 	let manualQuery = $state('');
@@ -14,6 +21,9 @@
 	let notes = $state('');
 	let errorMsg = $state('');
 	let searching = $state(false);
+	let availableTags = $state<Tag[]>([]);
+	let selectedTagIds = $state<string[]>([]);
+	let tagsToCreate = $state<{ name: string; color: string | null }[]>([]);
 
 	const DESCRIPTION_LIMIT = 300;
 	let descriptionExpanded = $state(false);
@@ -48,12 +58,23 @@
 		}
 	}
 
+	async function fetchUserTags(): Promise<void> {
+		try {
+			const res = await fetch('/api/tags');
+			if (res.ok) availableTags = await res.json();
+		} catch {
+			// tags are optional — silently ignore
+		}
+	}
+
 	async function selectBook(book: SearchResult) {
 		selectedBook = book;
 		descriptionExpanded = false;
 		selectedDescription = null;
+		selectedTagIds = [];
+		tagsToCreate = [];
 		mode = 'confirm';
-		selectedDescription = await fetchDescription(book.id);
+		await Promise.all([fetchDescription(book.id).then((d) => (selectedDescription = d)), fetchUserTags()]);
 	}
 
 	async function onIsbnDetected(isbn: string) {
@@ -105,7 +126,9 @@
 				body: JSON.stringify({
 					workId: selectedBook.id,
 					isbn: selectedBook.isbn ?? undefined,
-					notes: notes || undefined
+					notes: notes || undefined,
+					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 				})
 			});
 			if (!res.ok) {
@@ -266,6 +289,19 @@
 					placeholder="Edition, book condition..."
 					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 				></textarea>
+			</div>
+
+			<div>
+				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Tags <span class="tracking-normal normal-case">(optional)</span>
+				</span>
+				<div class="mt-1.5">
+					<TagSelectorLocal
+						{availableTags}
+						bind:selectedTagIds
+						bind:tagsToCreate
+					/>
+				</div>
 			</div>
 
 			<div class="flex gap-3">

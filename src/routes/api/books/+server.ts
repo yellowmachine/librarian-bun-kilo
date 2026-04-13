@@ -1,13 +1,25 @@
 import { json, error, isHttpError } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import * as v from 'valibot';
+import { nanoid } from 'nanoid';
 import { getUserBooks, addBookToLibrary, upsertBook, resolveBook } from '$lib/server/books';
+import { withRLS } from '$lib/server/db/rls';
+import { tags, userBookTags } from '$lib/server/db/schema';
 
 const AddBookSchema = v.pipe(
   v.object({
     isbn: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(13))),
     workId: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(32))),
-    notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000)))
+    notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
+    tagsToAdd: v.optional(v.array(v.pipe(v.string(), v.trim()))),
+    tagsToCreate: v.optional(
+      v.array(
+        v.object({
+          name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50)),
+          color: v.optional(v.pipe(v.string(), v.trim()))
+        })
+      )
+    )
   }),
   v.check(({ isbn, workId }) => Boolean(isbn || workId), 'An ISBN or workId is required.')
 );
@@ -36,7 +48,7 @@ export async function POST({ locals, request }: RequestEvent) {
   }
 
   try {
-    const { isbn, workId, notes } = result.output;
+    const { isbn, workId, notes, tagsToAdd, tagsToCreate } = result.output;
     const identifier = isbn ?? workId!;
 
     const bookData = await resolveBook(identifier);
@@ -45,6 +57,38 @@ export async function POST({ locals, request }: RequestEvent) {
     const bookId = await upsertBook(bookData);
 
     const userBookId = await addBookToLibrary(locals.user.id, bookId, notes);
+
+    const hasTagsToAdd = tagsToAdd && tagsToAdd.length > 0;
+    const hasTagsToCreate = tagsToCreate && tagsToCreate.length > 0;
+
+    if (hasTagsToAdd || hasTagsToCreate) {
+      await withRLS(locals.user.id, async (tx) => {
+        const assignments: { userBookId: string; tagId: string }[] = [];
+
+        if (hasTagsToCreate) {
+          for (const newTag of tagsToCreate!) {
+            const tagId = nanoid();
+            await tx.insert(tags).values({
+              id: tagId,
+              userId: locals.user!.id,
+              name: newTag.name,
+              color: newTag.color ?? null
+            });
+            assignments.push({ userBookId, tagId });
+          }
+        }
+
+        if (hasTagsToAdd) {
+          for (const tagId of tagsToAdd!) {
+            assignments.push({ userBookId, tagId });
+          }
+        }
+
+        if (assignments.length > 0) {
+          await tx.insert(userBookTags).values(assignments).onConflictDoNothing();
+        }
+      });
+    }
 
     return json(
       { userBookId, bookId, title: bookData.title },
