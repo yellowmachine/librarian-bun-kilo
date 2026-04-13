@@ -52,7 +52,7 @@
 
 <div class="space-y-8">
 	<div>
-		<h1 class="font-serif text-3xl font-normal text-ink">Loans</h1>
+		<h1 class="font-serif text-2xl sm:text-3xl font-normal text-ink">Loans</h1>
 	</div>
 
 	<!-- Búsqueda -->

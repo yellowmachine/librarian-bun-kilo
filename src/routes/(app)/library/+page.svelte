@@ -49,7 +49,7 @@
 	<!-- Cabecera -->
 	<div class="flex items-end justify-between">
 		<div>
-			<h1 class="font-serif text-3xl font-normal text-ink">My library</h1>
+			<h1 class="font-serif text-2xl sm:text-3xl font-normal text-ink">My library</h1>
 			<p class="mt-1 text-sm text-ink-faint">
 				{#if !letter}
 					{titleLetters.length > 0 ? 'Showing recent books' : ''}

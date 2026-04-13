@@ -55,7 +55,7 @@
 		</a>
 		<div class="mt-3 flex items-start justify-between">
 			<div>
-				<h1 class="font-serif text-3xl font-normal text-ink">{group.name}</h1>
+				<h1 class="font-serif text-2xl sm:text-3xl font-normal text-ink">{group.name}</h1>
 				{#if group.description}
 					<p class="mt-1 text-sm text-ink-faint">{group.description}</p>
 				{/if}

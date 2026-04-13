@@ -56,7 +56,7 @@
 		<a href="/library" class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink">
 			<ArrowLeft size={16} /> Library
 		</a>
-		<h1 class="mt-3 font-serif text-3xl font-normal text-ink">Tags</h1>
+		<h1 class="mt-3 font-serif text-2xl sm:text-3xl font-normal text-ink">Tags</h1>
 	</div>
 
 	<!-- Crear tag -->
