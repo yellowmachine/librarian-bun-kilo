@@ -120,8 +120,8 @@ export async function getUserGroups(userId: string): Promise<GroupWithRole[]> {
       .leftJoin(groupInviteCodes, eq(groups.id, groupInviteCodes.groupId))
       .where(inArray(groups.id, groupIds));
 
-    // Contar miembros por grupo (sin RLS para conteo global)
-    const memberCounts = await db
+    // Contar miembros por grupo (dentro del contexto RLS)
+    const memberCounts = await tx
       .select({ groupId: groupMembers.groupId })
       .from(groupMembers)
       .where(inArray(groupMembers.groupId, groupIds));
