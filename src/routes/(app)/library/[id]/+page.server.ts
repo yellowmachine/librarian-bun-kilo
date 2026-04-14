@@ -1,4 +1,4 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -142,6 +142,7 @@ export const actions = {
     }
 
     await removeFromLibrary(locals.user!.id, params.id!);
-    return { removed: true };
+    //return { removed: true };
+    redirect(303, '/library')
   }
 };

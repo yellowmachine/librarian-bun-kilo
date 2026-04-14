@@ -74,7 +74,10 @@
 		selectedTagIds = [];
 		tagsToCreate = [];
 		mode = 'confirm';
-		await Promise.all([fetchDescription(book.id).then((d) => (selectedDescription = d)), fetchUserTags()]);
+		await Promise.all([
+			fetchDescription(book.id).then((d) => (selectedDescription = d)),
+			fetchUserTags()
+		]);
 	}
 
 	async function onIsbnDetected(isbn: string) {
@@ -137,7 +140,8 @@
 				mode = 'confirm';
 				return;
 			}
-			goto('/library');
+			//goto('/library');
+			mode = 'choose';
 		} catch {
 			errorMsg = 'Network error.';
 			mode = 'confirm';
@@ -296,11 +300,7 @@
 					Tags <span class="tracking-normal normal-case">(optional)</span>
 				</span>
 				<div class="mt-1.5">
-					<TagSelectorLocal
-						{availableTags}
-						bind:selectedTagIds
-						bind:tagsToCreate
-					/>
+					<TagSelectorLocal {availableTags} bind:selectedTagIds bind:tagsToCreate />
 				</div>
 			</div>
 
