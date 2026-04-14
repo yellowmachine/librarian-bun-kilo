@@ -77,7 +77,7 @@
 
 	<!-- ── Contenido ─────────────────────────────────────────────────────── -->
 	<!-- pb-20 en mobile deja espacio para la barra inferior -->
-	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8 pb-24 sm:pb-8">
+	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-8">
 		<Breadcrumb />
 		{@render children()}
 	</main>
