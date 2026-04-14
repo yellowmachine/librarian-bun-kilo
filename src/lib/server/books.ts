@@ -233,7 +233,8 @@ export async function removeFromLibrary(userId: string, userBookId: string): Pro
 // Busca en la BD primero; si no existe, va a OpenLibrary.
 
 export async function resolveBook(isbnOrWorkId: string): Promise<OpenLibraryBook | null> {
-  const isIsbn = /^[0-9]{10,13}$/.test(isbnOrWorkId.replace(/-/g, ''));
+  const normalized = isbnOrWorkId.replace(/[-\s]/g, '');
+  const isIsbn = /^(?:\d{9}[\dXx]|\d{13})$/.test(normalized);
 
   if (isIsbn) {
     const clean = isbnOrWorkId.replace(/[^0-9X]/gi, '');
