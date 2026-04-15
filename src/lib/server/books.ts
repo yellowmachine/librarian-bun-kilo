@@ -5,7 +5,7 @@ import { books, userBooks, tags, userBookTags } from './db/schema';
 import { withRLS } from './db/rls';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
 
-export const LIBRARY_RECENT_LIMIT = 500;
+export const LIBRARY_RECENT_LIMIT = 50;
 
 // ─── Upsert libro en catálogo global ─────────────────────────────────────────
 // Si el libro ya existe por workId lo devuelve sin tocar; si no, lo inserta.
