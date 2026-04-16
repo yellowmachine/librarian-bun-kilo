@@ -1,6 +1,7 @@
 // Servicio de integración con OpenLibrary API
 // Docs: https://openlibrary.org/developers/api
 import { error } from '@sveltejs/kit';
+import type { BookSearchResult } from '$lib/types';
 
 // Timeout por request individual a OpenLibrary (ms)
 const OL_TIMEOUT_MS = 10_000;
@@ -60,16 +61,7 @@ export async function searchByIsbn(isbn: string): Promise<OpenLibraryBook | null
 }
 // ─── Buscar por título / autor ────────────────────────────────────────────────
 
-export interface SearchResult {
-  id: string;
-  isbn: string | null;
-  title: string;
-  authors: string[];
-  coverUrl: string | null;
-  publishYear: number | null;
-}
-
-export async function searchBooks(query: string, limit = 10): Promise<SearchResult[]> {
+export async function searchBooks(query: string, limit = 10): Promise<BookSearchResult[]> {
   const params = new URLSearchParams({
     q: query,
     limit: String(limit),

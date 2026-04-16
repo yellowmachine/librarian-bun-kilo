@@ -49,7 +49,7 @@ export async function POST({ locals, request }: RequestEvent) {
 
   try {
     const { isbn, workId, notes, tagsToAdd, tagsToCreate } = result.output;
-    const identifier = isbn ?? workId!;
+    const identifier = workId ?? isbn!;
 
     const bookData = await resolveBook(identifier);
     if (!bookData) error(404, 'Book not found on OpenLibrary');

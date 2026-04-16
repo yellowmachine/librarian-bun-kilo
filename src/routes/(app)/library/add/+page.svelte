@@ -3,6 +3,7 @@
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
+	import type { BookSearchResult } from '$lib/types';
 
 	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'adding';
 
@@ -14,8 +15,8 @@
 
 	let mode = $state<Mode>('choose');
 	let manualQuery = $state('');
-	let searchResults = $state<SearchResult[]>([]);
-	let selectedBook = $state<SearchResult | null>(null);
+	let searchResults = $state<BookSearchResult[]>([]);
+	let selectedBook = $state<BookSearchResult | null>(null);
 	let selectedDescription = $state<string | null>(null);
 	let notes = $state('');
 	let errorMsg = $state('');
@@ -37,15 +38,6 @@
 			: null
 	);
 
-	interface SearchResult {
-		id: string;
-		isbn: string | null;
-		title: string;
-		authors: string[];
-		coverUrl: string | null;
-		publishYear: number | null;
-	}
-
 	async function fetchDescription(workId: string): Promise<string | null> {
 		try {
 			const res = await fetch(`/api/books/detail?workId=${encodeURIComponent(workId)}`);
@@ -66,7 +58,7 @@
 		}
 	}
 
-	async function selectBook(book: SearchResult) {
+	async function selectBook(book: BookSearchResult) {
 		selectedBook = book;
 		descriptionExpanded = false;
 		selectedDescription = null;
