@@ -4,7 +4,6 @@
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import type { GroupBookResult } from '$lib/server/groups';
 	import BookGrid from '$lib/components/BookGrid.svelte';
-	import BookCard from '$lib/components/BookCard.svelte';
 
 	let exportOpen = $state(false);
 
@@ -291,33 +290,52 @@
 				</p>
 				<ul class="divide-y divide-paper-border">
 					{#each othersResults as book (book.userBookId)}
-						<li class="py-3">
-							<div class="flex items-center gap-4">
-								<BookCard
-									title={book.title}
-									authors={book.authors}
-									coverUrl={book.coverUrl}
-									publishYear={book.publishYear}
-									isAvailable={book.isAvailable}
-									variant="list"
-								/>
-							</div>
-							<div class="mt-1 flex flex-wrap items-center gap-2 pl-[60px]">
-								<span class="text-xs text-ink-faint">{book.ownerName}</span>
-								{#if !book.isAvailable}
-									<span class="text-xs text-ink-faint">· On loan</span>
+						<li>
+							<a
+								href="/borrow/{book.userBookId}"
+								class="group flex items-start gap-4 py-3 transition-colors hover:bg-paper-ui"
+							>
+								<!-- Portada -->
+								{#if book.coverUrl}
+									<img
+										src={book.coverUrl}
+										alt={book.title}
+										class="h-14 w-10 flex-shrink-0 object-cover"
+									/>
+								{:else}
+									<div class="flex h-14 w-10 flex-shrink-0 items-center justify-center bg-paper-ui text-ink-faint/40 font-serif text-lg">
+										·
+									</div>
 								{/if}
-								{#each book.tags as tag (tag.id)}
-									<span
-										class="rounded-full border px-2 py-0.5 text-[10px]"
-										style={tag.color
-											? `border-color: ${tag.color}44; color: ${tag.color}`
-											: 'border-color: #e8e2da; color: #8a8480'}
-									>
-										{tag.name}
-									</span>
-								{/each}
-							</div>
+
+								<!-- Info -->
+								<div class="min-w-0 flex-1 space-y-1">
+									<p class="truncate text-sm font-medium text-ink group-hover:underline group-hover:underline-offset-2">
+										{book.title}
+									</p>
+									{#if book.authors.length > 0}
+										<p class="truncate text-xs text-ink-faint">{book.authors.join(', ')}</p>
+									{/if}
+									<div class="flex flex-wrap items-center gap-2">
+										<span class="text-xs text-ink-faint">{book.ownerName}</span>
+										{#each book.tags as tag (tag.id)}
+											<span
+												class="rounded-full border px-2 py-0.5 text-[10px]"
+												style={tag.color
+													? `border-color: ${tag.color}44; color: ${tag.color}`
+													: 'border-color: #e8e2da; color: #8a8480'}
+											>
+												{tag.name}
+											</span>
+										{/each}
+									</div>
+								</div>
+
+								<!-- Disponibilidad -->
+								<span class="shrink-0 pt-0.5 text-xs {book.isAvailable ? 'text-ink-faint' : 'text-ink-faint/50'}">
+									{book.isAvailable ? 'Available' : 'On loan'}
+								</span>
+							</a>
 						</li>
 					{/each}
 				</ul>

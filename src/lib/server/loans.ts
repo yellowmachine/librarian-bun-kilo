@@ -375,6 +375,74 @@ export async function transitionLoan(
   return { success: true };
 }
 
+// ─── Cargar libro ajeno para solicitar préstamo ───────────────────────────────
+
+export type BorrowableBook = {
+  userBookId: string;
+  bookId: string;
+  title: string;
+  authors: string[];
+  coverUrl: string | null;
+  publishYear: number | null;
+  isAvailable: boolean;
+  ownerId: string;
+  ownerName: string;
+  existingLoanId: string | null;
+  existingLoanStatus: LoanStatus | null;
+};
+
+export async function getBookForBorrow(
+  userId: string,
+  userBookId: string
+): Promise<BorrowableBook | null> {
+  return withRLS(userId, async (tx) => {
+    // RLS user_books_select_in_group permite ver libros ajenos vía shared_tags
+    const rows = await tx
+      .select({
+        userBookId: userBooks.id,
+        bookId: books.id,
+        title: books.title,
+        authors: books.authors,
+        coverUrl: books.coverUrl,
+        publishYear: books.publishYear,
+        isAvailable: userBooks.isAvailable,
+        ownerId: userBooks.userId
+      })
+      .from(userBooks)
+      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .where(eq(userBooks.id, userBookId));
+
+    if (rows.length === 0) return null;
+    const row = rows[0];
+    if (row.ownerId === userId) return null; // No se puede pedir el propio libro
+
+    const ownerRows = await db
+      .select({ name: user.name })
+      .from(user)
+      .where(eq(user.id, row.ownerId));
+
+    // Préstamo activo del usuario para este libro (borrower = userId)
+    const existingRows = await tx
+      .select({ id: loans.id, status: loans.status })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.userBookId, userBookId),
+          eq(loans.borrowerId, userId),
+          inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+        )
+      );
+
+    return {
+      ...row,
+      authors: row.authors ?? [],
+      ownerName: ownerRows[0]?.name ?? '?',
+      existingLoanId: existingRows[0]?.id ?? null,
+      existingLoanStatus: (existingRows[0]?.status as LoanStatus) ?? null
+    };
+  });
+}
+
 // ─── Contar préstamos pendientes de acción ────────────────────────────────────
 // Usado para el badge de notificaciones en el nav.
 
