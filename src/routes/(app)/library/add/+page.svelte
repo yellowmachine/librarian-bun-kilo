@@ -62,6 +62,7 @@
 
 	// ── OpenLibrary confirm state ─────────────────────────────────────────────
 
+	let loadingDescription = $state(false);
 	const DESCRIPTION_LIMIT = 300;
 	let descriptionExpanded = $state(false);
 	let descriptionTruncated = $derived(
@@ -101,9 +102,10 @@
 		selectedDescription = null;
 		selectedTagIds = [];
 		tagsToCreate = [];
+		loadingDescription = true;
 		mode = 'confirm';
 		await Promise.all([
-			fetchDescription(book.id).then((d) => (selectedDescription = d)),
+			fetchDescription(book.id).then((d) => { selectedDescription = d; loadingDescription = false; }),
 			fetchUserTags()
 		]);
 	}
@@ -339,11 +341,14 @@
 				{/if}
 			</div>
 
-			{#if descriptionVisible}
+			{#if loadingDescription}
+				<div class="flex items-center gap-2 text-xs text-ink-faint">
+					<SpinnerGap size={13} class="animate-spin" />
+					Loading synopsis…
+				</div>
+			{:else if descriptionVisible}
 				<div class="space-y-2">
-					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
-						>Synopsis</span
-					>
+					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">Synopsis</span>
 					<p class="text-sm leading-relaxed text-ink-muted">
 						{descriptionVisible}{#if descriptionTruncated && !descriptionExpanded}…{/if}
 					</p>
