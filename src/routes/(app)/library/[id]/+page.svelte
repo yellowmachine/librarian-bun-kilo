@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Tag, Trash, Star } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
@@ -62,7 +62,6 @@
 	);
 
 	$effect(() => {
-		if (form?.removed) goto('/library');
 		if (form?.success) {
 			savedOk = true;
 			clearTimeout(savedTimer);
