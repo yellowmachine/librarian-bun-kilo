@@ -21,9 +21,9 @@ export const load = async ({ locals, params }: RequestEvent) => {
     withRLS(locals.user!.id, (tx) =>
       tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
     ),
-    getMyReview(locals.user!.id, book.bookId),
-    getBookReviews(locals.user!.id, book.bookId),
-    getBookReviewStats(locals.user!.id, book.bookId)
+    book.bookId ? getMyReview(locals.user!.id, book.bookId) : null,
+    book.bookId ? getBookReviews(locals.user!.id, book.bookId) : [],
+    book.bookId ? getBookReviewStats(locals.user!.id, book.bookId) : null
   ]);
 
   return { book, userTags, myReview, reviews, reviewStats };
@@ -101,6 +101,8 @@ export const actions = {
       return fail(400, { reviewError: 'The rating must be between 1 and 5 stars' });
     }
 
+    if (!book.bookId) return fail(400, { reviewError: 'Reviews are not available for manually added books.' });
+
     try {
       await upsertReview(locals.user!.id, book.bookId, { rating, body });
     } catch (e) {
@@ -115,6 +117,7 @@ export const actions = {
     const book = await getUserBook(locals.user!.id, params.id!);
     if (!book) return fail(404, { reviewError: 'Book not found.' });
 
+    if (!book.bookId) return fail(400, { reviewError: 'Reviews are not available for manually added books.' });
     await deleteReview(locals.user!.id, book.bookId);
     return { reviewDeleted: true };
   },

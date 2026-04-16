@@ -1,10 +1,14 @@
 import { nanoid } from 'nanoid';
-import { eq, and, or, inArray } from 'drizzle-orm';
+import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import { loans, userBooks, books } from './db/schema';
 import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
 import { sendLoanRequestEmail, sendLoanAcceptedEmail } from './email';
+
+// COALESCE helpers: userBooks manual fields override books catalog fields
+const effectiveTitle = sql<string>`COALESCE(${userBooks.title}, ${books.title})`;
+const effectiveAuthors = sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -30,7 +34,7 @@ export type LoanWithDetails = {
   ownerNotes: string | null;
   // Libro
   userBookId: string;
-  bookId: string;
+  bookId: string | null;
   title: string;
   authors: string[];
   coverUrl: string | null;
@@ -53,12 +57,17 @@ export async function requestLoan(
   const { loanId, ownerId, bookTitle } = await withRLS(borrowerId, async (tx) => {
     // user_books_select_in_group policy allows borrower to read the book via shared tags
     const ubRows = await tx
-      .select({ userId: userBooks.userId, isAvailable: userBooks.isAvailable, bookId: userBooks.bookId })
+      .select({
+        userId: userBooks.userId,
+        isAvailable: userBooks.isAvailable,
+        bookId: userBooks.bookId,
+        manualTitle: userBooks.title
+      })
       .from(userBooks)
       .where(eq(userBooks.id, userBookId));
 
     if (ubRows.length === 0) throw new Error('Book not found');
-    const { userId: ownerId, isAvailable, bookId } = ubRows[0];
+    const { userId: ownerId, isAvailable, bookId, manualTitle } = ubRows[0];
 
     if (!isAvailable) throw new Error('Book is not available');
     if (ownerId === borrowerId) throw new Error("You can't request your own book.");
@@ -75,10 +84,9 @@ export async function requestLoan(
       );
     if (existing.length > 0) throw new Error('There is already an active request for this book.');
 
-    const bookRows = await tx
-      .select({ title: books.title })
-      .from(books)
-      .where(eq(books.id, bookId));
+    const bookRows = bookId
+      ? await tx.select({ title: books.title }).from(books).where(eq(books.id, bookId))
+      : [];
 
     const id = nanoid();
     await tx.insert(loans).values({
@@ -90,7 +98,7 @@ export async function requestLoan(
       notes: notes ?? null
     });
 
-    return { loanId: id, ownerId, bookTitle: bookRows[0]?.title ?? '' };
+    return { loanId: id, ownerId, bookTitle: bookRows[0]?.title ?? manualTitle ?? '' };
   });
 
   // Notificar al owner — queries solo a la tabla user (sin RLS) para obtener nombres y emails
@@ -134,16 +142,16 @@ export async function getUserLoans(userId: string): Promise<{
         notes: loans.notes,
         ownerNotes: loans.ownerNotes,
         userBookId: loans.userBookId,
-        bookId: books.id,
-        title: books.title,
-        authors: books.authors,
+        bookId: userBooks.bookId,
+        title: effectiveTitle,
+        authors: effectiveAuthors,
         coverUrl: books.coverUrl,
         borrowerId: loans.borrowerId,
         ownerId: loans.ownerId
       })
       .from(loans)
       .innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .leftJoin(books, eq(userBooks.bookId, books.id))
       .where(eq(loans.ownerId, userId));
 
     const borrowerLoans = await tx
@@ -159,16 +167,16 @@ export async function getUserLoans(userId: string): Promise<{
         notes: loans.notes,
         ownerNotes: loans.ownerNotes,
         userBookId: loans.userBookId,
-        bookId: books.id,
-        title: books.title,
-        authors: books.authors,
+        bookId: userBooks.bookId,
+        title: effectiveTitle,
+        authors: effectiveAuthors,
         coverUrl: books.coverUrl,
         borrowerId: loans.borrowerId,
         ownerId: loans.ownerId
       })
       .from(loans)
       .innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .leftJoin(books, eq(userBooks.bookId, books.id))
       .where(eq(loans.borrowerId, userId));
 
     return { ownerLoans, borrowerLoans };
@@ -237,16 +245,16 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
         notes: loans.notes,
         ownerNotes: loans.ownerNotes,
         userBookId: loans.userBookId,
-        bookId: books.id,
-        title: books.title,
-        authors: books.authors,
+        bookId: userBooks.bookId,
+        title: effectiveTitle,
+        authors: effectiveAuthors,
         coverUrl: books.coverUrl,
         borrowerId: loans.borrowerId,
         ownerId: loans.ownerId
       })
       .from(loans)
       .innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .leftJoin(books, eq(userBooks.bookId, books.id))
       .where(eq(loans.id, loanId))
   );
 
@@ -379,7 +387,7 @@ export async function transitionLoan(
 
 export type BorrowableBook = {
   userBookId: string;
-  bookId: string;
+  bookId: string | null;
   title: string;
   authors: string[];
   coverUrl: string | null;
@@ -400,16 +408,16 @@ export async function getBookForBorrow(
     const rows = await tx
       .select({
         userBookId: userBooks.id,
-        bookId: books.id,
-        title: books.title,
-        authors: books.authors,
+        bookId: userBooks.bookId,
+        title: effectiveTitle,
+        authors: effectiveAuthors,
         coverUrl: books.coverUrl,
-        publishYear: books.publishYear,
+        publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
         isAvailable: userBooks.isAvailable,
         ownerId: userBooks.userId
       })
       .from(userBooks)
-      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .leftJoin(books, eq(userBooks.bookId, books.id))
       .where(eq(userBooks.id, userBookId));
 
     if (rows.length === 0) return null;

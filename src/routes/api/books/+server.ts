@@ -8,8 +8,16 @@ import { tags, userBookTags } from '$lib/server/db/schema';
 
 const AddBookSchema = v.pipe(
   v.object({
+    // OpenLibrary path
     isbn: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(13))),
     workId: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(32))),
+    // Manual entry path
+    title: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
+    authors: v.optional(v.array(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+    manualIsbn: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(13))),
+    description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(5000))),
+    publishYear: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(9999))),
+    // Common
     notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
     tagsToAdd: v.optional(v.array(v.pipe(v.string(), v.trim()))),
     tagsToCreate: v.optional(
@@ -21,7 +29,10 @@ const AddBookSchema = v.pipe(
       )
     )
   }),
-  v.check(({ isbn, workId }) => Boolean(isbn || workId), 'An ISBN or workId is required.')
+  v.check(
+    ({ isbn, workId, title }) => Boolean(isbn || workId || title),
+    'An ISBN, workId, or title is required.'
+  )
 );
 
 // GET /api/books — lista los libros del usuario autenticado
@@ -48,15 +59,38 @@ export async function POST({ locals, request }: RequestEvent) {
   }
 
   try {
-    const { isbn, workId, notes, tagsToAdd, tagsToCreate } = result.output;
-    const identifier = workId ?? isbn!;
+    const { isbn, workId, title, authors, manualIsbn, description, publishYear, notes, tagsToAdd, tagsToCreate } = result.output;
 
-    const bookData = await resolveBook(identifier);
-    if (!bookData) error(404, 'Book not found on OpenLibrary');
+    let userBookId: string;
+    let responseTitle: string;
+    let responseBookId: string | null = null;
 
-    const bookId = await upsertBook(bookData);
+    if (title && !isbn && !workId) {
+      // Manual entry path — no OpenLibrary lookup
+      userBookId = await addBookToLibrary(
+        locals.user.id,
+        {
+          bookId: null,
+          title,
+          authors: authors?.filter(Boolean),
+          isbn: manualIsbn,
+          description,
+          publishYear
+        },
+        notes
+      );
+      responseTitle = title;
+    } else {
+      // OpenLibrary path
+      const identifier = workId ?? isbn!;
+      const bookData = await resolveBook(identifier);
+      if (!bookData) error(404, 'Book not found on OpenLibrary');
 
-    const userBookId = await addBookToLibrary(locals.user.id, bookId, notes);
+      const bookId = await upsertBook(bookData);
+      userBookId = await addBookToLibrary(locals.user.id, { bookId }, notes);
+      responseTitle = bookData.title;
+      responseBookId = bookId;
+    }
 
     const hasTagsToAdd = tagsToAdd && tagsToAdd.length > 0;
     const hasTagsToCreate = tagsToCreate && tagsToCreate.length > 0;
@@ -91,7 +125,7 @@ export async function POST({ locals, request }: RequestEvent) {
     }
 
     return json(
-      { userBookId, bookId, title: bookData.title },
+      { userBookId, bookId: responseBookId, title: responseTitle },
       { status: 201 }
     );
   } catch (e) {

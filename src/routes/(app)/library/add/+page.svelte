@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { Barcode, MagnifyingGlass, ArrowLeft, SpinnerGap } from 'phosphor-svelte';
+	import { Barcode, MagnifyingGlass, ArrowLeft, SpinnerGap, Plus, Trash } from 'phosphor-svelte';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import type { BookSearchResult } from '$lib/types';
 
-	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'adding';
+	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'form' | 'adding';
 
 	interface Tag {
 		id: string;
@@ -24,6 +24,42 @@
 	let availableTags = $state<Tag[]>([]);
 	let selectedTagIds = $state<string[]>([]);
 	let tagsToCreate = $state<{ name: string; color: string | null }[]>([]);
+
+	// ── Manual form state ─────────────────────────────────────────────────────
+	let formTitle = $state('');
+	let formAuthors = $state<string[]>(['']);
+	let formIsbn = $state('');
+	let formPublishYear = $state('');
+	let formDescription = $state('');
+
+	function addAuthorField() {
+		formAuthors = [...formAuthors, ''];
+	}
+
+	function removeAuthorField(i: number) {
+		formAuthors = formAuthors.filter((_, idx) => idx !== i);
+		if (formAuthors.length === 0) formAuthors = [''];
+	}
+
+	function resetFormFields() {
+		formTitle = '';
+		formAuthors = [''];
+		formIsbn = '';
+		formPublishYear = '';
+		formDescription = '';
+		notes = '';
+		selectedTagIds = [];
+		tagsToCreate = [];
+		errorMsg = '';
+	}
+
+	async function enterFormMode() {
+		resetFormFields();
+		await fetchUserTags();
+		mode = 'form';
+	}
+
+	// ── OpenLibrary confirm state ─────────────────────────────────────────────
 
 	const DESCRIPTION_LIMIT = 300;
 	let descriptionExpanded = $state(false);
@@ -131,11 +167,46 @@
 				mode = 'confirm';
 				return;
 			}
-			//goto('/library');
 			mode = 'choose';
 		} catch {
 			errorMsg = 'Network error.';
 			mode = 'confirm';
+		}
+	}
+
+	async function addManualBook(e: SubmitEvent) {
+		e.preventDefault();
+		if (!formTitle.trim()) return;
+		mode = 'adding';
+		errorMsg = '';
+		const authors = formAuthors.map((a) => a.trim()).filter(Boolean);
+		const year = formPublishYear ? parseInt(formPublishYear, 10) : undefined;
+		try {
+			const res = await fetch('/api/books', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					title: formTitle.trim(),
+					authors: authors.length > 0 ? authors : undefined,
+					manualIsbn: formIsbn.trim() || undefined,
+					publishYear: year && !isNaN(year) ? year : undefined,
+					description: formDescription.trim() || undefined,
+					notes: notes.trim() || undefined,
+					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
+				})
+			});
+			if (!res.ok) {
+				const e = await res.json();
+				errorMsg = e.message ?? 'Error.';
+				mode = 'form';
+				return;
+			}
+			resetFormFields();
+			mode = 'choose';
+		} catch {
+			errorMsg = 'Network error.';
+			mode = 'form';
 		}
 	}
 </script>
@@ -155,20 +226,27 @@
 
 	<!-- Elegir modo -->
 	{#if mode === 'choose'}
-		<div class="grid grid-cols-2 gap-4">
+		<div class="grid grid-cols-3 gap-3">
 			<button
 				onclick={() => (mode = 'scan')}
-				class="group flex flex-col items-center gap-4 border border-paper-border p-8 transition-colors hover:border-ink"
+				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
 			>
-				<Barcode size={40} weight="thin" class="text-ink-faint group-hover:text-ink" />
-				<span class="text-sm text-ink-muted">ISBN scan</span>
+				<Barcode size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
+				<span class="text-xs text-ink-muted">ISBN scan</span>
 			</button>
 			<button
 				onclick={() => (mode = 'manual')}
-				class="group flex flex-col items-center gap-4 border border-paper-border p-8 transition-colors hover:border-ink"
+				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
 			>
-				<MagnifyingGlass size={40} weight="thin" class="text-ink-faint group-hover:text-ink" />
-				<span class="text-sm text-ink-muted">Manual Search</span>
+				<MagnifyingGlass size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
+				<span class="text-xs text-ink-muted">Search</span>
+			</button>
+			<button
+				onclick={enterFormMode}
+				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
+			>
+				<Plus size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
+				<span class="text-xs text-ink-muted">Enter manually</span>
 			</button>
 		</div>
 
@@ -234,7 +312,7 @@
 			{/if}
 		</div>
 
-		<!-- Confirmar -->
+		<!-- Confirmar (OpenLibrary) -->
 	{:else if mode === 'confirm' && selectedBook}
 		<div class="space-y-6">
 			<div class="border border-paper-border p-5">
@@ -310,6 +388,140 @@
 				</button>
 			</div>
 		</div>
+
+		<!-- Entrada manual -->
+	{:else if mode === 'form'}
+		<form onsubmit={addManualBook} class="space-y-5">
+			<div>
+				<label for="form-title" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Title <span class="tracking-normal normal-case text-ink-faint">*</span>
+				</label>
+				<input
+					id="form-title"
+					type="text"
+					bind:value={formTitle}
+					required
+					autofocus
+					placeholder="Book title"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				/>
+			</div>
+
+			<div>
+				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Authors <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+				</span>
+				<div class="mt-1.5 space-y-2">
+					{#each formAuthors as _, i (i)}
+						<div class="flex gap-2">
+							<input
+								type="text"
+								bind:value={formAuthors[i]}
+								placeholder="Author name"
+								class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+							/>
+							{#if formAuthors.length > 1}
+								<button
+									type="button"
+									onclick={() => removeAuthorField(i)}
+									class="flex items-center justify-center border border-paper-border px-2.5 text-ink-faint hover:border-ink-faint hover:text-ink"
+								>
+									<Trash size={14} />
+								</button>
+							{/if}
+						</div>
+					{/each}
+					<button
+						type="button"
+						onclick={addAuthorField}
+						class="flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink-muted"
+					>
+						<Plus size={12} /> Add author
+					</button>
+				</div>
+			</div>
+
+			<div class="grid grid-cols-2 gap-3">
+				<div>
+					<label for="form-isbn" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+						ISBN <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+					</label>
+					<input
+						id="form-isbn"
+						type="text"
+						bind:value={formIsbn}
+						placeholder="9780000000000"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					/>
+				</div>
+				<div>
+					<label for="form-year" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+						Year <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+					</label>
+					<input
+						id="form-year"
+						type="number"
+						bind:value={formPublishYear}
+						placeholder="2024"
+						min="0"
+						max="9999"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					/>
+				</div>
+			</div>
+
+			<div>
+				<label for="form-description" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Description <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+				</label>
+				<textarea
+					id="form-description"
+					bind:value={formDescription}
+					rows="3"
+					placeholder="Synopsis or notes about the book..."
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				></textarea>
+			</div>
+
+			<div>
+				<label for="form-notes" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Personal notes <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+				</label>
+				<textarea
+					id="form-notes"
+					bind:value={notes}
+					rows="2"
+					placeholder="Edition, condition..."
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				></textarea>
+			</div>
+
+			<div>
+				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Tags <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+				</span>
+				<div class="mt-1.5">
+					<TagSelectorLocal {availableTags} bind:selectedTagIds bind:tagsToCreate />
+				</div>
+			</div>
+
+			<div class="flex gap-3 pt-1">
+				<button
+					type="button"
+					onclick={() => (mode = 'choose')}
+					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
+				>
+					Cancel
+				</button>
+				<button
+					type="submit"
+					disabled={!formTitle.trim()}
+					class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90 disabled:opacity-40"
+				>
+					Add to my library
+				</button>
+			</div>
+		</form>
 
 		<!-- Añadiendo -->
 	{:else if mode === 'adding'}

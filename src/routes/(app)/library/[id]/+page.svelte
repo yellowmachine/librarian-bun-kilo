@@ -220,7 +220,8 @@
 		<TagCombobox {availableTags} />
 	</div>
 
-	<!-- Reseñas -->
+	<!-- Reseñas (solo libros de OpenLibrary) -->
+	{#if book.bookId}
 	<div class="space-y-6 border-t border-paper-border pt-6">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-2">
@@ -228,7 +229,7 @@
 				<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Reviews</span>
 			</div>
 			<div class="flex items-center gap-3">
-				{#if reviewStats.totalReviews > 0}
+				{#if reviewStats && reviewStats.totalReviews > 0}
 					<div class="flex items-center gap-2">
 						<StarRating value={Math.round(reviewStats.averageRating ?? 0)} readonly size={16} />
 						<span class="text-xs text-ink-muted">
@@ -335,6 +336,7 @@
 			<p class="text-xs text-ink-faint">There are no reviews for this book yet.</p>
 		{/if}
 	</div>
+	{/if}
 
 	<!-- Eliminar -->
 	<div class="border-t border-paper-border pt-4">

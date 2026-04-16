@@ -51,7 +51,7 @@ export type SharedTagWithBooks = {
 
 export type GroupBookResult = {
   userBookId: string;
-  bookId: string;
+  bookId: string | null;
   title: string;
   authors: string[];
   coverUrl: string | null;
@@ -407,17 +407,17 @@ export async function searchBooksFromOthers(
     const detailRows = await tx
       .select({
         userBookId: userBooks.id,
-        bookId: books.id,
-        title: books.title,
-        authors: books.authors,
+        bookId: userBooks.bookId,
+        title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+        authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
         coverUrl: books.coverUrl,
-        publishYear: books.publishYear,
+        publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
         isAvailable: userBooks.isAvailable,
         ownerId: userBooks.userId,
         ownerName: user.name
       })
       .from(userBooks)
-      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .leftJoin(books, eq(userBooks.bookId, books.id))
       .innerJoin(user, eq(userBooks.userId, user.id))
       .where(
         and(

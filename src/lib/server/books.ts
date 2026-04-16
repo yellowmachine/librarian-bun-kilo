@@ -7,6 +7,16 @@ import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
 
 export const LIBRARY_RECENT_LIMIT = 50;
 
+// ─── COALESCE helpers ─────────────────────────────────────────────────────────
+// userBooks fields take priority over books fields (manual-entry override).
+// When bookId IS NULL, all books.* are NULL (LEFT JOIN), so COALESCE returns
+// the userBooks value.
+
+const effectiveTitle = sql<string>`COALESCE(${userBooks.title}, ${books.title})`;
+const effectiveAuthors = sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`;
+const effectivePublishYear = sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`;
+const effectiveDescription = sql<string | null>`COALESCE(${userBooks.description}, ${books.description})`;
+
 // ─── Upsert libro en catálogo global ─────────────────────────────────────────
 // Si el libro ya existe por workId lo devuelve sin tocar; si no, lo inserta.
 // Se llama con el usuario root (sin RLS) porque books es catálogo global.
@@ -33,25 +43,36 @@ export async function upsertBook(data: OpenLibraryBook): Promise<string> {
 
 // ─── Añadir libro a la biblioteca del usuario ─────────────────────────────────
 
+type BookSource =
+  | { bookId: string; title?: undefined }
+  | { bookId: null; title: string; authors?: string[]; isbn?: string; description?: string; publishYear?: number };
+
 export async function addBookToLibrary(
   userId: string,
-  bookId: string,
+  source: BookSource,
   notes?: string
 ): Promise<string> {
   return withRLS(userId, async (tx) => {
-    // Verificar si ya tiene este libro concreto (RLS filtra por userId automáticamente)
-    const dup = await tx
-      .select({ id: userBooks.id })
-      .from(userBooks)
-      .where(eq(userBooks.bookId, bookId));
+    if (source.bookId !== null) {
+      // OpenLibrary book — check for duplicates
+      const dup = await tx
+        .select({ id: userBooks.id })
+        .from(userBooks)
+        .where(eq(userBooks.bookId, source.bookId));
 
-    if (dup.length > 0) return dup[0].id;
+      if (dup.length > 0) return dup[0].id;
+    }
 
     const id = nanoid();
     await tx.insert(userBooks).values({
       id,
       userId,
-      bookId,
+      bookId: source.bookId ?? null,
+      title: source.bookId === null ? source.title : null,
+      authors: source.bookId === null ? (source.authors ?? null) : null,
+      isbn: source.bookId === null ? (source.isbn ?? null) : null,
+      description: source.bookId === null ? (source.description ?? null) : null,
+      publishYear: source.bookId === null ? (source.publishYear ?? null) : null,
       notes: notes ?? null,
       isAvailable: true
     });
@@ -63,7 +84,7 @@ export async function addBookToLibrary(
 
 export type UserBookWithDetails = {
   userBookId: string;
-  bookId: string;
+  bookId: string | null;
   title: string;
   authors: string[];
   coverUrl: string | null;
@@ -88,18 +109,18 @@ export async function getUserBooks(
     const base = tx
       .select({
         userBookId: userBooks.id,
-        bookId: books.id,
-        title: books.title,
-        authors: books.authors,
+        bookId: userBooks.bookId,
+        title: effectiveTitle,
+        authors: effectiveAuthors,
         coverUrl: books.coverUrl,
-        publishYear: books.publishYear,
-        description: books.description,
+        publishYear: effectivePublishYear,
+        description: effectiveDescription,
         isAvailable: userBooks.isAvailable,
         notes: userBooks.notes,
         addedAt: userBooks.addedAt
       })
       .from(userBooks)
-      .innerJoin(books, eq(userBooks.bookId, books.id));
+      .leftJoin(books, eq(userBooks.bookId, books.id));
 
     let rows;
     if (filter.type === 'recent') {
@@ -107,16 +128,16 @@ export async function getUserBooks(
         .orderBy(desc(userBooks.addedAt))
         .limit(filter.limit ?? LIBRARY_RECENT_LIMIT);
     } else if (filter.type === 'all') {
-      rows = await base.orderBy(asc(books.title));
+      rows = await base.orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
     } else if (filter.by === 'title') {
       rows = await base
-        .where(sql`upper(left(${books.title}, 1)) = ${filter.letter}`)
-        .orderBy(asc(books.title));
+        .where(sql`upper(left(COALESCE(${userBooks.title}, ${books.title}), 1)) = ${filter.letter}`)
+        .orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
     } else {
       // by author: only the first author (index 0) determines the letter
       rows = await base
-        .where(sql`upper(left(${books.authors}[1], 1)) = ${filter.letter}`)
-        .orderBy(sql`${books.authors}[1]`);
+        .where(sql`upper(left(COALESCE(${userBooks.authors}, ${books.authors})[1], 1)) = ${filter.letter}`)
+        .orderBy(sql`COALESCE(${userBooks.authors}, ${books.authors})[1] ASC`);
     }
 
     if (rows.length === 0) return [];
@@ -158,15 +179,15 @@ export async function getLibraryLetters(
     const rows =
       by === 'title'
         ? await tx.execute<{ letter: string }>(sql`
-						select distinct upper(left(${books.title}, 1)) as letter
+						select distinct upper(left(COALESCE(${userBooks.title}, ${books.title}), 1)) as letter
 						from ${userBooks}
-						inner join ${books} on ${userBooks.bookId} = ${books.id}
+						left join ${books} on ${userBooks.bookId} = ${books.id}
 						order by 1
 					`)
         : await tx.execute<{ letter: string }>(sql`
-						select distinct upper(left(${books.authors}[1], 1)) as letter
+						select distinct upper(left(COALESCE(${userBooks.authors}, ${books.authors})[1], 1)) as letter
 						from ${userBooks}
-						inner join ${books} on ${userBooks.bookId} = ${books.id}
+						left join ${books} on ${userBooks.bookId} = ${books.id}
 						order by 1
 					`);
     return rows.map((r) => r.letter).filter((l) => /^[A-Z]$/.test(l));
@@ -183,18 +204,18 @@ export async function getUserBook(
     const rows = await tx
       .select({
         userBookId: userBooks.id,
-        bookId: books.id,
-        title: books.title,
-        authors: books.authors,
+        bookId: userBooks.bookId,
+        title: effectiveTitle,
+        authors: effectiveAuthors,
         coverUrl: books.coverUrl,
-        publishYear: books.publishYear,
-        description: books.description,
+        publishYear: effectivePublishYear,
+        description: effectiveDescription,
         isAvailable: userBooks.isAvailable,
         notes: userBooks.notes,
         addedAt: userBooks.addedAt
       })
       .from(userBooks)
-      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .leftJoin(books, eq(userBooks.bookId, books.id))
       .where(eq(userBooks.id, userBookId));
 
     if (rows.length === 0) return null;

@@ -8,7 +8,8 @@ import {
   boolean,
   integer,
   uniqueIndex,
-  index
+  index,
+  check
 } from 'drizzle-orm/pg-core';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -121,18 +122,27 @@ export const userBooks = librarianSchema.table(
     userId: text('user_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
+    // Nullable: null means the book was entered manually (no OpenLibrary record)
     bookId: text('book_id')
-      .notNull()
       .references(() => books.id, { onDelete: 'restrict' }),
+    // Manual-entry fields — override books.* when bookId is null; ignored when bookId is set
+    title: text('title'),
+    authors: text('authors').array(),
+    isbn: text('isbn'),
+    description: text('description'),
+    publishYear: integer('publish_year'),
     notes: text('notes'),
     isAvailable: boolean('is_available').default(true).notNull(),
     addedAt: timestamp('added_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull()
   },
   (table) => [
-    uniqueIndex('user_books_user_book_idx').on(table.userId, table.bookId),
+    // Partial unique index: only one entry per (userId, bookId) when bookId is not null
+    uniqueIndex('user_books_user_book_idx').on(table.userId, table.bookId).where(sql`${table.bookId} IS NOT NULL`),
     index('user_books_user_idx').on(table.userId),
     index('user_books_book_idx').on(table.bookId),
+    // Either bookId (OpenLibrary) or title (manual entry) must be present
+    check('user_books_book_or_title', sql`${table.bookId} IS NOT NULL OR ${table.title} IS NOT NULL`),
     pgPolicy('user_books_select', {
       for: 'select',
       to: appUser,

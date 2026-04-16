@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { eq, inArray, and } from 'drizzle-orm';
+import { eq, inArray, and, sql } from 'drizzle-orm';
 import { withRLS } from '$lib/server/db/rls';
 import { books, userBooks, userBookTags, tags, bookReviews } from '$lib/server/db/schema';
 
@@ -17,17 +17,17 @@ export async function GET({ locals, url }: RequestEvent) {
 		tx
 			.select({
 				userBookId: userBooks.id,
-				bookId: books.id,
-				title: books.title,
-				authors: books.authors,
-				isbn: books.isbn,
+				bookId: userBooks.bookId,
+				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
+				isbn: sql<string | null>`COALESCE(${userBooks.isbn}, ${books.isbn})`,
 				coverUrl: books.coverUrl,
-				publishYear: books.publishYear,
+				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
 				notes: userBooks.notes
 			})
 			.from(userBooks)
-			.innerJoin(books, eq(userBooks.bookId, books.id))
-			.orderBy(books.title)
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.orderBy(sql`COALESCE(${userBooks.title}, ${books.title})`)
 	);
 
 	if (rows.length === 0) {
@@ -36,7 +36,7 @@ export async function GET({ locals, url }: RequestEvent) {
 			: yamlResponse('books: []\n');
 	}
 
-	const bookIds = [...new Set(rows.map((r) => r.bookId))];
+	const bookIds = [...new Set(rows.map((r) => r.bookId).filter((id): id is string => id !== null))];
 	const userBookIds = rows.map((r) => r.userBookId);
 
 	const [allTags, ownRatings] = await Promise.all([
@@ -47,12 +47,14 @@ export async function GET({ locals, url }: RequestEvent) {
 				.innerJoin(tags, eq(userBookTags.tagId, tags.id))
 				.where(inArray(userBookTags.userBookId, userBookIds))
 		),
-		withRLS(userId, (tx) =>
-			tx
-				.select({ bookId: bookReviews.bookId, rating: bookReviews.rating })
-				.from(bookReviews)
-				.where(and(inArray(bookReviews.bookId, bookIds), eq(bookReviews.userId, userId)))
-		)
+		bookIds.length > 0
+			? withRLS(userId, (tx) =>
+					tx
+						.select({ bookId: bookReviews.bookId, rating: bookReviews.rating })
+						.from(bookReviews)
+						.where(and(inArray(bookReviews.bookId, bookIds), eq(bookReviews.userId, userId)))
+				)
+			: Promise.resolve([])
 	]);
 
 	const tagsByBook = new Map<string, string[]>();
@@ -70,7 +72,7 @@ export async function GET({ locals, url }: RequestEvent) {
 		isbn: row.isbn ?? null,
 		coverUrl: row.coverUrl ?? null,
 		publishYear: row.publishYear ?? null,
-		rating: ratingByBook.get(row.bookId) ?? null,
+		rating: row.bookId ? (ratingByBook.get(row.bookId) ?? null) : null,
 		notes: row.notes ?? null,
 		tags: tagsByBook.get(row.userBookId) ?? []
 	}));

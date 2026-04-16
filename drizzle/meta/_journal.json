@@ -43,6 +43,13 @@
       "when": 1775989696115,
       "tag": "0005_clear_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1776337795305,
+      "tag": "0006_tiny_speed",
+      "breakpoints": true
     }
   ]
 }
