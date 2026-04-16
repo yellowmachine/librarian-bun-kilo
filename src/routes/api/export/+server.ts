@@ -4,9 +4,12 @@ import { eq, inArray, and } from 'drizzle-orm';
 import { withRLS } from '$lib/server/db/rls';
 import { books, userBooks, userBookTags, tags, bookReviews } from '$lib/server/db/schema';
 
-// GET /api/export — descarga la biblioteca del usuario como YAML
-export async function GET({ locals }: RequestEvent) {
+// GET /api/export?format=yaml|bibtex
+export async function GET({ locals, url }: RequestEvent) {
 	if (!locals.user) error(401, 'Not authenticated');
+
+	const format = url.searchParams.get('format') ?? 'yaml';
+	if (format !== 'yaml' && format !== 'bibtex') error(400, 'format must be yaml or bibtex');
 
 	const userId = locals.user.id;
 
@@ -28,7 +31,9 @@ export async function GET({ locals }: RequestEvent) {
 	);
 
 	if (rows.length === 0) {
-		return yamlResponse('books: []\n');
+		return format === 'bibtex'
+			? bibtexResponse('% Empty library\n')
+			: yamlResponse('books: []\n');
 	}
 
 	const bookIds = [...new Set(rows.map((r) => r.bookId))];
@@ -42,7 +47,6 @@ export async function GET({ locals }: RequestEvent) {
 				.innerJoin(tags, eq(userBookTags.tagId, tags.id))
 				.where(inArray(userBookTags.userBookId, userBookIds))
 		),
-		// book_reviews RLS allows all authenticated users to read — filter by userId explicitly
 		withRLS(userId, (tx) =>
 			tx
 				.select({ bookId: bookReviews.bookId, rating: bookReviews.rating })
@@ -60,21 +64,24 @@ export async function GET({ locals }: RequestEvent) {
 
 	const ratingByBook = new Map(ownRatings.map((r) => [r.bookId, r.rating]));
 
-	const yaml = serializeLibraryYaml(
-		rows.map((row) => ({
-			title: row.title,
-			authors: row.authors ?? [],
-			isbn: row.isbn ?? null,
-			coverUrl: row.coverUrl ?? null,
-			publishYear: row.publishYear ?? null,
-			rating: ratingByBook.get(row.bookId) ?? null,
-			notes: row.notes ?? null,
-			tags: tagsByBook.get(row.userBookId) ?? []
-		}))
-	);
+	const entries = rows.map((row) => ({
+		title: row.title,
+		authors: row.authors ?? [],
+		isbn: row.isbn ?? null,
+		coverUrl: row.coverUrl ?? null,
+		publishYear: row.publishYear ?? null,
+		rating: ratingByBook.get(row.bookId) ?? null,
+		notes: row.notes ?? null,
+		tags: tagsByBook.get(row.userBookId) ?? []
+	}));
 
-	return yamlResponse(yaml);
+	if (format === 'bibtex') {
+		return bibtexResponse(serializeLibraryBibTex(entries));
+	}
+	return yamlResponse(serializeLibraryYaml(entries));
 }
+
+// ─── Responses ────────────────────────────────────────────────────────────────
 
 function yamlResponse(body: string): Response {
 	return new Response(body, {
@@ -84,6 +91,17 @@ function yamlResponse(body: string): Response {
 		}
 	});
 }
+
+function bibtexResponse(body: string): Response {
+	return new Response(body, {
+		headers: {
+			'Content-Type': 'application/x-bibtex; charset=utf-8',
+			'Content-Disposition': 'attachment; filename="library.bib"'
+		}
+	});
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type BookExport = {
 	title: string;
@@ -95,6 +113,8 @@ type BookExport = {
 	notes: string | null;
 	tags: string[];
 };
+
+// ─── YAML ─────────────────────────────────────────────────────────────────────
 
 function yamlStr(s: string): string {
 	if (/[:#\[\]{},&*?|<>=!%@`\n"']/.test(s) || s.trim() !== s || s === '') {
@@ -116,4 +136,53 @@ function serializeLibraryYaml(entries: BookExport[]): string {
 		if (b.tags.length > 0) lines.push(`    tags: [${b.tags.map(yamlStr).join(', ')}]`);
 	}
 	return lines.join('\n') + '\n';
+}
+
+// ─── BibTeX ───────────────────────────────────────────────────────────────────
+
+function bibTexEscape(s: string): string {
+	return s
+		.replace(/\\/g, '\\textbackslash{}')
+		.replace(/[&%$#_^~]/g, (c) => `\\${c}`)
+		.replace(/\{/g, '\\{')
+		.replace(/\}/g, '\\}');
+}
+
+function makeBibKey(authors: string[], year: number | null, usedKeys: Set<string>): string {
+	const surname = authors[0]
+		? (authors[0].split(' ').at(-1) ?? authors[0]).toLowerCase().replace(/[^a-z]/g, '')
+		: 'unknown';
+	const yr = year ? String(year) : 'nd';
+	let key = `${surname}${yr}`;
+	let suffix = 1;
+	while (usedKeys.has(key)) {
+		key = `${surname}${yr}${String.fromCharCode(96 + suffix)}`; // a, b, c …
+		suffix++;
+	}
+	usedKeys.add(key);
+	return key;
+}
+
+function serializeLibraryBibTex(entries: BookExport[]): string {
+	const usedKeys = new Set<string>();
+	const blocks: string[] = [];
+
+	for (const b of entries) {
+		const key = makeBibKey(b.authors, b.publishYear, usedKeys);
+		const fields: string[] = [];
+
+		fields.push(`  title     = {${bibTexEscape(b.title)}}`);
+		if (b.authors.length > 0) {
+			fields.push(`  author    = {${b.authors.map(bibTexEscape).join(' and ')}}`);
+		}
+		if (b.publishYear !== null) fields.push(`  year      = {${b.publishYear}}`);
+		if (b.isbn) fields.push(`  isbn      = {${b.isbn}}`);
+		if (b.rating !== null) fields.push(`  rating    = {${b.rating}}`);
+		if (b.tags.length > 0) fields.push(`  keywords  = {${b.tags.map(bibTexEscape).join(', ')}}`);
+		if (b.notes) fields.push(`  annote    = {${bibTexEscape(b.notes)}}`);
+
+		blocks.push(`@book{${key},\n${fields.join(',\n')}\n}`);
+	}
+
+	return blocks.join('\n\n') + '\n';
 }

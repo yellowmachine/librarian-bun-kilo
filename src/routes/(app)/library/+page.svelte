@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { MagnifyingGlass, SpinnerGap } from 'phosphor-svelte';
+	import { MagnifyingGlass, SpinnerGap, Tag, Export, Plus, CaretDown } from 'phosphor-svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import type { GroupBookResult } from '$lib/server/groups';
 	import BookGrid from '$lib/components/BookGrid.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
+
+	let exportOpen = $state(false);
 
 	let { data, form } = $props();
 	const { userBooks } = $derived(data);
@@ -82,12 +84,67 @@
 <div class="space-y-12">
 	<!-- ── Mis libros ─────────────────────────────────────────────────────── -->
 	<section class="space-y-6">
-		<div>
-			<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">My library</h1>
-			<p class="mt-1 text-sm text-ink-faint">
-				{(userBooks as UserBookWithDetails[]).length}
-				{(userBooks as UserBookWithDetails[]).length === 1 ? 'book' : 'books'}
-			</p>
+		<div class="flex items-end justify-between gap-4">
+			<div>
+				<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">My library</h1>
+				<p class="mt-1 text-sm text-ink-faint">
+					{(userBooks as UserBookWithDetails[]).length}
+					{(userBooks as UserBookWithDetails[]).length === 1 ? 'book' : 'books'}
+				</p>
+			</div>
+			<div class="flex shrink-0 items-center gap-2">
+				<a
+					href="/tags"
+					class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+				>
+					<Tag size={15} />
+					<span class="hidden sm:inline">Tags</span>
+				</a>
+
+				<!-- Export dropdown -->
+				<div class="relative">
+					<button
+						onclick={() => (exportOpen = !exportOpen)}
+						class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+					>
+						<Export size={15} />
+						<span class="hidden sm:inline">Export</span>
+						<CaretDown size={11} class="transition-transform {exportOpen ? 'rotate-180' : ''}" />
+					</button>
+					{#if exportOpen}
+						<div
+							class="absolute right-0 top-full z-20 mt-1 min-w-36 border border-paper-border bg-paper shadow-sm"
+						>
+							<a
+								href="/api/export?format=yaml"
+								download="library.yaml"
+								onclick={() => (exportOpen = false)}
+								class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
+							>
+								YAML
+								<span class="ml-auto text-xs text-ink-faint">.yaml</span>
+							</a>
+							<a
+								href="/api/export?format=bibtex"
+								download="library.bib"
+								onclick={() => (exportOpen = false)}
+								class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
+							>
+								BibTeX
+								<span class="ml-auto text-xs text-ink-faint">.bib</span>
+							</a>
+						</div>
+					{/if}
+				</div>
+
+				<a
+					href="/library/add"
+					class="flex items-center gap-1.5 border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
+				>
+					<Plus size={15} weight="bold" />
+					<span class="hidden sm:inline">Add</span>
+				</a>
+			</div>
 		</div>
 
 		{#if (userBooks as UserBookWithDetails[]).length > 0}
