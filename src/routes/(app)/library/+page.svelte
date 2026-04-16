@@ -6,6 +6,7 @@
 	import BookGrid from '$lib/components/BookGrid.svelte';
 
 	let exportOpen = $state(false);
+	let activeTab = $state<'mine' | 'others'>('mine');
 
 	let { data, form } = $props();
 	const { userBooks } = $derived(data);
@@ -78,19 +79,19 @@
 	);
 	const othersQuery = $derived((form?.othersQuery ?? '') as string);
 	const othersSearched = $derived(form !== null && form !== undefined && 'othersResults' in (form ?? {}));
+
+	// Auto-switch to the others tab when a search returns results
+	$effect(() => {
+		if (othersSearched) activeTab = 'others';
+	});
 </script>
 
-<div class="space-y-12">
-	<!-- ── Mis libros ─────────────────────────────────────────────────────── -->
-	<section class="space-y-6">
-		<div class="flex items-end justify-between gap-4">
-			<div>
-				<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">My library</h1>
-				<p class="mt-1 text-sm text-ink-faint">
-					{(userBooks as UserBookWithDetails[]).length}
-					{(userBooks as UserBookWithDetails[]).length === 1 ? 'book' : 'books'}
-				</p>
-			</div>
+<div class="space-y-6">
+	<!-- ── Cabecera + acciones ───────────────────────────────────────────── -->
+	<div class="flex items-end justify-between gap-4">
+		<div>
+			<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">Library</h1>
+		</div>
 			<div class="flex shrink-0 items-center gap-2">
 				<a
 					href="/tags"
@@ -143,9 +144,32 @@
 					<Plus size={15} weight="bold" />
 					<span class="hidden sm:inline">Add</span>
 				</a>
-			</div>
 		</div>
+	</div>
 
+	<!-- ── Tabs ──────────────────────────────────────────────────────────── -->
+	<div class="flex border-b border-paper-border">
+		<button
+			onclick={() => (activeTab = 'mine')}
+			class="flex items-center gap-2 border-b-2 pb-3 pr-6 text-sm transition-colors
+			{activeTab === 'mine' ? 'border-ink font-medium text-ink' : 'border-transparent text-ink-faint hover:text-ink-muted'}"
+		>
+			My books
+			<span class="text-xs {activeTab === 'mine' ? 'text-ink-muted' : 'text-ink-faint'}">
+				{(userBooks as UserBookWithDetails[]).length}
+			</span>
+		</button>
+		<button
+			onclick={() => (activeTab = 'others')}
+			class="flex items-center gap-2 border-b-2 pb-3 pr-6 text-sm transition-colors
+			{activeTab === 'others' ? 'border-ink font-medium text-ink' : 'border-transparent text-ink-faint hover:text-ink-muted'}"
+		>
+			From others
+		</button>
+	</div>
+
+	<!-- ── Mis libros ────────────────────────────────────────────────────── -->
+	{#if activeTab === 'mine'}
 		{#if (userBooks as UserBookWithDetails[]).length > 0}
 			<!-- Índice alfabético -->
 			<div class="space-y-3">
@@ -232,17 +256,9 @@
 				</a>
 			</div>
 		{/if}
-	</section>
 
 	<!-- ── Libros de otros ────────────────────────────────────────────────── -->
-	<section class="space-y-6 border-t border-paper-border pt-8">
-		<div>
-			<h2 class="font-serif text-xl font-normal text-ink">Books from others</h2>
-			<p class="mt-1 text-sm text-ink-faint">
-				Search books shared by people in your groups
-			</p>
-		</div>
-
+	{:else}
 		<form
 			method="POST"
 			action="?/searchOthers"
@@ -340,6 +356,8 @@
 					{/each}
 				</ul>
 			{/if}
+		{:else}
+			<p class="text-sm text-ink-faint">Search books shared by people in your groups.</p>
 		{/if}
-	</section>
+	{/if}
 </div>
