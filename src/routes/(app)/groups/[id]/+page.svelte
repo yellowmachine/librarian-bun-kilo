@@ -1,15 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import {
-		ArrowLeft,
-		Tag,
-		Users,
-		Copy,
-		ArrowsClockwise,
-		MagnifyingGlass,
-		X
-	} from 'phosphor-svelte';
+	import { ArrowLeft, Tag, Users, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
 	import InviteQR from '$lib/components/InviteQR.svelte';
 
 	let { data, form } = $props();
@@ -111,16 +103,6 @@
 			{/if}
 		</div>
 	{/if}
-
-	<!-- Acceso rápido búsqueda -->
-	<a
-		href="/groups/{group.id}/search"
-		class="flex items-center gap-3 border border-paper-border px-5 py-4 transition-colors hover:border-ink"
-	>
-		<MagnifyingGlass size={20} weight="light" class="text-ink-faint" />
-		<span class="text-sm text-ink-muted">Search books in this group</span>
-		<span class="ml-auto text-ink-faint">→</span>
-	</a>
 
 	<!-- Tabs -->
 	<div class="border-b border-paper-border">
