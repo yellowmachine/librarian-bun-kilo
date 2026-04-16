@@ -213,8 +213,8 @@
 		</div>
 	{/if}
 
-	<!-- OpenLibrary link -->
-	{#if book.bookId}
+	<!-- OpenLibrary link (only for proper work IDs, not isbn:... fallbacks) -->
+	{#if book.bookId?.startsWith('OL')}
 		<a
 			href="https://openlibrary.org/works/{book.bookId}"
 			target="_blank"

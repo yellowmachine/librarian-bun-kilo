@@ -4,8 +4,9 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import { getUserBook, updateUserBook, removeFromLibrary } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
-import { tags, userBookTags, loans, userBooks } from '$lib/server/db/schema';
+import { tags, userBookTags, loans, userBooks, books } from '$lib/server/db/schema';
 import { getWorkById } from '$lib/server/openlibrary';
+import { db } from '$lib/server/db/index';
 import {
   getMyReview,
   getBookReviews,
@@ -163,13 +164,33 @@ export const actions = {
     const book = await getUserBook(locals.user!.id, params.id!);
     if (!book || !book.bookId) return fail(400, { error: 'Not an OpenLibrary book.' });
 
-    const workData = await getWorkById(book.bookId);
-    if (!workData?.description) return fail(404, { error: 'No description found on OpenLibrary.' });
+    let description: string | null = null;
+
+    // 1. Try fresh fetch from OL Works API
+    try {
+      const workData = await getWorkById(book.bookId);
+      description = workData?.description ?? null;
+    } catch {
+      // OL unreachable — fall through to catalog fallback
+    }
+
+    // 2. Fallback: description already stored in the books catalog
+    if (!description) {
+      const row = await db
+        .select({ description: books.description })
+        .from(books)
+        .where(eq(books.id, book.bookId));
+      description = row[0]?.description ?? null;
+    }
+
+    if (!description) {
+      return fail(404, { error: 'No description available for this book on OpenLibrary.' });
+    }
 
     await withRLS(locals.user!.id, async (tx) => {
       await tx
         .update(userBooks)
-        .set({ description: workData.description, updatedAt: new Date() })
+        .set({ description, updatedAt: new Date() })
         .where(eq(userBooks.id, params.id!));
     });
 
