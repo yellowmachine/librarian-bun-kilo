@@ -20,6 +20,7 @@
 	let selectedDescription = $state<string | null>(null);
 	let notes = $state('');
 	let errorMsg = $state('');
+	let lastAddedTitle = $state<string | null>(null);
 	let searching = $state(false);
 	let availableTags = $state<Tag[]>([]);
 	let selectedTagIds = $state<string[]>([]);
@@ -167,6 +168,8 @@
 				mode = 'confirm';
 				return;
 			}
+			const data = await res.json();
+			lastAddedTitle = data.title ?? selectedBook.title;
 			mode = 'choose';
 		} catch {
 			errorMsg = 'Network error.';
@@ -202,6 +205,8 @@
 				mode = 'form';
 				return;
 			}
+			const data = await res.json();
+			lastAddedTitle = data.title ?? formTitle;
 			resetFormFields();
 			mode = 'choose';
 		} catch {
@@ -226,6 +231,12 @@
 
 	<!-- Elegir modo -->
 	{#if mode === 'choose'}
+		{#if lastAddedTitle}
+			<div class="flex items-center justify-between border border-paper-border bg-paper-ui px-4 py-2.5 text-sm">
+				<span class="text-ink-muted"><span class="font-medium text-ink">{lastAddedTitle}</span> added to your library.</span>
+				<a href="/library" class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2">View library</a>
+			</div>
+		{/if}
 		<div class="grid grid-cols-3 gap-3">
 			<button
 				onclick={() => (mode = 'scan')}
