@@ -4,7 +4,8 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import { getUserBook, updateUserBook, removeFromLibrary } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
-import { tags, userBookTags, loans } from '$lib/server/db/schema';
+import { tags, userBookTags, loans, userBooks } from '$lib/server/db/schema';
+import { getWorkById } from '$lib/server/openlibrary';
 import {
   getMyReview,
   getBookReviews,
@@ -120,6 +121,59 @@ export const actions = {
     if (!book.bookId) return fail(400, { reviewError: 'Reviews are not available for manually added books.' });
     await deleteReview(locals.user!.id, book.bookId);
     return { reviewDeleted: true };
+  },
+
+  // Editar campos de un libro introducido manualmente (bookId IS NULL)
+  editManual: async ({ locals, params, request }: RequestEvent) => {
+    const book = await getUserBook(locals.user!.id, params.id!);
+    if (!book) return fail(404, { editError: 'Book not found.' });
+    if (book.bookId !== null) return fail(400, { editError: 'Only manually added books can be edited.' });
+
+    const data = await request.formData();
+    const title = (data.get('title') as string)?.trim();
+    const authorsRaw = (data.get('authors') as string)?.trim();
+    const isbn = (data.get('isbn') as string)?.trim() || null;
+    const publishYearRaw = (data.get('publishYear') as string)?.trim();
+    const description = (data.get('description') as string)?.trim() || null;
+
+    if (!title) return fail(400, { editError: 'Title is required.' });
+
+    const authors = authorsRaw ? authorsRaw.split('\n').map((a) => a.trim()).filter(Boolean) : [];
+    const publishYear = publishYearRaw ? parseInt(publishYearRaw, 10) : null;
+
+    await withRLS(locals.user!.id, async (tx) => {
+      await tx
+        .update(userBooks)
+        .set({
+          title,
+          authors: authors.length > 0 ? authors : null,
+          isbn: isbn || null,
+          publishYear: publishYear && !isNaN(publishYear) ? publishYear : null,
+          description,
+          updatedAt: new Date()
+        })
+        .where(eq(userBooks.id, params.id!));
+    });
+
+    return { editSaved: true };
+  },
+
+  // Actualizar descripción desde OpenLibrary (solo libros con bookId)
+  updateDescription: async ({ locals, params }: RequestEvent) => {
+    const book = await getUserBook(locals.user!.id, params.id!);
+    if (!book || !book.bookId) return fail(400, { error: 'Not an OpenLibrary book.' });
+
+    const workData = await getWorkById(book.bookId);
+    if (!workData?.description) return fail(404, { error: 'No description found on OpenLibrary.' });
+
+    await withRLS(locals.user!.id, async (tx) => {
+      await tx
+        .update(userBooks)
+        .set({ description: workData.description, updatedAt: new Date() })
+        .where(eq(userBooks.id, params.id!));
+    });
+
+    return { success: true };
   },
 
   // Eliminar libro de la biblioteca

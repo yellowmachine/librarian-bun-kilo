@@ -14,8 +14,6 @@
 		 *  - 'detail' → portada grande con metadatos al lado (página de detalle)
 		 */
 		variant?: 'grid' | 'list' | 'detail';
-		/** Work ID de OpenLibrary (ej: "OL45804W"). Si se pasa, se muestra un enlace en variant=detail */
-		openLibraryId?: string | null;
 		/** Si se pasa, envuelve la card en un <a> */
 		href?: string;
 		onclick?: () => void;
@@ -28,14 +26,9 @@
 		publishYear = null,
 		isAvailable = true,
 		variant = 'grid',
-		openLibraryId = null,
 		href,
 		onclick
 	}: Props = $props();
-
-	const openLibraryUrl = $derived(
-		openLibraryId?.startsWith('OL') ? `https://openlibrary.org/works/${openLibraryId}` : null
-	);
 </script>
 
 {#snippet cover(classes: string)}
@@ -67,7 +60,7 @@
 		<a {href} class="group w-full min-w-0 space-y-2">
 			{@render cover('w-full aspect-[2/3] transition-opacity duration-200 group-hover:opacity-80')}
 			<div class="space-y-0.5">
-				<p class="line-clamp-2 text-xs leading-snug font-medium text-ink">{title}</p>
+				<p class="text-xs leading-snug font-medium text-ink">{title}</p>
 				{#if authors.length > 0}
 					<p class="truncate text-xs text-ink-faint">{authors[0]}</p>
 				{/if}
@@ -77,7 +70,7 @@
 		<button type="button" {onclick} class="group w-full min-w-0 space-y-2 text-left">
 			{@render cover('w-full aspect-[2/3] transition-opacity duration-200 group-hover:opacity-80')}
 			<div class="space-y-0.5">
-				<p class="line-clamp-2 text-xs leading-snug font-medium text-ink">{title}</p>
+				<p class="text-xs leading-snug font-medium text-ink">{title}</p>
 				{#if authors.length > 0}
 					<p class="truncate text-xs text-ink-faint">{authors[0]}</p>
 				{/if}
@@ -128,16 +121,6 @@
 			{/if}
 			{#if publishYear}
 				<p class="text-xs text-ink-faint">{publishYear}</p>
-			{/if}
-			{#if openLibraryUrl}
-				<a
-					href={openLibraryUrl}
-					target="_blank"
-					rel="noopener noreferrer"
-					class="inline-flex items-center gap-1 text-xs text-ink-faint underline underline-offset-2 transition-colors hover:text-ink-muted"
-				>
-					View on Open Library ↗
-				</a>
 			{/if}
 		</div>
 	</div>

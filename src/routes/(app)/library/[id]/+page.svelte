@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, Tag, Trash, Star } from 'phosphor-svelte';
+	import { ArrowLeft, Tag, Trash, Star, PencilSimple } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
 	import StarRating from '$lib/components/StarRating.svelte';
@@ -48,6 +48,14 @@
 	let reviewSavedTimer: ReturnType<typeof setTimeout>;
 	let showReviewForm = $state(!!myReview || false);
 
+	// Edit form state (manual books only)
+	let editOpen = $state(false);
+	let editTitle = $state(book.title);
+	let editAuthors = $state((book.authors as string[]).join('\n'));
+	let editIsbn = $state(book.isbn ?? '');
+	let editPublishYear = $state(book.publishYear?.toString() ?? '');
+	let editDescription = $state(book.description ?? '');
+
 	const DESCRIPTION_LIMIT = 300;
 	let descriptionExpanded = $state(false);
 	let descriptionTruncated = $derived(
@@ -66,6 +74,9 @@
 			savedOk = true;
 			clearTimeout(savedTimer);
 			savedTimer = setTimeout(() => (savedOk = false), 2500);
+		}
+		if (form?.editSaved) {
+			editOpen = false;
 		}
 		if (form?.reviewSaved) {
 			reviewSavedOk = true;
@@ -103,22 +114,81 @@
 	</a>
 
 	<!-- Libro -->
-	<BookCard
-		title={book.title}
-		authors={book.authors}
-		coverUrl={book.coverUrl}
-		publishYear={book.publishYear}
-		isAvailable={book.isAvailable}
-		openLibraryId={book.bookId}
-		variant="detail"
-	/>
+	<div class="flex items-start justify-between gap-4">
+		<BookCard
+			title={book.title}
+			authors={book.authors}
+			coverUrl={book.coverUrl}
+			publishYear={book.publishYear}
+			isAvailable={book.isAvailable}
+			variant="detail"
+		/>
+		{#if !book.bookId}
+			<button
+				type="button"
+				onclick={() => (editOpen = !editOpen)}
+				class="mt-1 flex shrink-0 items-center gap-1 text-xs text-ink-faint hover:text-ink"
+			>
+				<PencilSimple size={13} />
+				{editOpen ? 'Cancel' : 'Edit'}
+			</button>
+		{/if}
+	</div>
+
+	<!-- Edit form (manual books only) -->
+	{#if editOpen && !book.bookId}
+		<form method="POST" action="?/editManual" use:enhance class="space-y-4 border border-paper-border p-4">
+			{#if form?.editError}
+				<p class="text-xs text-red-600">{form.editError}</p>
+			{/if}
+			<div>
+				<label for="edit-title" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">Title *</label>
+				<input id="edit-title" name="title" type="text" required bind:value={editTitle}
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0" />
+			</div>
+			<div>
+				<label for="edit-authors" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Authors <span class="tracking-normal normal-case text-ink-faint">(one per line)</span>
+				</label>
+				<textarea id="edit-authors" name="authors" rows="2" bind:value={editAuthors}
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"></textarea>
+			</div>
+			<div class="grid grid-cols-2 gap-3">
+				<div>
+					<label for="edit-isbn" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">ISBN</label>
+					<input id="edit-isbn" name="isbn" type="text" bind:value={editIsbn}
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0" />
+				</div>
+				<div>
+					<label for="edit-year" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">Year</label>
+					<input id="edit-year" name="publishYear" type="number" min="0" max="9999" bind:value={editPublishYear}
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0" />
+				</div>
+			</div>
+			<div>
+				<label for="edit-desc" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">Description</label>
+				<textarea id="edit-desc" name="description" rows="4" bind:value={editDescription}
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"></textarea>
+			</div>
+			<button type="submit" class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90">
+				Save changes
+			</button>
+		</form>
+	{/if}
 
 	<!-- Descripción -->
 	{#if descriptionVisible}
 		<div class="space-y-2">
-			<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
-				>Synopsis</span
-			>
+			<div class="flex items-center justify-between">
+				<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Synopsis</span>
+				{#if book.bookId}
+					<form method="POST" action="?/updateDescription" use:enhance>
+						<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
+							↻ Update from OpenLibrary
+						</button>
+					</form>
+				{/if}
+			</div>
 			<p class="text-sm leading-relaxed text-ink-muted">
 				{descriptionVisible}{#if descriptionTruncated && !descriptionExpanded}…{/if}
 			</p>
@@ -132,6 +202,27 @@
 				</button>
 			{/if}
 		</div>
+	{:else if book.bookId}
+		<div class="flex items-center justify-between">
+			<span class="text-xs text-ink-faint">No synopsis available.</span>
+			<form method="POST" action="?/updateDescription" use:enhance>
+				<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
+					↻ Fetch from OpenLibrary
+				</button>
+			</form>
+		</div>
+	{/if}
+
+	<!-- OpenLibrary link -->
+	{#if book.bookId}
+		<a
+			href="https://openlibrary.org/works/{book.bookId}"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="inline-flex items-center gap-1 text-xs text-ink-faint underline underline-offset-2 hover:text-ink-muted"
+		>
+			View on Open Library ↗
+		</a>
 	{/if}
 
 	<!-- Notas y disponibilidad -->

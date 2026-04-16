@@ -16,6 +16,7 @@ const effectiveTitle = sql<string>`COALESCE(${userBooks.title}, ${books.title})`
 const effectiveAuthors = sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`;
 const effectivePublishYear = sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`;
 const effectiveDescription = sql<string | null>`COALESCE(${userBooks.description}, ${books.description})`;
+const effectiveIsbn = sql<string | null>`COALESCE(${userBooks.isbn}, ${books.isbn})`;
 
 // ─── Upsert libro en catálogo global ─────────────────────────────────────────
 // Si el libro ya existe por workId lo devuelve sin tocar; si no, lo inserta.
@@ -88,6 +89,7 @@ export type UserBookWithDetails = {
   title: string;
   authors: string[];
   coverUrl: string | null;
+  isbn: string | null;
   publishYear: number | null;
   description: string | null;
   isAvailable: boolean;
@@ -113,6 +115,7 @@ export async function getUserBooks(
         title: effectiveTitle,
         authors: effectiveAuthors,
         coverUrl: books.coverUrl,
+        isbn: effectiveIsbn,
         publishYear: effectivePublishYear,
         description: effectiveDescription,
         isAvailable: userBooks.isAvailable,
@@ -208,6 +211,7 @@ export async function getUserBook(
         title: effectiveTitle,
         authors: effectiveAuthors,
         coverUrl: books.coverUrl,
+        isbn: effectiveIsbn,
         publishYear: effectivePublishYear,
         description: effectiveDescription,
         isAvailable: userBooks.isAvailable,
