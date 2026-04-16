@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { Barcode, MagnifyingGlass, ArrowLeft, SpinnerGap } from 'phosphor-svelte';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
