@@ -39,16 +39,28 @@ export async function searchByIsbn(isbn: string): Promise<OpenLibraryBook | null
   const clean = isbn.replace(/[^0-9X]/gi, '');
 
   try {
+    // 1. search.json returns a reliable work ID (OL…W) — preferred path
+    const searchRes = await fetchOL(
+      `https://openlibrary.org/search.json?isbn=${clean}&fields=key,title,author_name,cover_i,first_publish_year&limit=1`
+    );
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      const doc = searchData.docs?.[0];
+      if (doc?.key) {
+        const workId = (doc.key as string).replace('/works/', '');
+        const work = await getWorkById(workId);
+        if (work) return work;
+      }
+    }
+
+    // 2. Fallback: Books API (may produce isbn:… IDs when works key is absent)
     const res = await fetchOL(
       `https://openlibrary.org/api/books?bibkeys=ISBN:${clean}&format=json&jscmd=data`
     );
-
     if (!res.ok) return null;
 
     const data = await res.json();
-    const key = `ISBN:${clean}`;
-    const book = data[key];
-
+    const book = data[`ISBN:${clean}`];
     if (!book) return null;
 
     return parseBookData(book, clean);
