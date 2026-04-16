@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { BookOpen, Books, ArrowsLeftRight, SignOut } from 'phosphor-svelte';
+	import { BookOpen, Books, ArrowsLeftRight, SignOut, ClockCounterClockwise } from 'phosphor-svelte';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 
 	let { children, data } = $props();
@@ -13,6 +13,7 @@
 
 	const NAV = [
 		{ href: '/library', label: 'Library', icon: BookOpen },
+		{ href: '/activity', label: 'Activity', icon: ClockCounterClockwise },
 		{ href: '/groups', label: 'Groups', icon: Books },
 		{ href: '/loans', label: 'Loans', icon: ArrowsLeftRight }
 	];

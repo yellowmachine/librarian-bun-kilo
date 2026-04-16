@@ -363,6 +363,113 @@ export async function getUserTagsForGroup(
   });
 }
 
+// ─── Buscar libros de otros usuarios (cross-group) ───────────────────────────
+// Devuelve libros de otros usuarios visibles a través de shared_tags en
+// cualquier grupo al que pertenezca el usuario. Filtra por texto libre
+// (título, autores, nombre del propietario, nombre del tag).
+
+export async function searchBooksFromOthers(
+  userId: string,
+  query: string
+): Promise<GroupBookResult[]> {
+  if (!query.trim()) return [];
+  const q = query.toLowerCase().trim();
+
+  return withRLS(userId, async (tx) => {
+    // 1. Grupos del usuario
+    const memberRows = await tx
+      .select({ groupId: groupMembers.groupId })
+      .from(groupMembers)
+      .where(eq(groupMembers.userId, userId));
+
+    if (memberRows.length === 0) return [];
+    const groupIds = memberRows.map((r) => r.groupId);
+
+    // 2. Tags compartidos en esos grupos
+    const sharedTagRows = await tx
+      .select({ tagId: sharedTags.tagId })
+      .from(sharedTags)
+      .where(inArray(sharedTags.groupId, groupIds));
+
+    if (sharedTagRows.length === 0) return [];
+    const tagIds = [...new Set(sharedTagRows.map((r) => r.tagId))];
+
+    // 3. user_book_ids que tienen esos tags (RLS permite verlos via in_group policy)
+    const ubTagRows = await tx
+      .select({ userBookId: userBookTags.userBookId })
+      .from(userBookTags)
+      .where(inArray(userBookTags.tagId, tagIds));
+
+    if (ubTagRows.length === 0) return [];
+    const userBookIds = [...new Set(ubTagRows.map((r) => r.userBookId))];
+
+    // 4. Detalle de los libros, excluyendo los propios
+    const detailRows = await tx
+      .select({
+        userBookId: userBooks.id,
+        bookId: books.id,
+        title: books.title,
+        authors: books.authors,
+        coverUrl: books.coverUrl,
+        publishYear: books.publishYear,
+        isAvailable: userBooks.isAvailable,
+        ownerId: userBooks.userId,
+        ownerName: user.name
+      })
+      .from(userBooks)
+      .innerJoin(books, eq(userBooks.bookId, books.id))
+      .innerJoin(user, eq(userBooks.userId, user.id))
+      .where(
+        and(
+          inArray(userBooks.id, userBookIds),
+          sql`${userBooks.userId} != ${userId}`
+        )
+      );
+
+    if (detailRows.length === 0) return [];
+
+    // 5. Tags visibles por libro (solo los shared)
+    const filteredIds = detailRows.map((r) => r.userBookId);
+    const bookTagRows = await tx
+      .select({
+        userBookId: userBookTags.userBookId,
+        id: tags.id,
+        name: tags.name,
+        color: tags.color
+      })
+      .from(userBookTags)
+      .innerJoin(tags, eq(userBookTags.tagId, tags.id))
+      .where(
+        and(
+          inArray(userBookTags.userBookId, filteredIds),
+          inArray(userBookTags.tagId, tagIds)
+        )
+      );
+
+    const tagsMap = new Map<string, { id: string; name: string; color: string | null }[]>();
+    for (const bt of bookTagRows) {
+      const list = tagsMap.get(bt.userBookId) ?? [];
+      list.push({ id: bt.id, name: bt.name, color: bt.color });
+      tagsMap.set(bt.userBookId, list);
+    }
+
+    // 6. Filtro de texto en JS (título, autores, propietario, tags)
+    return detailRows
+      .map((row) => ({
+        ...row,
+        authors: row.authors ?? [],
+        tags: tagsMap.get(row.userBookId) ?? []
+      }))
+      .filter(
+        (book) =>
+          book.title.toLowerCase().includes(q) ||
+          book.authors.some((a: string) => a.toLowerCase().includes(q)) ||
+          book.ownerName.toLowerCase().includes(q) ||
+          book.tags.some((t) => t.name.toLowerCase().includes(q))
+      );
+  });
+}
+
 // ─── Buscar libros en un grupo ────────────────────────────────────────────────
 // Devuelve todos los libros accesibles a través de etiquetas compartidas en el grupo.
 // Opcionalmente filtra por query de texto o por tagId.

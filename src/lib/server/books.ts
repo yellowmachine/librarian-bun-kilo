@@ -77,6 +77,7 @@ export type UserBookWithDetails = {
 
 export type LibraryFilter =
   | { type: 'recent'; limit?: number }
+  | { type: 'all' }
   | { type: 'letter'; letter: string; by: 'title' | 'author' };
 
 export async function getUserBooks(
@@ -105,6 +106,8 @@ export async function getUserBooks(
       rows = await base
         .orderBy(desc(userBooks.addedAt))
         .limit(filter.limit ?? LIBRARY_RECENT_LIMIT);
+    } else if (filter.type === 'all') {
+      rows = await base.orderBy(asc(books.title));
     } else if (filter.by === 'title') {
       rows = await base
         .where(sql`upper(left(${books.title}, 1)) = ${filter.letter}`)

@@ -1,17 +1,17 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { getUserBooks, getLibraryLetters, type LibraryFilter } from '$lib/server/books';
+import { getUserBooks } from '$lib/server/books';
+import { searchBooksFromOthers } from '$lib/server/groups';
 
-export const load = async ({ locals, url }: RequestEvent) => {
-	const letter = url.searchParams.get('letter')?.toUpperCase() ?? null;
-	const by = (url.searchParams.get('by') ?? 'title') as 'title' | 'author';
+export const load = async ({ locals }: RequestEvent) => {
+  const userBooks = await getUserBooks(locals.user!.id, { type: 'all' });
+  return { userBooks };
+};
 
-	const filter: LibraryFilter = letter ? { type: 'letter', letter, by } : { type: 'recent' };
-
-	const [userBooks, titleLetters, authorLetters] = await Promise.all([
-		getUserBooks(locals.user!.id, filter),
-		getLibraryLetters(locals.user!.id, 'title'),
-		getLibraryLetters(locals.user!.id, 'author')
-	]);
-
-	return { userBooks, letter, by, titleLetters, authorLetters };
+export const actions = {
+  searchOthers: async ({ locals, request }: RequestEvent) => {
+    const data = await request.formData();
+    const query = (data.get('query') as string)?.trim() ?? '';
+    const results = await searchBooksFromOthers(locals.user!.id, query);
+    return { othersResults: results, othersQuery: query };
+  }
 };
