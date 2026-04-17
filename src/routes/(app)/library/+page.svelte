@@ -308,57 +308,16 @@
 				<p class="text-xs text-ink-faint">
 					{othersResults.length} {othersResults.length === 1 ? 'result' : 'results'}
 				</p>
-				<ul class="divide-y divide-paper-border">
-					{#each othersResults as book (book.userBookId)}
-						<li>
-							<a
-								href="/borrow/{book.userBookId}"
-								class="group flex items-start gap-4 py-3 transition-colors hover:bg-paper-ui"
-							>
-								<!-- Portada -->
-								{#if book.coverUrl}
-									<img
-										src={book.coverUrl}
-										alt={book.title}
-										class="h-14 w-10 flex-shrink-0 object-cover"
-									/>
-								{:else}
-									<div class="flex h-14 w-10 flex-shrink-0 items-center justify-center bg-paper-ui text-ink-faint/40 font-serif text-lg">
-										·
-									</div>
-								{/if}
-
-								<!-- Info -->
-								<div class="min-w-0 flex-1 space-y-1">
-									<p class="truncate text-sm font-medium text-ink group-hover:underline group-hover:underline-offset-2">
-										{book.title}
-									</p>
-									{#if book.authors.length > 0}
-										<p class="truncate text-xs text-ink-faint">{book.authors.join(', ')}</p>
-									{/if}
-									<div class="flex flex-wrap items-center gap-2">
-										<span class="text-xs text-ink-faint">{book.ownerName}</span>
-										{#each book.tags as tag (tag.id)}
-											<span
-												class="rounded-full border px-2 py-0.5 text-[10px]"
-												style={tag.color
-													? `border-color: ${tag.color}44; color: ${tag.color}`
-													: 'border-color: #e8e2da; color: #8a8480'}
-											>
-												{tag.name}
-											</span>
-										{/each}
-									</div>
-								</div>
-
-								<!-- Disponibilidad -->
-								<span class="shrink-0 pt-0.5 text-xs {book.isAvailable ? 'text-ink-faint' : 'text-ink-faint/50'}">
-									{book.isAvailable ? 'Available' : 'On loan'}
-								</span>
-							</a>
-						</li>
-					{/each}
-				</ul>
+				<BookGrid
+					books={othersResults.map((b) => ({
+						id: b.userBookId,
+						title: b.title,
+						authors: b.authors,
+						coverUrl: b.coverUrl,
+						isAvailable: b.isAvailable,
+						href: `/borrow/${b.userBookId}`
+					}))}
+				/>
 			{/if}
 		{:else}
 			<p class="text-sm text-ink-faint">Search books shared by people in your groups.</p>
