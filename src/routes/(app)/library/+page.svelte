@@ -10,12 +10,17 @@
 	let activeTab = $state<'mine' | 'others' | 'contacts'>('mine');
 
 	let { data, form } = $props();
-	const { userBooks, contacts } = $derived(data);
+	const { userBooks, contacts, sharedTagsForOthers } = $derived(data);
+
+	function normalize(s: string) {
+		return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+	}
 
 	// ── Sección propia ────────────────────────────────────────────────────────
 	let search = $state('');
 	let activeLetter = $state<string | null>(null);
 	let by = $state<'title' | 'author'>('title');
+	let activeMineTagIds = $state(new Set<string>());
 
 	const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -41,6 +46,16 @@
 
 	const activeLetters = $derived(by === 'title' ? titleLetters : authorLetters);
 
+	const mineTags = $derived(() => {
+		const map = new Map<string, { id: string; name: string; color: string | null }>();
+		for (const book of userBooks as UserBookWithDetails[]) {
+			for (const tag of book.tags) {
+				if (!map.has(tag.id)) map.set(tag.id, tag);
+			}
+		}
+		return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+	});
+
 	const filtered = $derived(() => {
 		let list = userBooks as UserBookWithDetails[];
 
@@ -61,6 +76,10 @@
 			);
 		}
 
+		if (activeMineTagIds.size > 0) {
+			list = list.filter((b) => b.tags.some((t) => activeMineTagIds.has(t.id)));
+		}
+
 		return list;
 	});
 
@@ -73,43 +92,89 @@
 		activeLetter = null;
 	}
 
-	function normalize(s: string) {
-		return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+	function toggleMineTag(id: string) {
+		const next = new Set(activeMineTagIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		activeMineTagIds = next;
 	}
 
 	// ── Sección ajenos ────────────────────────────────────────────────────────
 	let othersSearching = $state(false);
+	let activeOtherTagIds = $state(new Set<string>());
 	const othersResults = $derived(
 		(form?.othersResults ?? []) as GroupBookResult[]
 	);
 	const othersQuery = $derived((form?.othersQuery ?? '') as string);
+	const othersTagIds = $derived((form?.othersTagIds ?? []) as string[]);
 	const othersSearched = $derived(form !== null && form !== undefined && 'othersResults' in (form ?? {}));
 
 	$effect(() => {
-		if (othersSearched) activeTab = 'others';
+		if (othersSearched) {
+			activeTab = 'others';
+			activeOtherTagIds = new Set(othersTagIds);
+		}
 	});
+
+	function toggleOtherTag(id: string) {
+		const next = new Set(activeOtherTagIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		activeOtherTagIds = next;
+	}
 
 	// ── Sección contactos ─────────────────────────────────────────────────────
 	let contactsLoading = $state(false);
 	let contactSearch = $state('');
+	let activeContactTagIds = $state(new Set<string>());
 	const contactBooks = $derived(
 		(form?.contactBooks ?? []) as UserBookWithDetails[]
 	);
 	const selectedContactId = $derived((form?.contactId ?? '') as string);
 	const contactsFetched = $derived(form !== null && form !== undefined && 'contactBooks' in (form ?? {}));
+
+	const contactTags = $derived(() => {
+		const map = new Map<string, { id: string; name: string; color: string | null }>();
+		for (const book of contactBooks) {
+			for (const tag of book.tags) {
+				if (!map.has(tag.id)) map.set(tag.id, tag);
+			}
+		}
+		return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+	});
+
 	const filteredContactBooks = $derived(() => {
-		if (!contactSearch.trim()) return contactBooks;
-		const q = normalize(contactSearch);
-		return contactBooks.filter(
-			(b) =>
-				normalize(b.title).includes(q) ||
-				b.authors.some((a: string) => normalize(a).includes(q))
-		);
+		let list = contactBooks;
+
+		if (contactSearch.trim()) {
+			const q = normalize(contactSearch);
+			list = list.filter(
+				(b) =>
+					normalize(b.title).includes(q) ||
+					b.authors.some((a: string) => normalize(a).includes(q))
+			);
+		}
+
+		if (activeContactTagIds.size > 0) {
+			list = list.filter((b) => b.tags.some((t) => activeContactTagIds.has(t.id)));
+		}
+
+		return list;
 	});
 
 	$effect(() => {
-		if (contactsFetched) activeTab = 'contacts';
+		if (contactsFetched) {
+			activeTab = 'contacts';
+			activeContactTagIds = new Set();
+		}
 	});
+
+	function toggleContactTag(id: string) {
+		const next = new Set(activeContactTagIds);
+		if (next.has(id)) next.delete(id);
+		else next.add(id);
+		activeContactTagIds = next;
+	}
 </script>
 
 <div class="space-y-6">
@@ -206,6 +271,36 @@
 	<!-- ── Mis libros ────────────────────────────────────────────────────── -->
 	{#if activeTab === 'mine'}
 		{#if (userBooks as UserBookWithDetails[]).length > 0}
+			<!-- Filtro de tags -->
+			{#if mineTags().length > 0}
+				<div class="flex flex-wrap gap-1.5">
+					{#each mineTags() as tag (tag.id)}
+						{@const active = activeMineTagIds.has(tag.id)}
+						<button
+							onclick={() => toggleMineTag(tag.id)}
+							class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+							style={active
+								? tag.color
+									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${tag.color}`
+									: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+								: tag.color
+									? `border-color: ${tag.color}44; color: ${tag.color}88`
+									: 'border-color: #e8e2da; color: #b0aaa4'}
+						>
+							{tag.name}
+						</button>
+					{/each}
+					{#if activeMineTagIds.size > 0}
+						<button
+							onclick={() => (activeMineTagIds = new Set())}
+							class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
+						>
+							Clear
+						</button>
+					{/if}
+				</div>
+			{/if}
+
 			<!-- Índice alfabético -->
 			<div class="space-y-3">
 				<div class="flex gap-1 border-b border-paper-border">
@@ -294,6 +389,36 @@
 
 	<!-- ── Libros de otros ────────────────────────────────────────────────── -->
 	{:else if activeTab === 'others'}
+		<!-- Filtro de tags compartidos -->
+		{#if sharedTagsForOthers.length > 0}
+			<div class="flex flex-wrap gap-1.5">
+				{#each sharedTagsForOthers as tag (tag.id)}
+					{@const active = activeOtherTagIds.has(tag.id)}
+					<button
+						onclick={() => toggleOtherTag(tag.id)}
+						class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+						style={active
+							? tag.color
+								? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${tag.color}`
+								: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+							: tag.color
+								? `border-color: ${tag.color}44; color: ${tag.color}88`
+								: 'border-color: #e8e2da; color: #b0aaa4'}
+					>
+						{tag.name}
+					</button>
+				{/each}
+				{#if activeOtherTagIds.size > 0}
+					<button
+						onclick={() => (activeOtherTagIds = new Set())}
+						class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
+					>
+						Clear
+					</button>
+				{/if}
+			</div>
+		{/if}
+
 		<form
 			method="POST"
 			action="?/searchOthers"
@@ -306,6 +431,9 @@
 				};
 			}}
 		>
+			{#each [...activeOtherTagIds] as tagId}
+				<input type="hidden" name="tagIds" value={tagId} />
+			{/each}
 			<div class="relative flex-1">
 				<MagnifyingGlass
 					size={16}
@@ -387,6 +515,36 @@
 			{#if contactBooks.length === 0}
 				<p class="text-sm text-ink-faint">No shared books from this contact.</p>
 			{:else}
+				<!-- Filtro de tags del contacto -->
+				{#if contactTags().length > 0}
+					<div class="flex flex-wrap gap-1.5">
+						{#each contactTags() as tag (tag.id)}
+							{@const active = activeContactTagIds.has(tag.id)}
+							<button
+								onclick={() => toggleContactTag(tag.id)}
+								class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+								style={active
+									? tag.color
+										? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${tag.color}`
+										: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+									: tag.color
+										? `border-color: ${tag.color}44; color: ${tag.color}88`
+										: 'border-color: #e8e2da; color: #b0aaa4'}
+							>
+								{tag.name}
+							</button>
+						{/each}
+						{#if activeContactTagIds.size > 0}
+							<button
+								onclick={() => (activeContactTagIds = new Set())}
+								class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
+							>
+								Clear
+							</button>
+						{/if}
+					</div>
+				{/if}
+
 				<div class="relative">
 					<MagnifyingGlass
 						size={16}

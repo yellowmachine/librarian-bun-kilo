@@ -368,13 +368,46 @@ export async function getUserTagsForGroup(
 // cualquier grupo al que pertenezca el usuario. Filtra por texto libre
 // (título, autores, nombre del propietario, nombre del tag).
 
+export async function getSharedTagsForUser(
+  userId: string
+): Promise<{ id: string; name: string; color: string | null }[]> {
+  return withRLS(userId, async (tx) => {
+    const memberRows = await tx
+      .select({ groupId: groupMembers.groupId })
+      .from(groupMembers)
+      .where(eq(groupMembers.userId, userId));
+
+    if (memberRows.length === 0) return [];
+    const groupIds = memberRows.map((r) => r.groupId);
+
+    const rows = await tx
+      .select({ id: tags.id, name: tags.name, color: tags.color })
+      .from(sharedTags)
+      .innerJoin(tags, eq(sharedTags.tagId, tags.id))
+      .where(inArray(sharedTags.groupId, groupIds));
+
+    const seen = new Set<string>();
+    return rows
+      .filter((r) => {
+        if (seen.has(r.id)) return false;
+        seen.add(r.id);
+        return true;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+}
+
 export async function searchBooksFromOthers(
   userId: string,
-  query: string
+  query: string,
+  filterTagIds?: string[]
 ): Promise<GroupBookResult[]> {
-  if (!query.trim()) return [];
+  const hasQuery = query.trim().length > 0;
+  const hasTagFilter = filterTagIds && filterTagIds.length > 0;
+  if (!hasQuery && !hasTagFilter) return [];
+
   const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-  const q = normalize(query.trim());
+  const q = hasQuery ? normalize(query.trim()) : '';
 
   return withRLS(userId, async (tx) => {
     // 1. Grupos del usuario
@@ -396,10 +429,16 @@ export async function searchBooksFromOthers(
     const tagIds = [...new Set(sharedTagRows.map((r) => r.tagId))];
 
     // 3. user_book_ids que tienen esos tags (RLS permite verlos via in_group policy)
+    // Si hay filtro de tags, solo usar los seleccionados (que estén en los compartidos)
+    const effectiveTagIds = hasTagFilter
+      ? filterTagIds!.filter((id) => tagIds.includes(id))
+      : tagIds;
+    if (effectiveTagIds.length === 0) return [];
+
     const ubTagRows = await tx
       .select({ userBookId: userBookTags.userBookId })
       .from(userBookTags)
-      .where(inArray(userBookTags.tagId, tagIds));
+      .where(inArray(userBookTags.tagId, effectiveTagIds));
 
     if (ubTagRows.length === 0) return [];
     const userBookIds = [...new Set(ubTagRows.map((r) => r.userBookId))];
@@ -455,19 +494,21 @@ export async function searchBooksFromOthers(
     }
 
     // 6. Filtro de texto en JS (título, autores, propietario, tags)
-    return detailRows
-      .map((row) => ({
-        ...row,
-        authors: row.authors ?? [],
-        tags: tagsMap.get(row.userBookId) ?? []
-      }))
-      .filter(
-        (book) =>
-          normalize(book.title).includes(q) ||
-          book.authors.some((a: string) => normalize(a).includes(q)) ||
-          normalize(book.ownerName).includes(q) ||
-          book.tags.some((t) => normalize(t.name).includes(q))
-      );
+    const results = detailRows.map((row) => ({
+      ...row,
+      authors: row.authors ?? [],
+      tags: tagsMap.get(row.userBookId) ?? []
+    }));
+
+    if (!hasQuery) return results;
+
+    return results.filter(
+      (book) =>
+        normalize(book.title).includes(q) ||
+        book.authors.some((a: string) => normalize(a).includes(q)) ||
+        normalize(book.ownerName).includes(q) ||
+        book.tags.some((t) => normalize(t.name).includes(q))
+    );
   });
 }
 
