@@ -7,10 +7,10 @@
 	import BookGrid from '$lib/components/BookGrid.svelte';
 
 	let exportOpen = $state(false);
-	let activeTab = $state<'mine' | 'others'>('mine');
+	let activeTab = $state<'mine' | 'others' | 'contacts'>('mine');
 
 	let { data, form } = $props();
-	const { userBooks } = $derived(data);
+	const { userBooks, contacts } = $derived(data);
 
 	// ── Sección propia ────────────────────────────────────────────────────────
 	let search = $state('');
@@ -85,9 +85,20 @@
 	const othersQuery = $derived((form?.othersQuery ?? '') as string);
 	const othersSearched = $derived(form !== null && form !== undefined && 'othersResults' in (form ?? {}));
 
-	// Auto-switch to the others tab when a search returns results
 	$effect(() => {
 		if (othersSearched) activeTab = 'others';
+	});
+
+	// ── Sección contactos ─────────────────────────────────────────────────────
+	let contactsLoading = $state(false);
+	const contactBooks = $derived(
+		(form?.contactBooks ?? []) as UserBookWithDetails[]
+	);
+	const selectedContactId = $derived((form?.contactId ?? '') as string);
+	const contactsFetched = $derived(form !== null && form !== undefined && 'contactBooks' in (form ?? {}));
+
+	$effect(() => {
+		if (contactsFetched) activeTab = 'contacts';
 	});
 </script>
 
@@ -171,6 +182,15 @@
 		>
 			From others
 		</button>
+		{#if contacts.length > 0}
+			<button
+				onclick={() => (activeTab = 'contacts')}
+				class="flex items-center gap-2 border-b-2 pb-3 pr-6 text-sm transition-colors
+				{activeTab === 'contacts' ? 'border-ink font-medium text-ink' : 'border-transparent text-ink-faint hover:text-ink-muted'}"
+			>
+				Contacts
+			</button>
+		{/if}
 	</div>
 
 	<!-- ── Mis libros ────────────────────────────────────────────────────── -->
@@ -263,7 +283,7 @@
 		{/if}
 
 	<!-- ── Libros de otros ────────────────────────────────────────────────── -->
-	{:else}
+	{:else if activeTab === 'others'}
 		<form
 			method="POST"
 			action="?/searchOthers"
@@ -322,6 +342,58 @@
 			{/if}
 		{:else}
 			<p class="text-sm text-ink-faint">Search books shared by people in your groups.</p>
+		{/if}
+
+	<!-- ── Contactos ─────────────────────────────────────────────────────── -->
+	{:else}
+		<form
+			method="POST"
+			action="?/contactBooks"
+			use:enhance={() => {
+				contactsLoading = true;
+				return async ({ update }) => {
+					await update();
+					contactsLoading = false;
+				};
+			}}
+		>
+			<select
+				name="contactId"
+				onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}
+				class="w-full border border-paper-border bg-paper-ui py-2 px-3 text-sm text-ink focus:border-ink focus:bg-paper focus:ring-0"
+			>
+				<option value="">Select a contact…</option>
+				{#each contacts as c}
+					<option value={c.userId} selected={c.userId === selectedContactId}>{c.name}</option>
+				{/each}
+			</select>
+		</form>
+
+		{#if contactsLoading}
+			<div class="flex justify-center py-12">
+				<Spinner size="md" />
+			</div>
+		{:else if contactsFetched}
+			{#if contactBooks.length === 0}
+				<p class="text-sm text-ink-faint">No shared books from this contact.</p>
+			{:else}
+				<p class="text-xs text-ink-faint">
+					{contactBooks.length} {contactBooks.length === 1 ? 'book' : 'books'}
+				</p>
+				<BookGrid
+					books={contactBooks.map((b) => ({
+						id: b.userBookId,
+						title: b.title,
+						authors: b.authors,
+						coverUrl: b.coverUrl,
+						publishYear: b.publishYear,
+						isAvailable: b.isAvailable,
+						href: `/borrow/${b.userBookId}`
+					}))}
+				/>
+			{/if}
+		{:else}
+			<p class="text-sm text-ink-faint">Select a contact to browse their library.</p>
 		{/if}
 	{/if}
 </div>

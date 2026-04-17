@@ -471,3 +471,27 @@ export async function searchBooksFromOthers(
   });
 }
 
+// ─── Contactos del usuario (todos los miembros de sus grupos, sin él mismo) ───
+
+export type Contact = {
+  userId: string;
+  name: string;
+};
+
+export async function getContacts(userId: string): Promise<Contact[]> {
+  const userGroupList = await getUserGroups(userId);
+  if (userGroupList.length === 0) return [];
+
+  const contactMap = new Map<string, string>();
+  for (const group of userGroupList) {
+    const members = await getGroupMembers(userId, group.id);
+    for (const m of members) {
+      if (m.userId !== userId) contactMap.set(m.userId, m.name);
+    }
+  }
+
+  return [...contactMap.entries()]
+    .map(([uid, name]) => ({ userId: uid, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+

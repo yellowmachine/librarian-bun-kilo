@@ -172,6 +172,61 @@ export async function getUserBooks(
   });
 }
 
+// ─── Libros de un contacto (RLS del viewer) ───────────────────────────────────
+
+export async function getContactBooks(
+  viewerId: string,
+  contactId: string
+): Promise<UserBookWithDetails[]> {
+  return withRLS(viewerId, async (tx) => {
+    const rows = await tx
+      .select({
+        userBookId: userBooks.id,
+        bookId: userBooks.bookId,
+        title: effectiveTitle,
+        authors: effectiveAuthors,
+        coverUrl: books.coverUrl,
+        isbn: effectiveIsbn,
+        publishYear: effectivePublishYear,
+        description: effectiveDescription,
+        isAvailable: userBooks.isAvailable,
+        notes: userBooks.notes,
+        addedAt: userBooks.addedAt
+      })
+      .from(userBooks)
+      .leftJoin(books, eq(userBooks.bookId, books.id))
+      .where(eq(userBooks.userId, contactId))
+      .orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
+
+    if (rows.length === 0) return [];
+
+    const userBookIds = rows.map((r) => r.userBookId);
+    const allTags = await tx
+      .select({
+        userBookId: userBookTags.userBookId,
+        id: tags.id,
+        name: tags.name,
+        color: tags.color
+      })
+      .from(userBookTags)
+      .innerJoin(tags, eq(userBookTags.tagId, tags.id))
+      .where(inArray(userBookTags.userBookId, userBookIds));
+
+    const tagsByBook = new Map<string, { id: string; name: string; color: string | null }[]>();
+    for (const tag of allTags) {
+      const list = tagsByBook.get(tag.userBookId) ?? [];
+      list.push({ id: tag.id, name: tag.name, color: tag.color });
+      tagsByBook.set(tag.userBookId, list);
+    }
+
+    return rows.map((row) => ({
+      ...row,
+      authors: row.authors ?? [],
+      tags: tagsByBook.get(row.userBookId) ?? []
+    }));
+  });
+}
+
 // ─── Letras disponibles en la biblioteca ─────────────────────────────────────
 
 export async function getLibraryLetters(
