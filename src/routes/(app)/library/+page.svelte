@@ -52,11 +52,11 @@
 		}
 
 		if (search.trim()) {
-			const q = search.toLowerCase();
+			const q = normalize(search);
 			list = list.filter(
 				(b) =>
-					b.title.toLowerCase().includes(q) ||
-					b.authors.some((a: string) => a.toLowerCase().includes(q))
+					normalize(b.title).includes(q) ||
+					b.authors.some((a: string) => normalize(a).includes(q))
 			);
 		}
 
@@ -70,6 +70,10 @@
 	function toggleBy(mode: 'title' | 'author') {
 		by = mode;
 		activeLetter = null;
+	}
+
+	function normalize(s: string) {
+		return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 	}
 
 	// ── Sección ajenos ────────────────────────────────────────────────────────

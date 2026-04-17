@@ -373,7 +373,8 @@ export async function searchBooksFromOthers(
   query: string
 ): Promise<GroupBookResult[]> {
   if (!query.trim()) return [];
-  const q = query.toLowerCase().trim();
+  const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const q = normalize(query.trim());
 
   return withRLS(userId, async (tx) => {
     // 1. Grupos del usuario
@@ -462,10 +463,10 @@ export async function searchBooksFromOthers(
       }))
       .filter(
         (book) =>
-          book.title.toLowerCase().includes(q) ||
-          book.authors.some((a: string) => a.toLowerCase().includes(q)) ||
-          book.ownerName.toLowerCase().includes(q) ||
-          book.tags.some((t) => t.name.toLowerCase().includes(q))
+          normalize(book.title).includes(q) ||
+          book.authors.some((a: string) => normalize(a).includes(q)) ||
+          normalize(book.ownerName).includes(q) ||
+          book.tags.some((t) => normalize(t.name).includes(q))
       );
   });
 }
