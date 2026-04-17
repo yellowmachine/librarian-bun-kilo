@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { eq, desc, asc, inArray, sql } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import { books, userBooks, tags, userBookTags } from './db/schema';
 import { withRLS } from './db/rls';
@@ -128,18 +128,21 @@ export async function getUserBooks(
     let rows;
     if (filter.type === 'recent') {
       rows = await base
+        .where(eq(userBooks.userId, userId))
         .orderBy(desc(userBooks.addedAt))
         .limit(filter.limit ?? LIBRARY_RECENT_LIMIT);
     } else if (filter.type === 'all') {
-      rows = await base.orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
+      rows = await base
+        .where(eq(userBooks.userId, userId))
+        .orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
     } else if (filter.by === 'title') {
       rows = await base
-        .where(sql`upper(left(COALESCE(${userBooks.title}, ${books.title}), 1)) = ${filter.letter}`)
+        .where(and(eq(userBooks.userId, userId), sql`upper(left(COALESCE(${userBooks.title}, ${books.title}), 1)) = ${filter.letter}`))
         .orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
     } else {
       // by author: only the first author (index 0) determines the letter
       rows = await base
-        .where(sql`upper(left(COALESCE(${userBooks.authors}, ${books.authors})[1], 1)) = ${filter.letter}`)
+        .where(and(eq(userBooks.userId, userId), sql`upper(left(COALESCE(${userBooks.authors}, ${books.authors})[1], 1)) = ${filter.letter}`))
         .orderBy(sql`COALESCE(${userBooks.authors}, ${books.authors})[1] ASC`);
     }
 
