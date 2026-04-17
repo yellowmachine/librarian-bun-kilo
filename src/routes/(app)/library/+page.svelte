@@ -91,11 +91,21 @@
 
 	// ── Sección contactos ─────────────────────────────────────────────────────
 	let contactsLoading = $state(false);
+	let contactSearch = $state('');
 	const contactBooks = $derived(
 		(form?.contactBooks ?? []) as UserBookWithDetails[]
 	);
 	const selectedContactId = $derived((form?.contactId ?? '') as string);
 	const contactsFetched = $derived(form !== null && form !== undefined && 'contactBooks' in (form ?? {}));
+	const filteredContactBooks = $derived(() => {
+		if (!contactSearch.trim()) return contactBooks;
+		const q = normalize(contactSearch);
+		return contactBooks.filter(
+			(b) =>
+				normalize(b.title).includes(q) ||
+				b.authors.some((a: string) => normalize(a).includes(q))
+		);
+	});
 
 	$effect(() => {
 		if (contactsFetched) activeTab = 'contacts';
@@ -377,11 +387,26 @@
 			{#if contactBooks.length === 0}
 				<p class="text-sm text-ink-faint">No shared books from this contact.</p>
 			{:else}
+				<div class="relative">
+					<MagnifyingGlass
+						size={16}
+						class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
+					/>
+					<input
+						type="search"
+						bind:value={contactSearch}
+						placeholder="Search by title or author..."
+						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
+					/>
+				</div>
+				{#if filteredContactBooks().length === 0}
+					<p class="py-12 text-center text-sm text-ink-faint">No results.</p>
+				{:else}
 				<p class="text-xs text-ink-faint">
-					{contactBooks.length} {contactBooks.length === 1 ? 'book' : 'books'}
+					{filteredContactBooks().length} {filteredContactBooks().length === 1 ? 'book' : 'books'}
 				</p>
 				<BookGrid
-					books={contactBooks.map((b) => ({
+					books={filteredContactBooks().map((b) => ({
 						id: b.userBookId,
 						title: b.title,
 						authors: b.authors,
@@ -391,6 +416,7 @@
 						href: `/borrow/${b.userBookId}`
 					}))}
 				/>
+				{/if}
 			{/if}
 		{:else}
 			<p class="text-sm text-ink-faint">Select a contact to browse their library.</p>
