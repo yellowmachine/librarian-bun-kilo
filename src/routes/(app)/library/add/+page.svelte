@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { Barcode, MagnifyingGlass, ArrowLeft, SpinnerGap, Plus, Trash } from 'phosphor-svelte';
+	import { Barcode, MagnifyingGlass, ArrowLeft, Plus, Trash } from 'phosphor-svelte';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import type { BookSearchResult } from '$lib/types';
@@ -305,7 +306,7 @@
 			</div>
 			{#if searching}
 				<div class="flex justify-center py-12">
-					<SpinnerGap size={24} class="animate-spin text-ink-faint" />
+					<Spinner size="md" class="text-ink-faint" />
 				</div>
 			{:else}
 				<ul class="grid grid-cols-1 divide-paper-border sm:grid-cols-2 sm:gap-2">
@@ -343,7 +344,7 @@
 
 			{#if loadingDescription}
 				<div class="flex items-center gap-2 text-xs text-ink-faint">
-					<SpinnerGap size={13} class="animate-spin" />
+					<Spinner size="sm" />
 					Loading synopsis…
 				</div>
 			{:else if descriptionVisible}
@@ -542,7 +543,7 @@
 		<!-- Añadiendo -->
 	{:else if mode === 'adding'}
 		<div class="flex justify-center py-16">
-			<SpinnerGap size={28} class="animate-spin text-ink-faint" />
+			<Spinner size="lg" class="text-ink-faint" />
 		</div>
 	{/if}
 </div>

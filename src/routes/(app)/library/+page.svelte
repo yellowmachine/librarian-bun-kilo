@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { MagnifyingGlass, SpinnerGap, Tag, Export, Plus, CaretDown } from 'phosphor-svelte';
+	import { MagnifyingGlass, Tag, Export, Plus, CaretDown } from 'phosphor-svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import type { GroupBookResult } from '$lib/server/groups';
 	import BookGrid from '$lib/components/BookGrid.svelte';
@@ -294,7 +295,7 @@
 				class="border border-ink bg-ink px-4 py-2 text-sm text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
 			>
 				{#if othersSearching}
-					<SpinnerGap size={16} class="animate-spin" />
+					<Spinner size="sm" />
 				{:else}
 					Search
 				{/if}
