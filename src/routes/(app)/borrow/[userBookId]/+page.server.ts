@@ -13,11 +13,12 @@ export const actions = {
     const data = await request.formData();
     const notes = (data.get('notes') as string | null)?.trim() || undefined;
 
+    let loanId: string;
     try {
-      const loanId = await requestLoan(locals.user!.id, params.userBookId!, notes);
-      redirect(302, `/loans/${loanId}`);
+      loanId = await requestLoan(locals.user!.id, params.userBookId!, notes);
     } catch (e) {
       return fail(400, { error: e instanceof Error ? e.message : 'Error sending request.' });
     }
+    redirect(302, `/loans/${loanId}`);
   }
 };
