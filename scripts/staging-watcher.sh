@@ -6,6 +6,7 @@
 #   2. crontab -e and add:
 #
 #        REPO_DIR_LIBRARIAN=/opt/librarian
+#        SCHOLIO_DIR=/opt/scholio
 #
 #        # Check staging every 10 minutes
 #        */10 * * * * /opt/librarian/scripts/staging-watcher.sh >> /var/log/librarian-watcher.log 2>&1
@@ -91,4 +92,17 @@ if $BUILD_FAILED; then
 fi
 
 notify_slack "✅ *Build OK* · \`${REPO_NAME}\` · branch \`staging\` @ \`${REMOTE_SHA:0:8}\`"
+
+# ── Restart prod stack ────────────────────────────────────────────────────────
+SCHOLIO_DIR="${SCHOLIO_DIR:-/opt/scholio}"
+log "Restarting docker compose stack in ${SCHOLIO_DIR} ..."
+if docker compose -f "${SCHOLIO_DIR}/docker-compose.prod.yml" up -d; then
+  log "Stack restarted OK."
+  notify_slack "🚀 *Restarted* · \`${REPO_NAME}\` · branch \`staging\` @ \`${REMOTE_SHA:0:8}\`"
+else
+  log "ERROR: docker compose up failed."
+  notify_slack "🔴 *Restart failed* · \`${REPO_NAME}\` · branch \`staging\` @ \`${REMOTE_SHA:0:8}\`"
+  exit 1
+fi
+
 log "Done."
