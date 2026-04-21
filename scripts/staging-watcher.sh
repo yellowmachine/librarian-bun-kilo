@@ -5,7 +5,7 @@
 #   1. chmod +x /opt/librarian/scripts/staging-watcher.sh
 #   2. crontab -e and add:
 #
-#        REPO_DIR=/opt/librarian
+#        REPO_DIR_LIBRARIAN=/opt/librarian
 #
 #        # Check staging every 10 minutes
 #        */10 * * * * /opt/librarian/scripts/staging-watcher.sh >> /var/log/librarian-watcher.log 2>&1
@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
-REPO_DIR="${REPO_DIR:-/opt/librarian}"
+REPO_DIR="${REPO_DIR_LIBRARIAN:-/opt/librarian}"
 
 ENV_FILE="${REPO_DIR}/.env"
 if [ -f "$ENV_FILE" ]; then
