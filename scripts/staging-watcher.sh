@@ -95,12 +95,11 @@ notify_slack "✅ *Build OK* · \`${REPO_NAME}\` · branch \`staging\` @ \`${REM
 
 # ── Restart prod stack ────────────────────────────────────────────────────────
 SCHOLIO_DIR="${SCHOLIO_DIR:-/opt/scholio}"
-log "Restarting docker compose stack in ${SCHOLIO_DIR} ..."
-if docker compose -f "${SCHOLIO_DIR}/docker-compose.prod.yml" up -d; then
+if REPO_DIR="$SCHOLIO_DIR" "${SCHOLIO_DIR}/scripts/restart-stack.sh"; then
   log "Stack restarted OK."
   notify_slack "🚀 *Restarted* · \`${REPO_NAME}\` · branch \`staging\` @ \`${REMOTE_SHA:0:8}\`"
 else
-  log "ERROR: docker compose up failed."
+  log "ERROR: restart-stack.sh failed."
   notify_slack "🔴 *Restart failed* · \`${REPO_NAME}\` · branch \`staging\` @ \`${REMOTE_SHA:0:8}\`"
   exit 1
 fi
