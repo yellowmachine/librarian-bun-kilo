@@ -1,7 +1,7 @@
 import { nanoid, customAlphabet } from 'nanoid';
 
 const nanoidCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { db } from './db/index';
 import {
   groups,
@@ -509,6 +509,49 @@ export async function searchBooksFromOthers(
         normalize(book.ownerName).includes(q) ||
         book.tags.some((t) => normalize(t.name).includes(q))
     );
+  });
+}
+
+// ─── Actividad reciente en grupos (libros añadidos por cualquier miembro visible) ─
+
+export type GroupActivityBook = {
+  userBookId: string;
+  bookId: string | null;
+  title: string;
+  authors: string[];
+  coverUrl: string | null;
+  publishYear: number | null;
+  isAvailable: boolean;
+  addedAt: Date;
+  ownerId: string;
+  ownerName: string;
+};
+
+export async function getGroupRecentBooks(
+  userId: string,
+  limit = 50
+): Promise<GroupActivityBook[]> {
+  return withRLS(userId, async (tx) => {
+    const rows = await tx
+      .select({
+        userBookId: userBooks.id,
+        bookId: userBooks.bookId,
+        title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+        authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
+        coverUrl: books.coverUrl,
+        publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
+        isAvailable: userBooks.isAvailable,
+        addedAt: userBooks.addedAt,
+        ownerId: userBooks.userId,
+        ownerName: user.name
+      })
+      .from(userBooks)
+      .leftJoin(books, eq(userBooks.bookId, books.id))
+      .innerJoin(user, eq(userBooks.userId, user.id))
+      .orderBy(desc(userBooks.addedAt))
+      .limit(limit);
+
+    return rows.map((row) => ({ ...row, authors: row.authors ?? [] }));
   });
 }
 

@@ -1,7 +1,7 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { getUserBooks } from '$lib/server/books';
+import { getGroupRecentBooks } from '$lib/server/groups';
 
 export const load = async ({ locals }: RequestEvent) => {
-  const books = await getUserBooks(locals.user!.id, { type: 'recent', limit: 50 });
+  const books = await getGroupRecentBooks(locals.user!.id);
   return { books };
 };
