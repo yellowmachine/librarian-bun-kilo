@@ -14,21 +14,27 @@ import {
   upsertReview,
   deleteReview
 } from '$lib/server/reviews';
+import { getBookForBorrow, requestLoan } from '$lib/server/loans';
 
 export const load = async ({ locals, params }: RequestEvent) => {
   const book = await getUserBook(locals.user!.id, params.id!);
   if (!book) error(404, 'Book not found in your library');
 
-  const [userTags, myReview, reviews, reviewStats] = await Promise.all([
-    withRLS(locals.user!.id, (tx) =>
-      tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
-    ),
+  const isOwner = book.ownerId === locals.user!.id;
+
+  const [userTags, myReview, reviews, reviewStats, borrowInfo] = await Promise.all([
+    isOwner
+      ? withRLS(locals.user!.id, (tx) =>
+          tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
+        )
+      : Promise.resolve([]),
     book.bookId ? getMyReview(locals.user!.id, book.bookId) : null,
     book.bookId ? getBookReviews(locals.user!.id, book.bookId) : [],
-    book.bookId ? getBookReviewStats(locals.user!.id, book.bookId) : null
+    book.bookId ? getBookReviewStats(locals.user!.id, book.bookId) : null,
+    !isOwner ? getBookForBorrow(locals.user!.id, params.id!) : Promise.resolve(null)
   ]);
 
-  return { book, userTags, myReview, reviews, reviewStats };
+  return { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo };
 };
 
 export const actions = {
@@ -195,6 +201,20 @@ export const actions = {
     });
 
     return { success: true };
+  },
+
+  // Solicitar préstamo (solo para visitantes, no propietarios)
+  request: async ({ locals, params, request }: RequestEvent) => {
+    const data = await request.formData();
+    const notes = (data.get('notes') as string | null)?.trim() || undefined;
+
+    let loanId: string;
+    try {
+      loanId = await requestLoan(locals.user!.id, params.id!, notes);
+    } catch (e) {
+      return fail(400, { error: e instanceof Error ? e.message : 'Error sending request.' });
+    }
+    redirect(302, `/loans/${loanId}`);
   },
 
   // Eliminar libro de la biblioteca

@@ -85,6 +85,7 @@ export async function addBookToLibrary(
 
 export type UserBookWithDetails = {
   userBookId: string;
+  ownerId: string;
   bookId: string | null;
   title: string;
   authors: string[];
@@ -111,6 +112,7 @@ export async function getUserBooks(
     const base = tx
       .select({
         userBookId: userBooks.id,
+        ownerId: userBooks.userId,
         bookId: userBooks.bookId,
         title: effectiveTitle,
         authors: effectiveAuthors,
@@ -185,6 +187,7 @@ export async function getContactBooks(
     const rows = await tx
       .select({
         userBookId: userBooks.id,
+        ownerId: userBooks.userId,
         bookId: userBooks.bookId,
         title: effectiveTitle,
         authors: effectiveAuthors,
@@ -265,6 +268,7 @@ export async function getUserBook(
     const rows = await tx
       .select({
         userBookId: userBooks.id,
+        ownerId: userBooks.userId,
         bookId: userBooks.bookId,
         title: effectiveTitle,
         authors: effectiveAuthors,

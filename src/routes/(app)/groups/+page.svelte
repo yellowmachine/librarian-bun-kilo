@@ -12,7 +12,7 @@
 <div class="space-y-8">
 	<div class="flex items-end justify-between">
 		<div>
-			<h1 class="font-serif text-2xl sm:text-3xl font-normal text-ink">Group</h1>
+			<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">Group</h1>
 			<p class="mt-1 text-sm text-ink-faint">
 				{userGroups.length}
 				{userGroups.length === 1 ? 'group' : 'groups'}
@@ -23,7 +23,7 @@
 				onclick={() => (showJoinForm = !showJoinForm)}
 				class="border border-paper-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-ink hover:text-ink"
 			>
-				Unirse
+				Join
 			</button>
 			<a
 				href="/groups/new"
@@ -71,10 +71,7 @@
 			<div class="mt-4 flex gap-4 text-sm">
 				<a href="/groups/new" class="text-ink underline underline-offset-2">Create group</a>
 				<span class="text-ink-faint">|</span>
-				<button
-					onclick={() => (showJoinForm = true)}
-					class="text-ink underline underline-offset-2"
-				>
+				<button onclick={() => (showJoinForm = true)} class="text-ink underline underline-offset-2">
 					Join with code
 				</button>
 			</div>
