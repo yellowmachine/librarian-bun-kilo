@@ -474,7 +474,7 @@
 						authors: b.authors,
 						coverUrl: b.coverUrl,
 						isAvailable: b.isAvailable,
-						href: `/borrow/${b.userBookId}`
+						href: `/library/${b.userBookId}`
 					}))}
 				/>
 			{/if}
@@ -571,7 +571,7 @@
 						coverUrl: b.coverUrl,
 						publishYear: b.publishYear,
 						isAvailable: b.isAvailable,
-						href: `/borrow/${b.userBookId}`
+						href: `/library/${b.userBookId}`
 					}))}
 				/>
 				{/if}

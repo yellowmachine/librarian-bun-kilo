@@ -31,7 +31,7 @@
 
 
 	let { data, form } = $props();
-	let { book, userTags, myReview, reviews, reviewStats } = $derived(data);
+	let { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo } = $derived(data);
 
 	let assignedTagIds = $derived(new Set(book.tags.map((t: { id: string }) => t.id)));
 	let availableTags = $derived(userTags.filter((t: { id: string }) => !assignedTagIds.has(t.id)));
@@ -123,7 +123,7 @@
 			isAvailable={book.isAvailable}
 			variant="detail"
 		/>
-		{#if !book.bookId}
+		{#if isOwner && !book.bookId}
 			<button
 				type="button"
 				onclick={() => (editOpen = !editOpen)}
@@ -136,7 +136,7 @@
 	</div>
 
 	<!-- Edit form (manual books only) -->
-	{#if editOpen && !book.bookId}
+	{#if isOwner && editOpen && !book.bookId}
 		<form method="POST" action="?/editManual" use:enhance class="space-y-4 border border-paper-border p-4">
 			{#if form?.editError}
 				<p class="text-xs text-red-600">{form.editError}</p>
@@ -225,7 +225,8 @@
 		</a>
 	{/if}
 
-	<!-- Notas y disponibilidad -->
+	<!-- Notas y disponibilidad (solo propietario) -->
+	{#if isOwner}
 	<form method="POST" action="?/update" use:enhance class="space-y-5">
 		<div>
 			<label
@@ -310,6 +311,61 @@
 		<!-- Combobox: buscar etiqueta existente o crear nueva -->
 		<TagCombobox {availableTags} />
 	</div>
+	{/if}
+
+	<!-- Solicitar préstamo (solo visitantes) -->
+	{#if !isOwner && borrowInfo}
+	<div class="space-y-3 border-t border-paper-border pt-6">
+		<div class="grid grid-cols-2 gap-px border border-paper-border bg-paper-border">
+			<div class="bg-paper px-4 py-4">
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Owner</p>
+				<p class="mt-1 font-medium text-ink">{borrowInfo.ownerName}</p>
+			</div>
+			<div class="bg-paper px-4 py-4">
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Availability</p>
+				<p class="mt-1 font-medium {borrowInfo.isAvailable ? 'text-ink' : 'text-ink-faint'}">
+					{borrowInfo.isAvailable ? 'Available' : 'On loan'}
+				</p>
+			</div>
+		</div>
+
+		{#if borrowInfo.existingLoanId}
+			<p class="text-sm text-ink-muted">
+				You already have a {borrowInfo.existingLoanStatus === 'requested'
+					? 'pending request'
+					: borrowInfo.existingLoanStatus === 'accepted'
+						? 'loan accepted'
+						: 'loan active'} for this book.
+			</p>
+			<a
+				href="/loans/{borrowInfo.existingLoanId}"
+				class="block w-full border border-paper-border py-2.5 text-center text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+			>
+				View loan →
+			</a>
+		{:else if !borrowInfo.isAvailable}
+			<p class="text-sm text-ink-faint">This book is currently on loan and not available.</p>
+		{:else}
+			{#if form?.error}
+				<p class="border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{form.error}</p>
+			{/if}
+			<form method="POST" action="?/request" use:enhance class="space-y-3">
+				<textarea
+					name="notes"
+					placeholder="Message to the owner (optional)"
+					rows="3"
+					class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+				></textarea>
+				<button
+					type="submit"
+					class="w-full border border-ink bg-ink py-2.5 text-sm text-paper transition-colors hover:bg-ink/90"
+				>
+					Request loan
+				</button>
+			</form>
+		{/if}
+	</div>
+	{/if}
 
 	<!-- Reseñas (solo libros de OpenLibrary) -->
 	{#if book.bookId}
@@ -429,7 +485,8 @@
 	</div>
 	{/if}
 
-	<!-- Eliminar -->
+	<!-- Eliminar (solo propietario) -->
+	{#if isOwner}
 	<div class="border-t border-paper-border pt-4">
 		<form
 			method="POST"
@@ -444,6 +501,7 @@
 			</button>
 		</form>
 	</div>
+	{/if}
 </div>
 
 {#if pendingForm}
