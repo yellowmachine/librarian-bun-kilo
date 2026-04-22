@@ -368,6 +368,11 @@
 	{/if}
 
 	<!-- Reseñas (solo libros de OpenLibrary) -->
+	{#if !book.bookId && !isOwner}
+	<div class="border-t border-paper-border pt-6">
+		<p class="text-xs text-ink-faint">Reviews are only available for books linked to OpenLibrary.</p>
+	</div>
+	{/if}
 	{#if book.bookId}
 	<div class="space-y-6 border-t border-paper-border pt-6">
 		<div class="flex items-center justify-between">
