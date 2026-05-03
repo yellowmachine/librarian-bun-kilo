@@ -28,9 +28,7 @@
 	let inputEl = $state<HTMLInputElement | null>(null);
 	let containerEl = $state<HTMLDivElement | null>(null);
 
-	let unselectedAvailable = $derived(
-		availableTags.filter((t) => !selectedTagIds.includes(t.id))
-	);
+	let unselectedAvailable = $derived(availableTags.filter((t) => !selectedTagIds.includes(t.id)));
 
 	let filtered = $derived(
 		inputValue.trim().length === 0

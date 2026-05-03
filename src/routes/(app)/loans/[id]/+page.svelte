@@ -157,13 +157,17 @@
 		{/if}
 		{#if loan.notes}
 			<div class="col-span-2 bg-paper px-4 py-4">
-				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Message from borrower</p>
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">
+					Message from borrower
+				</p>
 				<p class="mt-1 text-sm text-ink-muted">{loan.notes}</p>
 			</div>
 		{/if}
 		{#if loan.ownerNotes}
 			<div class="col-span-2 bg-paper px-4 py-4">
-				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Message from owner</p>
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">
+					Message from owner
+				</p>
 				<p class="mt-1 text-sm text-ink-muted">{loan.ownerNotes}</p>
 			</div>
 		{/if}
@@ -174,7 +178,7 @@
 		<div class="space-y-3">
 			<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">History</p>
 			<ol class="space-y-2 border-l border-paper-border pl-4">
-				{#each timeline() as ev}
+				{#each timeline() as ev (ev.label)}
 					<li class="flex items-baseline justify-between gap-4 text-sm">
 						<span class="text-ink-muted">{ev.label}</span>
 						<span class="shrink-0 text-xs text-ink-faint">{fmt(ev.date)}</span>
@@ -187,7 +191,7 @@
 	<!-- Acciones -->
 	{#if actions().length > 0}
 		<div class="space-y-2 border-t border-paper-border pt-4">
-			{#each actions() as action}
+			{#each actions() as action (action.toStatus)}
 				{#snippet formBody()}
 					<input type="hidden" name="toStatus" value={action.toStatus} />
 					{#if action.toStatus === 'accepted'}
@@ -217,7 +221,10 @@
 					<form
 						method="POST"
 						action="?/transition"
-						onsubmit={(e) => { e.preventDefault(); openConfirm(action.confirm!, e.currentTarget as HTMLFormElement); }}
+						onsubmit={(e) => {
+							e.preventDefault();
+							openConfirm(action.confirm!, e.currentTarget as HTMLFormElement);
+						}}
 					>
 						{@render formBody()}
 					</form>
@@ -234,7 +241,9 @@
 		<ConfirmDialog
 			message={confirmMessage}
 			onconfirm={submitConfirmed}
-			oncancel={() => { pendingForm = null; }}
+			oncancel={() => {
+				pendingForm = null;
+			}}
 		/>
 	{/if}
 </div>

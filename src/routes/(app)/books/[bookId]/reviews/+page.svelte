@@ -152,7 +152,10 @@
 					<form
 						method="POST"
 						action="?/deleteReview"
-						onsubmit={(e) => { e.preventDefault(); openConfirm('Remove your review?', e.currentTarget as HTMLFormElement); }}
+						onsubmit={(e) => {
+							e.preventDefault();
+							openConfirm('Remove your review?', e.currentTarget as HTMLFormElement);
+						}}
 					>
 						<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
 							Remove review
@@ -166,8 +169,7 @@
 	<!-- Reseñas de otros -->
 	{#if reviews.filter((r) => r.userId !== myReview?.userId).length > 0}
 		<div class="space-y-4 border-t border-paper-border pt-6">
-			<span class="text-xs font-medium tracking-widest text-ink-muted uppercase"
-				>Other reviews</span
+			<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Other reviews</span
 			>
 			{#each reviews as review (review.id)}
 				{#if review.userId !== myReview?.userId}
@@ -191,6 +193,8 @@
 	<ConfirmDialog
 		message={confirmMessage}
 		onconfirm={submitConfirmed}
-		oncancel={() => { pendingForm = null; }}
+		oncancel={() => {
+			pendingForm = null;
+		}}
 	/>
 {/if}

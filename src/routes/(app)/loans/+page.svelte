@@ -52,7 +52,7 @@
 
 <div class="space-y-8">
 	<div>
-		<h1 class="font-serif text-2xl sm:text-3xl font-normal text-ink">Loans</h1>
+		<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">Loans</h1>
 	</div>
 
 	<!-- Búsqueda -->
@@ -74,7 +74,7 @@
 	<!-- Tabs -->
 	<div class="border-b border-paper-border">
 		<nav class="flex gap-6">
-			{#each [{ key: 'borrower', label: 'Books I request', count: pendingBorrower }, { key: 'owner', label: 'Books I lend', count: pendingOwner }] as tab}
+			{#each [{ key: 'borrower', label: 'Books I request', count: pendingBorrower }, { key: 'owner', label: 'Books I lend', count: pendingOwner }] as tab (tab.key)}
 				<button
 					onclick={() => (activeTab = tab.key as 'borrower' | 'owner')}
 					class="flex items-center gap-2 border-b-2 pb-3 text-sm transition-colors
@@ -112,7 +112,7 @@
 				{#each list as loan (loan.id)}
 					<li>
 						<a
-							href="/loans/{loan.id}"
+							href={`/loans/${loan.id}`}
 							class="-mx-2 flex items-center gap-4 px-2 py-4 hover:bg-paper-ui"
 						>
 							{#if loan.coverUrl}

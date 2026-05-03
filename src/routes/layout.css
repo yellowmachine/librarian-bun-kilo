@@ -6,68 +6,68 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    /* Tipografía */
-    --font-sans: 'Inter', system-ui, sans-serif;
-    --font-serif: 'Source Serif 4', Georgia, serif;
+	/* Tipografía */
+	--font-sans: 'Inter', system-ui, sans-serif;
+	--font-serif: 'Source Serif 4', Georgia, serif;
 
-    /* Paleta light — warm paper */
-    --color-paper: #f9f7f4;
-    --color-paper-ui: #f0ede8;
-    --color-paper-border: #e8e2da;
+	/* Paleta light — warm paper */
+	--color-paper: #f9f7f4;
+	--color-paper-ui: #f0ede8;
+	--color-paper-border: #e8e2da;
 
-    --color-ink: #1c1917;
-    --color-ink-muted: #57534e;
-    --color-ink-faint: #a8a29e;
+	--color-ink: #1c1917;
+	--color-ink-muted: #57534e;
+	--color-ink-faint: #a8a29e;
 
-    --color-accent: #7c5c3e;
-    --color-accent-hover: #6b4f35;
-    --color-accent-light: #e8d9c8;
+	--color-accent: #7c5c3e;
+	--color-accent-hover: #6b4f35;
+	--color-accent-light: #e8d9c8;
 
-    /* Paleta dark */
-    --color-dark-paper: #1a1917;
-    --color-dark-paper-ui: #141311;
-    --color-dark-paper-border: #2c2926;
+	/* Paleta dark */
+	--color-dark-paper: #1a1917;
+	--color-dark-paper-ui: #141311;
+	--color-dark-paper-border: #2c2926;
 
-    --color-dark-ink: #e8e4dc;
-    --color-dark-ink-muted: #a8a29e;
-    --color-dark-ink-faint: #57534e;
+	--color-dark-ink: #e8e4dc;
+	--color-dark-ink-muted: #a8a29e;
+	--color-dark-ink-faint: #57534e;
 }
 
 /* Base */
 html {
-    font-family: var(--font-sans);
-    background-color: var(--color-paper-ui);
-    color: var(--color-ink);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+	font-family: var(--font-sans);
+	background-color: var(--color-paper-ui);
+	color: var(--color-ink);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
 html.dark {
-    background-color: var(--color-dark-paper-ui);
-    color: var(--color-dark-ink);
+	background-color: var(--color-dark-paper-ui);
+	color: var(--color-dark-ink);
 }
 
 /* Safe area para PWA en iOS (home indicator) */
 .pb-safe {
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+	padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }
 
 /* Scrollbar discreta */
 ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+	width: 6px;
+	height: 6px;
 }
 ::-webkit-scrollbar-track {
-    background: transparent;
+	background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: var(--color-paper-border);
-    border-radius: 3px;
+	background: var(--color-paper-border);
+	border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-ink-faint);
+	background: var(--color-ink-faint);
 }
 
 html.dark ::-webkit-scrollbar-thumb {
-    background: var(--color-dark-paper-border);
+	background: var(--color-dark-paper-border);
 }

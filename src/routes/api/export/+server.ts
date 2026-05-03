@@ -31,9 +31,7 @@ export async function GET({ locals, url }: RequestEvent) {
 	);
 
 	if (rows.length === 0) {
-		return format === 'bibtex'
-			? bibtexResponse('% Empty library\n')
-			: yamlResponse('books: []\n');
+		return format === 'bibtex' ? bibtexResponse('% Empty library\n') : yamlResponse('books: []\n');
 	}
 
 	const bookIds = [...new Set(rows.map((r) => r.bookId).filter((id): id is string => id !== null))];
@@ -119,7 +117,7 @@ type BookExport = {
 // ─── YAML ─────────────────────────────────────────────────────────────────────
 
 function yamlStr(s: string): string {
-	if (/[:#\[\]{},&*?|<>=!%@`\n"']/.test(s) || s.trim() !== s || s === '') {
+	if (/[:#[\]{},&*?|<>=!%@`\n"']/.test(s) || s.trim() !== s || s === '') {
 		return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 	}
 	return s;

@@ -1,5 +1,5 @@
 {
-  "id": "571d5a96-8ec0-47d5-a0de-3e094afe8d76",
+  "id": "51bc4acf-09ee-4362-a352-ffbfab97a72a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -377,7 +377,7 @@
           "to": [
             "scholio_app"
           ],
-          "withCheck": "exists (\n        select 1 from \"librarian\".group_members gm\n        where gm.group_id = \"librarian\".\"group_invite_codes\".\"group_id\"\n          and gm.user_id = current_setting('app.current_user_id', true)\n          and gm.role in ('owner', 'admin')\n      )"
+          "withCheck": "\"librarian\".is_group_admin(\"librarian\".\"group_invite_codes\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "group_invite_codes_update": {
           "name": "group_invite_codes_update",
@@ -386,7 +386,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n        select 1 from \"librarian\".group_members gm\n        where gm.group_id = \"librarian\".\"group_invite_codes\".\"group_id\"\n          and gm.user_id = current_setting('app.current_user_id', true)\n          and gm.role in ('owner', 'admin')\n      )"
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"group_invite_codes\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "group_invite_codes_delete": {
           "name": "group_invite_codes_delete",
@@ -395,7 +395,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n        select 1 from \"librarian\".group_members gm\n        where gm.group_id = \"librarian\".\"group_invite_codes\".\"group_id\"\n          and gm.user_id = current_setting('app.current_user_id', true)\n          and gm.role in ('owner', 'admin')\n      )"
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"group_invite_codes\".\"group_id\", current_setting('app.current_user_id', true))"
         }
       },
       "checkConstraints": {},
@@ -510,16 +510,16 @@
           "to": [
             "scholio_app"
           ],
-          "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true) or \"librarian\".is_group_member(\"librarian\".\"group_members\".\"group_id\", current_setting('app.current_user_id', true))"
         },
-        "group_members_insert_self": {
-          "name": "group_members_insert_self",
+        "group_members_insert": {
+          "name": "group_members_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
             "scholio_app"
           ],
-          "withCheck": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "withCheck": "\"librarian\".is_group_admin(\"librarian\".\"group_members\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "group_members_delete": {
           "name": "group_members_delete",
@@ -528,7 +528,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true) or \"librarian\".is_group_admin(\"librarian\".\"group_members\".\"group_id\", current_setting('app.current_user_id', true))"
         }
       },
       "checkConstraints": {},
@@ -603,7 +603,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\twhere gm.group_id = \"librarian\".\"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "\"librarian\".is_group_member(\"librarian\".\"groups\".\"id\", current_setting('app.current_user_id', true))"
         },
         "groups_insert": {
           "name": "groups_insert",
@@ -621,7 +621,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\twhere gm.group_id = \"librarian\".\"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t)"
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"groups\".\"id\", current_setting('app.current_user_id', true))"
         },
         "groups_delete": {
           "name": "groups_delete",
@@ -630,7 +630,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\twhere gm.group_id = \"librarian\".\"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t  and gm.role = 'owner'\n\t\t\t)"
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"groups\".\"id\", current_setting('app.current_user_id', true))"
         }
       },
       "checkConstraints": {},
@@ -711,6 +711,12 @@
         },
         "notes": {
           "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_notes": {
+          "name": "owner_notes",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -990,7 +996,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\twhere gm.group_id = \"librarian\".\"shared_tags\".\"group_id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "\"librarian\".is_group_member(\"librarian\".\"shared_tags\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "shared_tags_insert": {
           "name": "shared_tags_insert",
@@ -999,7 +1005,7 @@
           "to": [
             "scholio_app"
           ],
-          "withCheck": "\"librarian\".\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true)\n\t\t\t\tand exists (\n\t\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\t\twhere gm.group_id = \"librarian\".\"shared_tags\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t)"
+          "withCheck": "\"librarian\".\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true) and \"librarian\".is_group_member(\"librarian\".\"shared_tags\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "shared_tags_delete": {
           "name": "shared_tags_delete",
@@ -1008,7 +1014,7 @@
           "to": [
             "scholio_app"
           ],
-          "using": "\"librarian\".\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from \"librarian\".group_members gm\n\t\t\t\t\twhere gm.group_id = \"librarian\".\"shared_tags\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+          "using": "\"librarian\".\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true) or \"librarian\".is_group_admin(\"librarian\".\"shared_tags\".\"group_id\", current_setting('app.current_user_id', true))"
         }
       },
       "checkConstraints": {},
@@ -1303,7 +1309,37 @@
           "name": "book_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "authors": {
+          "name": "authors",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isbn": {
+          "name": "isbn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publish_year": {
+          "name": "publish_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "notes": {
           "name": "notes",
@@ -1351,6 +1387,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"librarian\".\"user_books\".\"book_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1436,6 +1473,15 @@
           ],
           "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".user_book_tags ubt\n\t\t\t\tjoin \"librarian\".shared_tags st on st.tag_id = ubt.tag_id\n\t\t\t\tjoin \"librarian\".group_members gm on gm.group_id = st.group_id\n\t\t\t\twhere ubt.user_book_id = \"librarian\".\"user_books\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         },
+        "user_books_select_on_loan": {
+          "name": "user_books_select_on_loan",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".loans l\n\t\t\t\twhere l.user_book_id = \"librarian\".\"user_books\".\"id\"\n\t\t\t\t  and l.borrower_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
         "user_books_insert": {
           "name": "user_books_insert",
           "as": "PERMISSIVE",
@@ -1464,7 +1510,12 @@
           "using": "\"librarian\".\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
         }
       },
-      "checkConstraints": {},
+      "checkConstraints": {
+        "user_books_book_or_title": {
+          "name": "user_books_book_or_title",
+          "value": "\"librarian\".\"user_books\".\"book_id\" IS NOT NULL OR \"librarian\".\"user_books\".\"title\" IS NOT NULL"
+        }
+      },
       "isRLSEnabled": false
     },
     "librarian.user_profile": {

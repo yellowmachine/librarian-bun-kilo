@@ -81,7 +81,7 @@
 			{#each userGroups as group (group.id)}
 				<li>
 					<a
-						href="/groups/{group.id}"
+						href={`/groups/${group.id}`}
 						class="-mx-2 flex items-center gap-4 px-2 py-4 transition-colors hover:bg-paper-ui"
 					>
 						<div

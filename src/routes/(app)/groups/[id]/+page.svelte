@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, Tag, Users, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
+	import { ArrowLeft, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
 	import InviteQR from '$lib/components/InviteQR.svelte';
 
 	let { data, form } = $props();
@@ -47,7 +47,7 @@
 		</a>
 		<div class="mt-3 flex items-start justify-between">
 			<div>
-				<h1 class="font-serif text-2xl sm:text-3xl font-normal text-ink">{group.name}</h1>
+				<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{group.name}</h1>
 				{#if group.description}
 					<p class="mt-1 text-sm text-ink-faint">{group.description}</p>
 				{/if}
@@ -107,7 +107,7 @@
 	<!-- Tabs -->
 	<div class="border-b border-paper-border">
 		<nav class="flex gap-6">
-			{#each [{ key: 'shared', label: `Tags (${sharedTagsList.length})` }, { key: 'members', label: `Members (${members.length})` }] as tab}
+			{#each [{ key: 'shared', label: `Tags (${sharedTagsList.length})` }, { key: 'members', label: `Members (${members.length})` }] as tab (tab.key)}
 				<button
 					onclick={() => (activeTab = tab.key as 'shared' | 'members')}
 					class="border-b-2 pb-3 text-sm transition-colors
@@ -157,9 +157,7 @@
 
 			<!-- Todas las etiquetas del grupo -->
 			{#if sharedTagsList.length === 0}
-				<p class="py-8 text-center text-sm text-ink-faint">
-					No members have shared any tags yet.
-				</p>
+				<p class="py-8 text-center text-sm text-ink-faint">No members have shared any tags yet.</p>
 			{:else}
 				<div class="space-y-3">
 					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">En el grupo</p>
@@ -240,13 +238,21 @@
 				>
 					Cancel
 				</button>
-				<form method="POST" action="?/removeMember" use:enhance={() => async ({ update }) => {
-					pendingRemove = null;
-					await update();
-					await invalidateAll();
-				}}>
+				<form
+					method="POST"
+					action="?/removeMember"
+					use:enhance={() =>
+						async ({ update }) => {
+							pendingRemove = null;
+							await update();
+							await invalidateAll();
+						}}
+				>
 					<input type="hidden" name="userId" value={pendingRemove.userId} />
-					<button type="submit" class="border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100">
+					<button
+						type="submit"
+						class="border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100"
+					>
 						Remove
 					</button>
 				</form>
