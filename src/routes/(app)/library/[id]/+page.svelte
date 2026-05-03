@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { ArrowLeft, Tag, Trash, Star, PencilSimple } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
@@ -106,10 +105,7 @@
 		</p>
 	{/if}
 
-	<a
-		href={resolve('/library')}
-		class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
-	>
+	<a href="/library" class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink">
 		<ArrowLeft size={16} /> Mi biblioteca
 	</a>
 
@@ -390,7 +386,7 @@
 							: 'loan active'} for this book.
 				</p>
 				<a
-					href={resolve(`/loans/${borrowInfo.existingLoanId}`)}
+					href={`/loans/${borrowInfo.existingLoanId}`}
 					class="block w-full border border-paper-border py-2.5 text-center text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
 				>
 					View loan →
@@ -447,7 +443,7 @@
 						</div>
 					{/if}
 					<a
-						href={resolve(`/books/${book.bookId}/reviews`)}
+						href={`/books/${book.bookId}/reviews`}
 						class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
 					>
 						See all →

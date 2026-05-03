@@ -3,6 +3,54 @@
 import { error } from '@sveltejs/kit';
 import type { BookSearchResult } from '$lib/types';
 
+// ─── OpenLibrary API response shapes ─────────────────────────────────────────
+
+interface OLSearchDoc {
+	key: string;
+	title: string;
+	author_name?: string[];
+	cover_i?: number;
+	first_publish_year?: number;
+	isbn?: string[];
+}
+
+interface OLAuthorEntry {
+	author?: { key: string };
+	key?: string;
+}
+
+interface OLCover {
+	small?: string;
+	medium?: string;
+	large?: string;
+}
+
+interface OLBookData {
+	works?: { key: string }[];
+	authors?: { name: string }[];
+	cover?: OLCover;
+	title: string;
+	publish_date?: string;
+	notes?: string | { value: string };
+	publishers?: { name: string }[];
+	languages?: { key: string }[];
+}
+
+interface OLWorkData {
+	title: string;
+	authors?: OLAuthorEntry[];
+	covers?: number[];
+	description?: string | { value: string };
+}
+
+interface OLEditionData {
+	isbn_13?: string[];
+	isbn_10?: string[];
+	publishers?: string[];
+	publish_date?: string;
+	languages?: { key: string }[];
+}
+
 // Timeout por request individual a OpenLibrary (ms)
 const OL_TIMEOUT_MS = 10_000;
 
@@ -88,15 +136,15 @@ export async function searchBooks(query: string, limit = 10): Promise<BookSearch
 	if (!res.ok) return [];
 
 	const data = await res.json();
-	const docs: unknown[] = data.docs ?? [];
+	const docs: OLSearchDoc[] = data.docs ?? [];
 
-	return docs.map((doc: Record<string, unknown>) => ({
-		id: (doc.key as string).replace('/works/', ''),
-		isbn: (doc.isbn as string[] | undefined)?.[0] ?? null,
-		title: doc.title as string,
-		authors: (doc.author_name as string[] | undefined) ?? [],
+	return docs.map((doc) => ({
+		id: doc.key.replace('/works/', ''),
+		isbn: doc.isbn?.[0] ?? null,
+		title: doc.title,
+		authors: doc.author_name ?? [],
 		coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
-		publishYear: (doc.first_publish_year as number | undefined) ?? null
+		publishYear: doc.first_publish_year ?? null
 	}));
 }
 
@@ -110,13 +158,13 @@ export async function getWorkById(workId: string): Promise<OpenLibraryBook | nul
 	]);
 
 	if (!workRes.ok) return null;
-	const work = await workRes.json();
+	const work: OLWorkData = await workRes.json();
 
 	// Autores (en paralelo entre sí, tras obtener el work)
 	const authorNames: string[] = [];
 	if (Array.isArray(work.authors)) {
 		await Promise.all(
-			work.authors.slice(0, 5).map(async (a: Record<string, unknown>) => {
+			work.authors.slice(0, 5).map(async (a: OLAuthorEntry) => {
 				const authorKey: string = a.author?.key ?? a.key ?? '';
 				if (!authorKey) return;
 				const aRes = await fetchOL(`https://openlibrary.org${authorKey}.json`);
@@ -136,7 +184,7 @@ export async function getWorkById(workId: string): Promise<OpenLibraryBook | nul
 
 	if (editionRes.ok) {
 		const editions = await editionRes.json();
-		const ed = editions.entries?.[0];
+		const ed: OLEditionData | undefined = editions.entries?.[0];
 		if (ed) {
 			isbn = ed.isbn_13?.[0] ?? ed.isbn_10?.[0] ?? null;
 			publisher = ed.publishers?.[0] ?? null;
@@ -149,14 +197,12 @@ export async function getWorkById(workId: string): Promise<OpenLibraryBook | nul
 	const coverUrl = coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null;
 
 	const description =
-		typeof work.description === 'string'
-			? work.description
-			: ((work.description?.value as string | undefined) ?? null);
+		typeof work.description === 'string' ? work.description : (work.description?.value ?? null);
 
 	const raw: OpenLibraryBook = {
 		id: workId,
 		isbn,
-		title: work.title as string,
+		title: work.title,
 		authors: authorNames,
 		coverUrl,
 		publishYear,
@@ -171,34 +217,29 @@ export async function getWorkById(workId: string): Promise<OpenLibraryBook | nul
 
 // ─── Helper interno ───────────────────────────────────────────────────────────
 
-function parseBookData(book: Record<string, unknown>, isbn: string): OpenLibraryBook {
+function parseBookData(book: OLBookData, isbn: string): OpenLibraryBook {
 	const workKey: string = book.works?.[0]?.key ?? '';
 	const workId = workKey.replace('/works/', '') || `isbn:${isbn}`;
 
-	const authors: string[] = ((book.authors ?? []) as Record<string, unknown>[]).map(
-		(a) => a.name as string
-	);
+	const authors: string[] = (book.authors ?? []).map((a) => a.name);
 
 	const coverId = book.cover?.medium ?? book.cover?.large ?? book.cover?.small ?? null;
 
 	const publishYear: number | null = book.publish_date
-		? parseInt((book.publish_date as string).slice(-4)) || null
+		? parseInt(book.publish_date.slice(-4)) || null
 		: null;
 
-	const description =
-		typeof book.notes === 'string'
-			? book.notes
-			: ((book.notes?.value as string | undefined) ?? null);
+	const description = typeof book.notes === 'string' ? book.notes : (book.notes?.value ?? null);
 
 	return {
 		id: workId,
 		isbn,
-		title: book.title as string,
+		title: book.title,
 		authors,
 		coverUrl: coverId ?? null,
 		publishYear,
-		publisher: (book.publishers ?? [])[0]?.name ?? null,
-		language: (book.languages ?? [])[0]?.key?.replace('/languages/', '') ?? null,
+		publisher: book.publishers?.[0]?.name ?? null,
+		language: book.languages?.[0]?.key?.replace('/languages/', '') ?? null,
 		description,
 		openlibraryData: JSON.stringify(book)
 	};

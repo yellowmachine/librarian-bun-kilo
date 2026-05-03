@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { resolve } from '$app/paths';
 
 	type Crumb = { label: string; href?: string };
 
+	interface PageData {
+		book?: { title?: string };
+		group?: { name?: string };
+		loan?: { title?: string };
+	}
+
 	const crumbs = $derived.by((): Crumb[] => {
 		const path = page.url.pathname;
-		const data = page.data as Record<string, unknown>;
+		const data = page.data as PageData;
 
 		// Raíces — sin breadcrumb
 		if (path === '/library' || path === '/groups' || path === '/loans') return [];
@@ -68,7 +73,7 @@
 				<span aria-hidden="true">›</span>
 			{/if}
 			{#if crumb.href}
-				<a href={resolve(crumb.href)} class="hover:text-ink-muted">{crumb.label}</a>
+				<a href={crumb.href} class="hover:text-ink-muted">{crumb.label}</a>
 			{:else}
 				<span class="text-ink-muted">{crumb.label}</span>
 			{/if}

@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { ArrowLeft } from 'phosphor-svelte';
-	import { resolve } from '$app/paths';
 	let { form } = $props();
 </script>
 
 <div class="mx-auto max-w-md space-y-8">
 	<div class="flex items-center gap-3">
-		<a href={resolve('/groups')} class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
+		<a href="/groups" class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
 		<h1 class="font-serif text-2xl font-normal text-ink">Nuevo grupo</h1>
 	</div>
 

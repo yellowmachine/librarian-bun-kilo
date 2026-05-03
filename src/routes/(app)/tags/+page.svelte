@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { resolve } from '$app/paths';
 	import { ArrowLeft, PencilSimple, Check, X, Trash, Plus } from 'phosphor-svelte';
 
 	let { data } = $props();
@@ -55,7 +54,7 @@
 <div class="mx-auto max-w-2xl space-y-8">
 	<div>
 		<a
-			href={resolve('/library')}
+			href="/library"
 			class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
 		>
 			<ArrowLeft size={16} /> Library

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { resolve } from '$app/paths';
 	import {
 		BookOpen,
 		Books,
@@ -32,7 +31,7 @@
 		<div class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
 			<!-- Logotipo -->
 			<a
-				href={resolve('/library')}
+				href="/library"
 				class="flex items-baseline gap-2 font-serif text-xl font-normal tracking-tight text-ink"
 			>
 				The Svelte Librarian
@@ -45,7 +44,7 @@
 			<nav class="hidden items-center gap-1 sm:flex">
 				{#each NAV as item (item.href)}
 					<a
-						href={resolve(item.href)}
+						href={item.href}
 						class="relative flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors
 						{isActive(item.href) ? 'bg-ink text-paper' : 'text-ink-muted hover:bg-paper-ui hover:text-ink'}"
 					>
@@ -118,7 +117,7 @@
 		<div class="flex">
 			{#each NAV as item (item.href)}
 				<a
-					href={resolve(item.href)}
+					href={item.href}
 					class="relative flex flex-1 flex-col items-center gap-1 py-3 text-xs transition-colors
 					{isActive(item.href) ? 'text-ink' : 'text-ink-faint'}"
 				>

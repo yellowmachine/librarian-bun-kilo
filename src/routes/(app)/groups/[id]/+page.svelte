@@ -2,7 +2,6 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
-	import { resolve } from '$app/paths';
 	import InviteQR from '$lib/components/InviteQR.svelte';
 
 	let { data, form } = $props();
@@ -41,7 +40,7 @@
 	<!-- Cabecera -->
 	<div>
 		<a
-			href={resolve('/groups')}
+			href="/groups"
 			class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
 		>
 			<ArrowLeft size={16} /> Grupos

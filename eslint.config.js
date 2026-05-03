@@ -30,7 +30,9 @@ export default defineConfig(
 			'@typescript-eslint/no-unused-vars': [
 				'error',
 				{ varsIgnorePattern: '^_', argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }
-			]
+			],
+			// This project does not use a base path, so resolve() is not needed for hrefs.
+			'svelte/no-navigation-without-resolve': 'off'
 		}
 	},
 	{

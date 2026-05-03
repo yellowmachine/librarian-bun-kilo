@@ -16,7 +16,7 @@ async function seedUsers(tdb: TestDb) {
 			VALUES
 				('${ALICE}', 'Alice', 'alice@test.com', true, now(), now()),
 				('${BOB}',   'Bob',   'bob@test.com',   true, now(), now())
-		` as unknown
+		` as string
 		);
 	});
 }

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import BookGrid from '$lib/components/BookGrid.svelte';
 	import type { GroupActivityBook } from '$lib/server/groups';
-	import { resolve } from '$app/paths';
 
 	let { data } = $props();
 	const { books } = $derived(data);
@@ -29,7 +28,7 @@
 		<div class="flex flex-col items-center justify-center py-24 text-center">
 			<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
 			<p class="text-sm text-ink-faint">No recent activity in your groups.</p>
-			<a href={resolve('/groups')} class="mt-4 text-sm text-ink underline underline-offset-2">
+			<a href="/groups" class="mt-4 text-sm text-ink underline underline-offset-2">
 				Join or create a group
 			</a>
 		</div>

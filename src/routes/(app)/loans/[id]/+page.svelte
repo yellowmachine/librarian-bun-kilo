@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { ArrowLeft, BookOpen } from 'phosphor-svelte';
 	import type { LoanWithDetails } from '$lib/server/loans';
 	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
@@ -110,10 +109,7 @@
 </script>
 
 <div class="mx-auto max-w-md space-y-10">
-	<a
-		href={resolve('/loans')}
-		class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
-	>
+	<a href="/loans" class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink">
 		<ArrowLeft size={16} /> Loans
 	</a>
 

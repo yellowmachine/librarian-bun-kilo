@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Barcode, MagnifyingGlass, ArrowLeft, Plus, Trash } from 'phosphor-svelte';
-	import { resolve } from '$app/paths';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
@@ -226,7 +225,7 @@
 <div class="mx-auto max-w-md space-y-8">
 	<!-- Cabecera -->
 	<div class="flex items-center gap-3">
-		<a href={resolve('/library')} class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
+		<a href="/library" class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
 		<h1 class="font-serif text-2xl font-normal text-ink">Add book</h1>
 	</div>
 
@@ -245,9 +244,8 @@
 				<span class="text-ink-muted"
 					><span class="font-medium text-ink">{lastAddedTitle}</span> added to your library.</span
 				>
-				<a
-					href={resolve('/library')}
-					class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2">View library</a
+				<a href="/library" class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2"
+					>View library</a
 				>
 			</div>
 		{/if}

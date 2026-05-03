@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { ArrowLeft, Star } from 'phosphor-svelte';
 	import StarRating from '$lib/components/StarRating.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -63,7 +62,7 @@
 	<!-- Cabecera -->
 	<div>
 		<a
-			href={resolve('/library')}
+			href="/library"
 			class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
 		>
 			<ArrowLeft size={16} /> My library

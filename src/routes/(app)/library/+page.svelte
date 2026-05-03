@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { resolve } from '$app/paths';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { MagnifyingGlass, Tag, Export, Plus, CaretDown } from 'phosphor-svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
@@ -188,7 +187,7 @@
 		</div>
 		<div class="flex shrink-0 items-center gap-2">
 			<a
-				href={resolve('/tags')}
+				href="/tags"
 				class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
 			>
 				<Tag size={15} />
@@ -210,7 +209,7 @@
 						class="absolute top-full right-0 z-20 mt-1 min-w-36 border border-paper-border bg-paper shadow-sm"
 					>
 						<a
-							href={resolve('/api/export?format=yaml')}
+							href="/api/export?format=yaml"
 							download="library.yaml"
 							onclick={() => (exportOpen = false)}
 							class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
@@ -219,7 +218,7 @@
 							<span class="ml-auto text-xs text-ink-faint">.yaml</span>
 						</a>
 						<a
-							href={resolve('/api/export?format=bibtex')}
+							href="/api/export?format=bibtex"
 							download="library.bib"
 							onclick={() => (exportOpen = false)}
 							class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
@@ -232,7 +231,7 @@
 			</div>
 
 			<a
-				href={resolve('/library/add')}
+				href="/library/add"
 				class="flex items-center gap-1.5 border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
 			>
 				<Plus size={15} weight="bold" />
@@ -392,10 +391,7 @@
 			<div class="flex flex-col items-center justify-center py-24 text-center">
 				<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
 				<p class="text-sm text-ink-faint">Your library is empty.</p>
-				<a
-					href={resolve('/library/add')}
-					class="mt-4 text-sm text-ink underline underline-offset-2"
-				>
+				<a href="/library/add" class="mt-4 text-sm text-ink underline underline-offset-2">
 					Add your first book
 				</a>
 			</div>

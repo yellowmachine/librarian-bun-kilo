@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { LoanWithDetails } from '$lib/server/loans';
 	import { ArrowsLeftRight } from 'phosphor-svelte';
-	import { resolve } from '$app/paths';
 	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
 
 	let { data } = $props();
@@ -113,7 +112,7 @@
 				{#each list as loan (loan.id)}
 					<li>
 						<a
-							href={resolve(`/loans/${loan.id}`)}
+							href={`/loans/${loan.id}`}
 							class="-mx-2 flex items-center gap-4 px-2 py-4 hover:bg-paper-ui"
 						>
 							{#if loan.coverUrl}
