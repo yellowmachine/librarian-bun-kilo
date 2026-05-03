@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import { Plus, Users, ArrowRight } from 'phosphor-svelte';
 
 	let { data, form } = $props();
@@ -26,7 +27,7 @@
 				Join
 			</button>
 			<a
-				href="/groups/new"
+				href={resolve('/groups/new')}
 				class="flex items-center gap-1.5 border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
 			>
 				<Plus size={16} weight="bold" /> New
@@ -69,7 +70,9 @@
 			<Users size={48} weight="thin" class="mb-4 text-ink-faint" />
 			<p class="text-sm text-ink-faint">You don't belong to any groups yet.</p>
 			<div class="mt-4 flex gap-4 text-sm">
-				<a href="/groups/new" class="text-ink underline underline-offset-2">Create group</a>
+				<a href={resolve('/groups/new')} class="text-ink underline underline-offset-2"
+					>Create group</a
+				>
 				<span class="text-ink-faint">|</span>
 				<button onclick={() => (showJoinForm = true)} class="text-ink underline underline-offset-2">
 					Join with code
@@ -81,7 +84,7 @@
 			{#each userGroups as group (group.id)}
 				<li>
 					<a
-						href="/groups/{group.id}"
+						href={resolve(`/groups/${group.id}`)}
 						class="-mx-2 flex items-center gap-4 px-2 py-4 transition-colors hover:bg-paper-ui"
 					>
 						<div

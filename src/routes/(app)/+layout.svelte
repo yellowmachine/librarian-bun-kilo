@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { BookOpen, Books, ArrowsLeftRight, SignOut, ClockCounterClockwise } from 'phosphor-svelte';
+	import { resolve } from '$app/paths';
+	import {
+		BookOpen,
+		Books,
+		ArrowsLeftRight,
+		SignOut,
+		ClockCounterClockwise
+	} from 'phosphor-svelte';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 
 	let { children, data } = $props();
@@ -25,7 +32,7 @@
 		<div class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
 			<!-- Logotipo -->
 			<a
-				href="/library"
+				href={resolve('/library')}
 				class="flex items-baseline gap-2 font-serif text-xl font-normal tracking-tight text-ink"
 			>
 				The Svelte Librarian
@@ -36,13 +43,11 @@
 
 			<!-- Nav principal — solo visible en sm+ -->
 			<nav class="hidden items-center gap-1 sm:flex">
-				{#each NAV as item}
+				{#each NAV as item (item.href)}
 					<a
-						href={item.href}
+						href={resolve(item.href)}
 						class="relative flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors
-						{isActive(item.href)
-							? 'bg-ink text-paper'
-							: 'text-ink-muted hover:bg-paper-ui hover:text-ink'}"
+						{isActive(item.href) ? 'bg-ink text-paper' : 'text-ink-muted hover:bg-paper-ui hover:text-ink'}"
 					>
 						<item.icon weight={isActive(item.href) ? 'fill' : 'regular'} size={16} />
 						<span>{item.label}</span>
@@ -78,7 +83,9 @@
 
 	<!-- ── Contenido ─────────────────────────────────────────────────────── -->
 	<!-- pb-20 en mobile deja espacio para la barra inferior -->
-	<main class="mx-auto w-full max-w-4xl flex-1 px-5 py-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-8">
+	<main
+		class="mx-auto w-full max-w-4xl flex-1 px-5 py-8 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-8"
+	>
 		<Breadcrumb />
 		{@render children()}
 	</main>
@@ -109,9 +116,9 @@
 		pb-[env(safe-area-inset-bottom)] sm:hidden"
 	>
 		<div class="flex">
-			{#each NAV as item}
+			{#each NAV as item (item.href)}
 				<a
-					href={item.href}
+					href={resolve(item.href)}
 					class="relative flex flex-1 flex-col items-center gap-1 py-3 text-xs transition-colors
 					{isActive(item.href) ? 'text-ink' : 'text-ink-faint'}"
 				>

@@ -61,7 +61,7 @@
 				}
 			);
 
-			QuaggaInstance.onDetected((result: any) => {
+			QuaggaInstance.onDetected((result: { codeResult?: { code?: string } }) => {
 				const code: string = result?.codeResult?.code ?? '';
 				if (!code) return;
 

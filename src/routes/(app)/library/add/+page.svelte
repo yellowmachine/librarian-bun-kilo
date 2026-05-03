@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Barcode, MagnifyingGlass, ArrowLeft, Plus, Trash } from 'phosphor-svelte';
+	import { resolve } from '$app/paths';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
@@ -106,7 +107,10 @@
 		loadingDescription = true;
 		mode = 'confirm';
 		await Promise.all([
-			fetchDescription(book.id).then((d) => { selectedDescription = d; loadingDescription = false; }),
+			fetchDescription(book.id).then((d) => {
+				selectedDescription = d;
+				loadingDescription = false;
+			}),
 			fetchUserTags()
 		]);
 	}
@@ -222,7 +226,7 @@
 <div class="mx-auto max-w-md space-y-8">
 	<!-- Cabecera -->
 	<div class="flex items-center gap-3">
-		<a href="/library" class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
+		<a href={resolve('/library')} class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
 		<h1 class="font-serif text-2xl font-normal text-ink">Add book</h1>
 	</div>
 
@@ -235,9 +239,16 @@
 	<!-- Elegir modo -->
 	{#if mode === 'choose'}
 		{#if lastAddedTitle}
-			<div class="flex items-center justify-between border border-paper-border bg-paper-ui px-4 py-2.5 text-sm">
-				<span class="text-ink-muted"><span class="font-medium text-ink">{lastAddedTitle}</span> added to your library.</span>
-				<a href="/library" class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2">View library</a>
+			<div
+				class="flex items-center justify-between border border-paper-border bg-paper-ui px-4 py-2.5 text-sm"
+			>
+				<span class="text-ink-muted"
+					><span class="font-medium text-ink">{lastAddedTitle}</span> added to your library.</span
+				>
+				<a
+					href={resolve('/library')}
+					class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2">View library</a
+				>
 			</div>
 		{/if}
 		<div class="grid grid-cols-3 gap-3">
@@ -349,7 +360,9 @@
 				</div>
 			{:else if descriptionVisible}
 				<div class="space-y-2">
-					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">Synopsis</span>
+					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+						>Synopsis</span
+					>
 					<p class="text-sm leading-relaxed text-ink-muted">
 						{descriptionVisible}{#if descriptionTruncated && !descriptionExpanded}…{/if}
 					</p>
@@ -410,8 +423,11 @@
 	{:else if mode === 'form'}
 		<form onsubmit={addManualBook} class="space-y-5">
 			<div>
-				<label for="form-title" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-					Title <span class="tracking-normal normal-case text-ink-faint">*</span>
+				<label
+					for="form-title"
+					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+				>
+					Title <span class="tracking-normal text-ink-faint normal-case">*</span>
 				</label>
 				<input
 					id="form-title"
@@ -426,7 +442,7 @@
 
 			<div>
 				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-					Authors <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+					Authors <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 				</span>
 				<div class="mt-1.5 space-y-2">
 					{#each formAuthors as _, i (i)}
@@ -460,8 +476,11 @@
 
 			<div class="grid grid-cols-2 gap-3">
 				<div>
-					<label for="form-isbn" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-						ISBN <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+					<label
+						for="form-isbn"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						ISBN <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 					</label>
 					<input
 						id="form-isbn"
@@ -472,8 +491,11 @@
 					/>
 				</div>
 				<div>
-					<label for="form-year" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-						Year <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+					<label
+						for="form-year"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						Year <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 					</label>
 					<input
 						id="form-year"
@@ -488,8 +510,11 @@
 			</div>
 
 			<div>
-				<label for="form-description" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-					Description <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+				<label
+					for="form-description"
+					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+				>
+					Description <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 				</label>
 				<textarea
 					id="form-description"
@@ -501,8 +526,11 @@
 			</div>
 
 			<div>
-				<label for="form-notes" class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-					Personal notes <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+				<label
+					for="form-notes"
+					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+				>
+					Personal notes <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 				</label>
 				<textarea
 					id="form-notes"
@@ -515,7 +543,7 @@
 
 			<div>
 				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-					Tags <span class="tracking-normal normal-case text-ink-faint">(optional)</span>
+					Tags <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 				</span>
 				<div class="mt-1.5">
 					<TagSelectorLocal {availableTags} bind:selectedTagIds bind:tagsToCreate />

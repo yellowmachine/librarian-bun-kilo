@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import { ArrowLeft, PencilSimple, Check, X, Trash, Plus } from 'phosphor-svelte';
 
 	let { data } = $props();
@@ -53,10 +54,13 @@
 
 <div class="mx-auto max-w-2xl space-y-8">
 	<div>
-		<a href="/library" class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink">
+		<a
+			href={resolve('/library')}
+			class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
+		>
 			<ArrowLeft size={16} /> Library
 		</a>
-		<h1 class="mt-3 font-serif text-2xl sm:text-3xl font-normal text-ink">Tags</h1>
+		<h1 class="mt-3 font-serif text-2xl font-normal text-ink sm:text-3xl">Tags</h1>
 	</div>
 
 	<!-- Crear tag -->
@@ -64,12 +68,13 @@
 		<form
 			method="POST"
 			action="?/create"
-			use:enhance={() => async ({ update }) => {
-				await update();
-				newName = '';
-				newColor = '#0a0a0a';
-				creating = false;
-			}}
+			use:enhance={() =>
+				async ({ update }) => {
+					await update();
+					newName = '';
+					newColor = '#0a0a0a';
+					creating = false;
+				}}
 			class="flex items-center gap-3 border border-paper-border px-4 py-3"
 		>
 			<input
@@ -119,10 +124,11 @@
 						<form
 							method="POST"
 							action="?/update"
-							use:enhance={() => async ({ update }) => {
-								editing = null;
-								await update();
-							}}
+							use:enhance={() =>
+								async ({ update }) => {
+									editing = null;
+									await update();
+								}}
 							class="flex items-center gap-3"
 						>
 							<input type="hidden" name="id" value={tag.id} />
@@ -152,7 +158,6 @@
 								<X size={16} />
 							</button>
 						</form>
-
 					{:else if isConfirming(tag.id)}
 						<!-- Confirmación de borrado con impacto -->
 						<div class="flex items-center gap-3">
@@ -169,7 +174,9 @@
 								{#if tag.bookCount > 0}
 									<strong>{tag.bookCount} {tag.bookCount === 1 ? 'book' : 'books'}</strong>
 								{/if}
-								{#if tag.bookCount > 0 && tag.groupCount > 0} and {/if}
+								{#if tag.bookCount > 0 && tag.groupCount > 0}
+									and
+								{/if}
 								{#if tag.groupCount > 0}
 									<strong>{tag.groupCount} {tag.groupCount === 1 ? 'group' : 'groups'}</strong>
 								{/if}.
@@ -177,10 +184,11 @@
 							<form
 								method="POST"
 								action="?/delete"
-								use:enhance={() => async ({ update }) => {
-									confirmingDelete = null;
-									await update();
-								}}
+								use:enhance={() =>
+									async ({ update }) => {
+										confirmingDelete = null;
+										await update();
+									}}
 							>
 								<input type="hidden" name="id" value={tag.id} />
 								<button
@@ -199,7 +207,6 @@
 								<X size={16} />
 							</button>
 						</div>
-
 					{:else}
 						<!-- Vista normal -->
 						<div class="flex items-center gap-3">
@@ -232,17 +239,14 @@
 									<form
 										method="POST"
 										action="?/delete"
-										use:enhance={() => async ({ update }) => {
-											confirmingDelete = null;
-											await update();
-										}}
+										use:enhance={() =>
+											async ({ update }) => {
+												confirmingDelete = null;
+												await update();
+											}}
 									>
 										<input type="hidden" name="id" value={tag.id} />
-										<button
-											type="submit"
-											class="text-ink-faint hover:text-ink"
-											aria-label="Delete"
-										>
+										<button type="submit" class="text-ink-faint hover:text-ink" aria-label="Delete">
 											<Trash size={14} />
 										</button>
 									</form>

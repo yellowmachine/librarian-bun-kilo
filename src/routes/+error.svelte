@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 </script>
 
 <div class="flex min-h-screen flex-col items-center justify-center bg-paper px-5">
@@ -12,7 +13,7 @@
 			{page.error?.message ?? 'An unexpected error has occurred.'}
 		</p>
 		<a
-			href="/library"
+			href={resolve('/library')}
 			class="mt-8 inline-block border border-ink bg-ink px-6 py-2.5 text-sm text-paper hover:bg-ink/90"
 		>
 			Back to your library

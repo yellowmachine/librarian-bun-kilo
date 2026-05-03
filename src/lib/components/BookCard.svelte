@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { BookOpen } from 'phosphor-svelte';
+	import { resolve } from '$app/paths';
 
 	interface Props {
 		title: string;
@@ -57,7 +58,7 @@
 {#if variant === 'grid'}
 	<!-- ── Grid: portada vertical + título/autor debajo ─────────────────── -->
 	{#if href}
-		<a {href} class="group w-full min-w-0 space-y-2">
+		<a href={resolve(href)} class="group w-full min-w-0 space-y-2">
 			{@render cover('w-full aspect-[2/3] transition-opacity duration-200 group-hover:opacity-80')}
 			<div class="space-y-0.5">
 				<p class="text-xs leading-snug font-medium text-ink">{title}</p>
@@ -80,7 +81,7 @@
 {:else if variant === 'list'}
 	<!-- ── List: fila horizontal (resultados búsqueda) ───────────────────── -->
 	{#if href}
-		<a {href} class="flex w-full items-center gap-4 py-4 hover:bg-paper-ui">
+		<a href={resolve(href)} class="flex w-full items-center gap-4 py-4 hover:bg-paper-ui">
 			{@render cover('h-16 w-11')}
 			<div class="min-w-0 flex-1">
 				<p class="truncate text-sm font-medium text-ink">{title}</p>

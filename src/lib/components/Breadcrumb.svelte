@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 
 	type Crumb = { label: string; href?: string };
 
 	const crumbs = $derived.by((): Crumb[] => {
 		const path = page.url.pathname;
-		const data = page.data as Record<string, any>;
+		const data = page.data as Record<string, unknown>;
 
 		// Raíces — sin breadcrumb
 		if (path === '/library' || path === '/groups' || path === '/loans') return [];
@@ -62,12 +63,12 @@
 
 {#if crumbs.length > 0}
 	<nav aria-label="Breadcrumb" class="mb-6 flex items-center gap-1.5 text-xs text-ink-faint">
-		{#each crumbs as crumb, i}
+		{#each crumbs as crumb, i (crumb.label)}
 			{#if i > 0}
 				<span aria-hidden="true">›</span>
 			{/if}
 			{#if crumb.href}
-				<a href={crumb.href} class="hover:text-ink-muted">{crumb.label}</a>
+				<a href={resolve(crumb.href)} class="hover:text-ink-muted">{crumb.label}</a>
 			{:else}
 				<span class="text-ink-muted">{crumb.label}</span>
 			{/if}

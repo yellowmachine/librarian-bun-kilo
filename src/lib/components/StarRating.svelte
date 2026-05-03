@@ -44,7 +44,7 @@
 	role={readonly ? 'img' : 'group'}
 	aria-label="Puntuación {value} de 5"
 >
-	{#each [1, 2, 3, 4, 5] as star}
+	{#each [1, 2, 3, 4, 5] as star (star)}
 		{#if readonly}
 			<svg
 				width={size}

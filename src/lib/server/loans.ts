@@ -13,466 +13,464 @@ const effectiveAuthors = sql<string[]>`COALESCE(${userBooks.authors}, ${books.au
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export type LoanStatus =
-  | 'requested'
-  | 'accepted'
-  | 'active'
-  | 'return_requested'
-  | 'returned'
-  | 'rejected'
-  | 'cancelled';
+	| 'requested'
+	| 'accepted'
+	| 'active'
+	| 'return_requested'
+	| 'returned'
+	| 'rejected'
+	| 'cancelled';
 
 export type LoanWithDetails = {
-  id: string;
-  status: LoanStatus;
-  requestedAt: Date;
-  acceptedAt: Date | null;
-  activeAt: Date | null;
-  returnRequestedAt: Date | null;
-  returnedAt: Date | null;
-  dueDate: Date | null;
-  notes: string | null;
-  ownerNotes: string | null;
-  // Libro
-  userBookId: string;
-  bookId: string | null;
-  title: string;
-  authors: string[];
-  coverUrl: string | null;
-  // Personas
-  borrowerId: string;
-  borrowerName: string;
-  borrowerEmail: string;
-  ownerId: string;
-  ownerName: string;
-  ownerEmail: string;
+	id: string;
+	status: LoanStatus;
+	requestedAt: Date;
+	acceptedAt: Date | null;
+	activeAt: Date | null;
+	returnRequestedAt: Date | null;
+	returnedAt: Date | null;
+	dueDate: Date | null;
+	notes: string | null;
+	ownerNotes: string | null;
+	// Libro
+	userBookId: string;
+	bookId: string | null;
+	title: string;
+	authors: string[];
+	coverUrl: string | null;
+	// Personas
+	borrowerId: string;
+	borrowerName: string;
+	borrowerEmail: string;
+	ownerId: string;
+	ownerName: string;
+	ownerEmail: string;
 };
 
 // ─── Solicitar préstamo ───────────────────────────────────────────────────────
 
 export async function requestLoan(
-  borrowerId: string,
-  userBookId: string,
-  notes?: string
+	borrowerId: string,
+	userBookId: string,
+	notes?: string
 ): Promise<string> {
-  const { loanId, ownerId, bookTitle } = await withRLS(borrowerId, async (tx) => {
-    // user_books_select_in_group policy allows borrower to read the book via shared tags
-    const ubRows = await tx
-      .select({
-        userId: userBooks.userId,
-        isAvailable: userBooks.isAvailable,
-        bookId: userBooks.bookId,
-        manualTitle: userBooks.title
-      })
-      .from(userBooks)
-      .where(eq(userBooks.id, userBookId));
+	const { loanId, ownerId, bookTitle } = await withRLS(borrowerId, async (tx) => {
+		// user_books_select_in_group policy allows borrower to read the book via shared tags
+		const ubRows = await tx
+			.select({
+				userId: userBooks.userId,
+				isAvailable: userBooks.isAvailable,
+				bookId: userBooks.bookId,
+				manualTitle: userBooks.title
+			})
+			.from(userBooks)
+			.where(eq(userBooks.id, userBookId));
 
-    if (ubRows.length === 0) throw new Error('Book not found');
-    const { userId: ownerId, isAvailable, bookId, manualTitle } = ubRows[0];
+		if (ubRows.length === 0) throw new Error('Book not found');
+		const { userId: ownerId, isAvailable, bookId, manualTitle } = ubRows[0];
 
-    if (!isAvailable) throw new Error('Book is not available');
-    if (ownerId === borrowerId) throw new Error("You can't request your own book.");
+		if (!isAvailable) throw new Error('Book is not available');
+		if (ownerId === borrowerId) throw new Error("You can't request your own book.");
 
-    // Check for existing active/pending loan (loans are visible to both parties via RLS)
-    const existing = await tx
-      .select({ id: loans.id })
-      .from(loans)
-      .where(
-        and(
-          eq(loans.userBookId, userBookId),
-          inArray(loans.status, ['requested', 'accepted', 'active'])
-        )
-      );
-    if (existing.length > 0) throw new Error('There is already an active request for this book.');
+		// Check for existing active/pending loan (loans are visible to both parties via RLS)
+		const existing = await tx
+			.select({ id: loans.id })
+			.from(loans)
+			.where(
+				and(
+					eq(loans.userBookId, userBookId),
+					inArray(loans.status, ['requested', 'accepted', 'active'])
+				)
+			);
+		if (existing.length > 0) throw new Error('There is already an active request for this book.');
 
-    const bookRows = bookId
-      ? await tx.select({ title: books.title }).from(books).where(eq(books.id, bookId))
-      : [];
+		const bookRows = bookId
+			? await tx.select({ title: books.title }).from(books).where(eq(books.id, bookId))
+			: [];
 
-    const id = nanoid();
-    await tx.insert(loans).values({
-      id,
-      userBookId,
-      borrowerId,
-      ownerId,
-      status: 'requested',
-      notes: notes ?? null
-    });
+		const id = nanoid();
+		await tx.insert(loans).values({
+			id,
+			userBookId,
+			borrowerId,
+			ownerId,
+			status: 'requested',
+			notes: notes ?? null
+		});
 
-    return { loanId: id, ownerId, bookTitle: bookRows[0]?.title ?? manualTitle ?? '' };
-  });
+		return { loanId: id, ownerId, bookTitle: bookRows[0]?.title ?? manualTitle ?? '' };
+	});
 
-  // Notificar al owner — queries solo a la tabla user (sin RLS) para obtener nombres y emails
-  const [borrowerRow, ownerRow] = await Promise.all([
-    db.select({ name: user.name }).from(user).where(eq(user.id, borrowerId)),
-    db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, ownerId))
-  ]);
+	// Notificar al owner — queries solo a la tabla user (sin RLS) para obtener nombres y emails
+	const [borrowerRow, ownerRow] = await Promise.all([
+		db.select({ name: user.name }).from(user).where(eq(user.id, borrowerId)),
+		db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, ownerId))
+	]);
 
-  if (ownerRow[0]?.email && bookTitle) {
-    sendLoanRequestEmail({
-      to: ownerRow[0].email,
-      ownerName: ownerRow[0].name ?? '',
-      borrowerName: borrowerRow[0]?.name ?? '',
-      bookTitle,
-      loanId,
-      notes
-    }).catch((err) => console.error('[email] sendLoanRequestEmail failed:', err));
-  }
+	if (ownerRow[0]?.email && bookTitle) {
+		sendLoanRequestEmail({
+			to: ownerRow[0].email,
+			ownerName: ownerRow[0].name ?? '',
+			borrowerName: borrowerRow[0]?.name ?? '',
+			bookTitle,
+			loanId,
+			notes
+		}).catch((err) => console.error('[email] sendLoanRequestEmail failed:', err));
+	}
 
-  return loanId;
+	return loanId;
 }
 
 // ─── Listar préstamos del usuario ─────────────────────────────────────────────
 
 export async function getUserLoans(userId: string): Promise<{
-  asOwner: LoanWithDetails[];
-  asBorrower: LoanWithDetails[];
+	asOwner: LoanWithDetails[];
+	asBorrower: LoanWithDetails[];
 }> {
-  const rows = await withRLS(userId, async (tx) => {
-    // Dos queries separadas porque Drizzle no soporta bien self-joins con alias
-    const ownerLoans = await tx
-      .select({
-        id: loans.id,
-        status: loans.status,
-        requestedAt: loans.requestedAt,
-        acceptedAt: loans.acceptedAt,
-        activeAt: loans.activeAt,
-        returnRequestedAt: loans.returnRequestedAt,
-        returnedAt: loans.returnedAt,
-        dueDate: loans.dueDate,
-        notes: loans.notes,
-        ownerNotes: loans.ownerNotes,
-        userBookId: loans.userBookId,
-        bookId: userBooks.bookId,
-        title: effectiveTitle,
-        authors: effectiveAuthors,
-        coverUrl: books.coverUrl,
-        borrowerId: loans.borrowerId,
-        ownerId: loans.ownerId
-      })
-      .from(loans)
-      .innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-      .leftJoin(books, eq(userBooks.bookId, books.id))
-      .where(eq(loans.ownerId, userId));
+	const rows = await withRLS(userId, async (tx) => {
+		// Dos queries separadas porque Drizzle no soporta bien self-joins con alias
+		const ownerLoans = await tx
+			.select({
+				id: loans.id,
+				status: loans.status,
+				requestedAt: loans.requestedAt,
+				acceptedAt: loans.acceptedAt,
+				activeAt: loans.activeAt,
+				returnRequestedAt: loans.returnRequestedAt,
+				returnedAt: loans.returnedAt,
+				dueDate: loans.dueDate,
+				notes: loans.notes,
+				ownerNotes: loans.ownerNotes,
+				userBookId: loans.userBookId,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
+				coverUrl: books.coverUrl,
+				borrowerId: loans.borrowerId,
+				ownerId: loans.ownerId
+			})
+			.from(loans)
+			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(loans.ownerId, userId));
 
-    const borrowerLoans = await tx
-      .select({
-        id: loans.id,
-        status: loans.status,
-        requestedAt: loans.requestedAt,
-        acceptedAt: loans.acceptedAt,
-        activeAt: loans.activeAt,
-        returnRequestedAt: loans.returnRequestedAt,
-        returnedAt: loans.returnedAt,
-        dueDate: loans.dueDate,
-        notes: loans.notes,
-        ownerNotes: loans.ownerNotes,
-        userBookId: loans.userBookId,
-        bookId: userBooks.bookId,
-        title: effectiveTitle,
-        authors: effectiveAuthors,
-        coverUrl: books.coverUrl,
-        borrowerId: loans.borrowerId,
-        ownerId: loans.ownerId
-      })
-      .from(loans)
-      .innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-      .leftJoin(books, eq(userBooks.bookId, books.id))
-      .where(eq(loans.borrowerId, userId));
+		const borrowerLoans = await tx
+			.select({
+				id: loans.id,
+				status: loans.status,
+				requestedAt: loans.requestedAt,
+				acceptedAt: loans.acceptedAt,
+				activeAt: loans.activeAt,
+				returnRequestedAt: loans.returnRequestedAt,
+				returnedAt: loans.returnedAt,
+				dueDate: loans.dueDate,
+				notes: loans.notes,
+				ownerNotes: loans.ownerNotes,
+				userBookId: loans.userBookId,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
+				coverUrl: books.coverUrl,
+				borrowerId: loans.borrowerId,
+				ownerId: loans.ownerId
+			})
+			.from(loans)
+			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(loans.borrowerId, userId));
 
-    return { ownerLoans, borrowerLoans };
-  });
+		return { ownerLoans, borrowerLoans };
+	});
 
-  // Resolver nombres de usuarios implicados
-  const allUserIds = [
-    ...new Set([
-      ...rows.ownerLoans.map((r) => r.borrowerId),
-      ...rows.borrowerLoans.map((r) => r.ownerId)
-    ])
-  ];
+	// Resolver nombres de usuarios implicados
+	const allUserIds = [
+		...new Set([
+			...rows.ownerLoans.map((r) => r.borrowerId),
+			...rows.borrowerLoans.map((r) => r.ownerId)
+		])
+	];
 
-  const userRows =
-    allUserIds.length > 0
-      ? await db
-        .select({ id: user.id, name: user.name, email: user.email })
-        .from(user)
-        .where(inArray(user.id, allUserIds))
-      : [];
+	const userRows =
+		allUserIds.length > 0
+			? await db
+					.select({ id: user.id, name: user.name, email: user.email })
+					.from(user)
+					.where(inArray(user.id, allUserIds))
+			: [];
 
-  const userMap = new Map(userRows.map((u) => [u.id, u]));
+	const userMap = new Map(userRows.map((u) => [u.id, u]));
 
-  // Datos del propio usuario
-  const selfRows = await db
-    .select({ id: user.id, name: user.name, email: user.email })
-    .from(user)
-    .where(eq(user.id, userId));
-  const self = selfRows[0] ?? { id: userId, name: 'You', email: '' };
+	// Datos del propio usuario
+	const selfRows = await db
+		.select({ id: user.id, name: user.name, email: user.email })
+		.from(user)
+		.where(eq(user.id, userId));
+	const self = selfRows[0] ?? { id: userId, name: 'You', email: '' };
 
-  function enrich(row: (typeof rows.ownerLoans)[0], asOwner: boolean): LoanWithDetails {
-    const borrowerInfo = asOwner ? (userMap.get(row.borrowerId) ?? { name: '?', email: '' }) : self;
-    const ownerInfo = asOwner ? self : (userMap.get(row.ownerId) ?? { name: '?', email: '' });
-    return {
-      ...row,
-      status: row.status as LoanStatus,
-      authors: row.authors ?? [],
-      borrowerName: borrowerInfo.name,
-      borrowerEmail: borrowerInfo.email ?? '',
-      ownerName: ownerInfo.name,
-      ownerEmail: ownerInfo.email ?? ''
-    };
-  }
+	function enrich(row: (typeof rows.ownerLoans)[0], asOwner: boolean): LoanWithDetails {
+		const borrowerInfo = asOwner ? (userMap.get(row.borrowerId) ?? { name: '?', email: '' }) : self;
+		const ownerInfo = asOwner ? self : (userMap.get(row.ownerId) ?? { name: '?', email: '' });
+		return {
+			...row,
+			status: row.status as LoanStatus,
+			authors: row.authors ?? [],
+			borrowerName: borrowerInfo.name,
+			borrowerEmail: borrowerInfo.email ?? '',
+			ownerName: ownerInfo.name,
+			ownerEmail: ownerInfo.email ?? ''
+		};
+	}
 
-  return {
-    asOwner: rows.ownerLoans.map((r) => enrich(r, true)),
-    asBorrower: rows.borrowerLoans.map((r) => enrich(r, false))
-  };
+	return {
+		asOwner: rows.ownerLoans.map((r) => enrich(r, true)),
+		asBorrower: rows.borrowerLoans.map((r) => enrich(r, false))
+	};
 }
 
 // ─── Obtener préstamo por ID ──────────────────────────────────────────────────
 
 export async function getLoan(userId: string, loanId: string): Promise<LoanWithDetails | null> {
+	const rows = await withRLS(userId, (tx) =>
+		tx
+			.select({
+				id: loans.id,
+				status: loans.status,
+				requestedAt: loans.requestedAt,
+				acceptedAt: loans.acceptedAt,
+				activeAt: loans.activeAt,
+				returnRequestedAt: loans.returnRequestedAt,
+				returnedAt: loans.returnedAt,
+				dueDate: loans.dueDate,
+				notes: loans.notes,
+				ownerNotes: loans.ownerNotes,
+				userBookId: loans.userBookId,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
+				coverUrl: books.coverUrl,
+				borrowerId: loans.borrowerId,
+				ownerId: loans.ownerId
+			})
+			.from(loans)
+			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(loans.id, loanId))
+	);
 
-  const rows = await withRLS(userId, (tx) =>
-    tx
-      .select({
-        id: loans.id,
-        status: loans.status,
-        requestedAt: loans.requestedAt,
-        acceptedAt: loans.acceptedAt,
-        activeAt: loans.activeAt,
-        returnRequestedAt: loans.returnRequestedAt,
-        returnedAt: loans.returnedAt,
-        dueDate: loans.dueDate,
-        notes: loans.notes,
-        ownerNotes: loans.ownerNotes,
-        userBookId: loans.userBookId,
-        bookId: userBooks.bookId,
-        title: effectiveTitle,
-        authors: effectiveAuthors,
-        coverUrl: books.coverUrl,
-        borrowerId: loans.borrowerId,
-        ownerId: loans.ownerId
-      })
-      .from(loans)
-      .innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-      .leftJoin(books, eq(userBooks.bookId, books.id))
-      .where(eq(loans.id, loanId))
-  );
+	if (rows.length === 0) return null;
+	const row = rows[0];
 
-  if (rows.length === 0) return null;
-  const row = rows[0];
+	const involvedIds = [...new Set([row.borrowerId, row.ownerId])];
+	const userRows = await db
+		.select({ id: user.id, name: user.name, email: user.email })
+		.from(user)
+		.where(inArray(user.id, involvedIds));
 
-  const involvedIds = [...new Set([row.borrowerId, row.ownerId])];
-  const userRows = await db
-    .select({ id: user.id, name: user.name, email: user.email })
-    .from(user)
-    .where(inArray(user.id, involvedIds));
+	const userMap = new Map(userRows.map((u) => [u.id, u]));
+	const borrower = userMap.get(row.borrowerId) ?? { name: '?', email: '' };
+	const owner = userMap.get(row.ownerId) ?? { name: '?', email: '' };
 
-  const userMap = new Map(userRows.map((u) => [u.id, u]));
-  const borrower = userMap.get(row.borrowerId) ?? { name: '?', email: '' };
-  const owner = userMap.get(row.ownerId) ?? { name: '?', email: '' };
-
-  return {
-    ...row,
-    status: row.status as LoanStatus,
-    authors: row.authors ?? [],
-    borrowerName: borrower.name,
-    borrowerEmail: borrower.email ?? '',
-    ownerName: owner.name,
-    ownerEmail: owner.email ?? ''
-  };
+	return {
+		...row,
+		status: row.status as LoanStatus,
+		authors: row.authors ?? [],
+		borrowerName: borrower.name,
+		borrowerEmail: borrower.email ?? '',
+		ownerName: owner.name,
+		ownerEmail: owner.email ?? ''
+	};
 }
 
 // ─── Transiciones de estado ───────────────────────────────────────────────────
 
 type StatusTransition = {
-  from: LoanStatus[];
-  to: LoanStatus;
-  actor: 'owner' | 'borrower';
-  // Campos adicionales a actualizar junto al status
-  extraFields?: Partial<typeof loans.$inferInsert>;
+	from: LoanStatus[];
+	to: LoanStatus;
+	actor: 'owner' | 'borrower';
+	// Campos adicionales a actualizar junto al status
+	extraFields?: Partial<typeof loans.$inferInsert>;
 };
 
 const TRANSITIONS: StatusTransition[] = [
-  { from: ['requested'], to: 'accepted', actor: 'owner', extraFields: { acceptedAt: new Date() } },
-  { from: ['requested'], to: 'rejected', actor: 'owner' },
-  { from: ['requested'], to: 'cancelled', actor: 'borrower' },
-  { from: ['accepted'], to: 'active', actor: 'owner', extraFields: { activeAt: new Date() } },
-  { from: ['accepted'], to: 'cancelled', actor: 'borrower' },
-  {
-    from: ['active'],
-    to: 'return_requested',
-    actor: 'borrower',
-    extraFields: { returnRequestedAt: new Date() }
-  },
-  {
-    from: ['return_requested'],
-    to: 'returned',
-    actor: 'owner',
-    extraFields: { returnedAt: new Date() }
-  },
-  { from: ['return_requested'], to: 'active', actor: 'owner' } // owner rechaza la devolución
+	{ from: ['requested'], to: 'accepted', actor: 'owner', extraFields: { acceptedAt: new Date() } },
+	{ from: ['requested'], to: 'rejected', actor: 'owner' },
+	{ from: ['requested'], to: 'cancelled', actor: 'borrower' },
+	{ from: ['accepted'], to: 'active', actor: 'owner', extraFields: { activeAt: new Date() } },
+	{ from: ['accepted'], to: 'cancelled', actor: 'borrower' },
+	{
+		from: ['active'],
+		to: 'return_requested',
+		actor: 'borrower',
+		extraFields: { returnRequestedAt: new Date() }
+	},
+	{
+		from: ['return_requested'],
+		to: 'returned',
+		actor: 'owner',
+		extraFields: { returnedAt: new Date() }
+	},
+	{ from: ['return_requested'], to: 'active', actor: 'owner' } // owner rechaza la devolución
 ];
 
 export async function transitionLoan(
-  userId: string,
-  loanId: string,
-  toStatus: LoanStatus,
-  ownerNotes?: string
+	userId: string,
+	loanId: string,
+	toStatus: LoanStatus,
+	ownerNotes?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const loan = await getLoan(userId, loanId);
-  if (!loan) return { success: false, error: 'Préstamo no encontrado' };
+	const loan = await getLoan(userId, loanId);
+	if (!loan) return { success: false, error: 'Préstamo no encontrado' };
 
-  const isOwner = loan.ownerId === userId;
-  const isBorrower = loan.borrowerId === userId;
-  const actor: 'owner' | 'borrower' = isOwner ? 'owner' : 'borrower';
+	const isOwner = loan.ownerId === userId;
+	const actor: 'owner' | 'borrower' = isOwner ? 'owner' : 'borrower';
 
-  const transition = TRANSITIONS.find(
-    (t) => t.to === toStatus && t.from.includes(loan.status) && t.actor === actor
-  );
+	const transition = TRANSITIONS.find(
+		(t) => t.to === toStatus && t.from.includes(loan.status) && t.actor === actor
+	);
 
-  if (!transition) {
-    return { success: false, error: `Transición no permitida: ${loan.status} → ${toStatus}` };
-  }
+	if (!transition) {
+		return { success: false, error: `Transición no permitida: ${loan.status} → ${toStatus}` };
+	}
 
-  // Calcular campos extra con timestamps frescos en el momento de ejecutar
-  const extraFields: Record<string, unknown> = {};
-  if (toStatus === 'accepted') extraFields.acceptedAt = new Date();
-  if (toStatus === 'active') extraFields.activeAt = new Date();
-  if (toStatus === 'return_requested') extraFields.returnRequestedAt = new Date();
-  if (toStatus === 'returned') extraFields.returnedAt = new Date();
+	// Calcular campos extra con timestamps frescos en el momento de ejecutar
+	const extraFields: Record<string, unknown> = {};
+	if (toStatus === 'accepted') extraFields.acceptedAt = new Date();
+	if (toStatus === 'active') extraFields.activeAt = new Date();
+	if (toStatus === 'return_requested') extraFields.returnRequestedAt = new Date();
+	if (toStatus === 'returned') extraFields.returnedAt = new Date();
 
-  await withRLS(userId, async (tx) => {
-    await tx
-      .update(loans)
-      .set({
-        status: toStatus,
-        ...extraFields,
-        ...(toStatus === 'accepted' && ownerNotes ? { ownerNotes } : {})
-      })
-      .where(eq(loans.id, loanId));
+	await withRLS(userId, async (tx) => {
+		await tx
+			.update(loans)
+			.set({
+				status: toStatus,
+				...extraFields,
+				...(toStatus === 'accepted' && ownerNotes ? { ownerNotes } : {})
+			})
+			.where(eq(loans.id, loanId));
 
-    // Si el préstamo se activa, marcar el libro como no disponible
-    if (toStatus === 'active') {
-      await tx
-        .update(userBooks)
-        .set({ isAvailable: false, updatedAt: new Date() })
-        .where(eq(userBooks.id, loan.userBookId));
-    }
+		// Si el préstamo se activa, marcar el libro como no disponible
+		if (toStatus === 'active') {
+			await tx
+				.update(userBooks)
+				.set({ isAvailable: false, updatedAt: new Date() })
+				.where(eq(userBooks.id, loan.userBookId));
+		}
 
-    // Si se devuelve, cancela o rechaza → libro disponible de nuevo
-    if (['returned', 'rejected', 'cancelled'].includes(toStatus)) {
-      await tx
-        .update(userBooks)
-        .set({ isAvailable: true, updatedAt: new Date() })
-        .where(eq(userBooks.id, loan.userBookId));
-    }
-  });
+		// Si se devuelve, cancela o rechaza → libro disponible de nuevo
+		if (['returned', 'rejected', 'cancelled'].includes(toStatus)) {
+			await tx
+				.update(userBooks)
+				.set({ isAvailable: true, updatedAt: new Date() })
+				.where(eq(userBooks.id, loan.userBookId));
+		}
+	});
 
-  // Notificar al borrower cuando el owner acepta
-  if (toStatus === 'accepted') {
-    sendLoanAcceptedEmail({
-      to: loan.borrowerEmail,
-      borrowerName: loan.borrowerName,
-      ownerName: loan.ownerName,
-      bookTitle: loan.title,
-      loanId,
-      notes: ownerNotes ?? null
-    }).catch((err) => console.error('[email] sendLoanAcceptedEmail failed:', err));
-  }
+	// Notificar al borrower cuando el owner acepta
+	if (toStatus === 'accepted') {
+		sendLoanAcceptedEmail({
+			to: loan.borrowerEmail,
+			borrowerName: loan.borrowerName,
+			ownerName: loan.ownerName,
+			bookTitle: loan.title,
+			loanId,
+			notes: ownerNotes ?? null
+		}).catch((err) => console.error('[email] sendLoanAcceptedEmail failed:', err));
+	}
 
-  return { success: true };
+	return { success: true };
 }
 
 // ─── Cargar libro ajeno para solicitar préstamo ───────────────────────────────
 
 export type BorrowableBook = {
-  userBookId: string;
-  bookId: string | null;
-  title: string;
-  authors: string[];
-  coverUrl: string | null;
-  publishYear: number | null;
-  isAvailable: boolean;
-  ownerId: string;
-  ownerName: string;
-  existingLoanId: string | null;
-  existingLoanStatus: LoanStatus | null;
+	userBookId: string;
+	bookId: string | null;
+	title: string;
+	authors: string[];
+	coverUrl: string | null;
+	publishYear: number | null;
+	isAvailable: boolean;
+	ownerId: string;
+	ownerName: string;
+	existingLoanId: string | null;
+	existingLoanStatus: LoanStatus | null;
 };
 
 export async function getBookForBorrow(
-  userId: string,
-  userBookId: string
+	userId: string,
+	userBookId: string
 ): Promise<BorrowableBook | null> {
-  return withRLS(userId, async (tx) => {
-    // RLS user_books_select_in_group permite ver libros ajenos vía shared_tags
-    const rows = await tx
-      .select({
-        userBookId: userBooks.id,
-        bookId: userBooks.bookId,
-        title: effectiveTitle,
-        authors: effectiveAuthors,
-        coverUrl: books.coverUrl,
-        publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
-        isAvailable: userBooks.isAvailable,
-        ownerId: userBooks.userId
-      })
-      .from(userBooks)
-      .leftJoin(books, eq(userBooks.bookId, books.id))
-      .where(eq(userBooks.id, userBookId));
+	return withRLS(userId, async (tx) => {
+		// RLS user_books_select_in_group permite ver libros ajenos vía shared_tags
+		const rows = await tx
+			.select({
+				userBookId: userBooks.id,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
+				coverUrl: books.coverUrl,
+				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
+				isAvailable: userBooks.isAvailable,
+				ownerId: userBooks.userId
+			})
+			.from(userBooks)
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(userBooks.id, userBookId));
 
-    if (rows.length === 0) return null;
-    const row = rows[0];
-    if (row.ownerId === userId) return null; // No se puede pedir el propio libro
+		if (rows.length === 0) return null;
+		const row = rows[0];
+		if (row.ownerId === userId) return null; // No se puede pedir el propio libro
 
-    const ownerRows = await db
-      .select({ name: user.name })
-      .from(user)
-      .where(eq(user.id, row.ownerId));
+		const ownerRows = await db
+			.select({ name: user.name })
+			.from(user)
+			.where(eq(user.id, row.ownerId));
 
-    // Préstamo activo del usuario para este libro (borrower = userId)
-    const existingRows = await tx
-      .select({ id: loans.id, status: loans.status })
-      .from(loans)
-      .where(
-        and(
-          eq(loans.userBookId, userBookId),
-          eq(loans.borrowerId, userId),
-          inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
-        )
-      );
+		// Préstamo activo del usuario para este libro (borrower = userId)
+		const existingRows = await tx
+			.select({ id: loans.id, status: loans.status })
+			.from(loans)
+			.where(
+				and(
+					eq(loans.userBookId, userBookId),
+					eq(loans.borrowerId, userId),
+					inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+				)
+			);
 
-    return {
-      ...row,
-      authors: row.authors ?? [],
-      ownerName: ownerRows[0]?.name ?? '?',
-      existingLoanId: existingRows[0]?.id ?? null,
-      existingLoanStatus: (existingRows[0]?.status as LoanStatus) ?? null
-    };
-  });
+		return {
+			...row,
+			authors: row.authors ?? [],
+			ownerName: ownerRows[0]?.name ?? '?',
+			existingLoanId: existingRows[0]?.id ?? null,
+			existingLoanStatus: (existingRows[0]?.status as LoanStatus) ?? null
+		};
+	});
 }
 
 // ─── Contar préstamos pendientes de acción ────────────────────────────────────
 // Usado para el badge de notificaciones en el nav.
 
 export async function getPendingCount(userId: string): Promise<number> {
-  const rows = await withRLS(userId, (tx) =>
-    tx
-      .select({
-        id: loans.id,
-        status: loans.status,
-        ownerId: loans.ownerId,
-        borrowerId: loans.borrowerId
-      })
-      .from(loans)
-      .where(
-        or(
-          // Como owner: solicitudes recibidas o devoluciones solicitadas
-          and(eq(loans.ownerId, userId), inArray(loans.status, ['requested', 'return_requested'])),
-          // Como borrower: préstamos aceptados (pendientes de recoger)
-          and(eq(loans.borrowerId, userId), eq(loans.status, 'accepted'))
-        )
-      )
-  );
+	const rows = await withRLS(userId, (tx) =>
+		tx
+			.select({
+				id: loans.id,
+				status: loans.status,
+				ownerId: loans.ownerId,
+				borrowerId: loans.borrowerId
+			})
+			.from(loans)
+			.where(
+				or(
+					// Como owner: solicitudes recibidas o devoluciones solicitadas
+					and(eq(loans.ownerId, userId), inArray(loans.status, ['requested', 'return_requested'])),
+					// Como borrower: préstamos aceptados (pendientes de recoger)
+					and(eq(loans.borrowerId, userId), eq(loans.status, 'accepted'))
+				)
+			)
+	);
 
-  return rows.length;
+	return rows.length;
 }
