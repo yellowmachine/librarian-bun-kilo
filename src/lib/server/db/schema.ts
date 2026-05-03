@@ -355,11 +355,12 @@ export const groupMembers = librarianSchema.table(
 			// Usa SECURITY DEFINER para evitar recursión auto-referencial.
 			using: sql`${table.userId} = ${currentUserId} or ${isGroupMember(table.groupId, currentUserId)}`
 		}),
-		// El flujo joinGroupByCode corre como superuser (bypass RLS).
-		pgPolicy('group_members_insert_self', {
+		// Solo owner/admin puede añadir miembros. El flujo joinGroupByCode
+		// corre como superuser (bypass RLS), así que no necesita esta policy.
+		pgPolicy('group_members_insert', {
 			for: 'insert',
 			to: appUser,
-			withCheck: sql`${table.userId} = ${currentUserId}`
+			withCheck: isGroupAdmin(table.groupId, currentUserId)
 		}),
 		pgPolicy('group_members_delete', {
 			for: 'delete',

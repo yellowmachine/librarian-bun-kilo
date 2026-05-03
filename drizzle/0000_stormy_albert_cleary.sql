@@ -65,7 +65,8 @@ CREATE TABLE "librarian"."loans" (
 	"return_requested_at" timestamp,
 	"returned_at" timestamp,
 	"due_date" timestamp,
-	"notes" text
+	"notes" text,
+	"owner_notes" text
 );
 --> statement-breakpoint
 ALTER TABLE "librarian"."loans" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -96,11 +97,17 @@ ALTER TABLE "librarian"."user_book_tags" ENABLE ROW LEVEL SECURITY;--> statement
 CREATE TABLE "librarian"."user_books" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
-	"book_id" text NOT NULL,
+	"book_id" text,
+	"title" text,
+	"authors" text[],
+	"isbn" text,
+	"description" text,
+	"publish_year" integer,
 	"notes" text,
 	"is_available" boolean DEFAULT true NOT NULL,
 	"added_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "user_books_book_or_title" CHECK ("librarian"."user_books"."book_id" IS NOT NULL OR "librarian"."user_books"."title" IS NOT NULL)
 );
 --> statement-breakpoint
 ALTER TABLE "librarian"."user_books" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
@@ -144,7 +151,7 @@ CREATE UNIQUE INDEX "tags_user_name_idx" ON "librarian"."tags" USING btree ("use
 CREATE INDEX "tags_user_idx" ON "librarian"."tags" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "user_book_tags_pk" ON "librarian"."user_book_tags" USING btree ("user_book_id","tag_id");--> statement-breakpoint
 CREATE INDEX "user_book_tags_tag_idx" ON "librarian"."user_book_tags" USING btree ("tag_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "user_books_user_book_idx" ON "librarian"."user_books" USING btree ("user_id","book_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "user_books_user_book_idx" ON "librarian"."user_books" USING btree ("user_id","book_id") WHERE "librarian"."user_books"."book_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "user_books_user_idx" ON "librarian"."user_books" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "user_books_book_idx" ON "librarian"."user_books" USING btree ("book_id");--> statement-breakpoint
 CREATE POLICY "book_reviews_select" ON "librarian"."book_reviews" AS PERMISSIVE FOR SELECT TO "scholio_app" USING (true);--> statement-breakpoint
@@ -155,45 +162,16 @@ CREATE POLICY "books_select" ON "librarian"."books" AS PERMISSIVE FOR SELECT TO 
 CREATE POLICY "books_insert" ON "librarian"."books" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK (true);--> statement-breakpoint
 CREATE POLICY "books_update" ON "librarian"."books" AS PERMISSIVE FOR UPDATE TO "scholio_app" USING (true);--> statement-breakpoint
 CREATE POLICY "group_invite_codes_select" ON "librarian"."group_invite_codes" AS PERMISSIVE FOR SELECT TO "scholio_app" USING (true);--> statement-breakpoint
-CREATE POLICY "group_invite_codes_insert" ON "librarian"."group_invite_codes" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK (exists (
-        select 1 from "librarian".group_members gm
-        where gm.group_id = "librarian"."group_invite_codes"."group_id"
-          and gm.user_id = current_setting('app.current_user_id', true)
-          and gm.role in ('owner', 'admin')
-      ));--> statement-breakpoint
-CREATE POLICY "group_invite_codes_update" ON "librarian"."group_invite_codes" AS PERMISSIVE FOR UPDATE TO "scholio_app" USING (exists (
-        select 1 from "librarian".group_members gm
-        where gm.group_id = "librarian"."group_invite_codes"."group_id"
-          and gm.user_id = current_setting('app.current_user_id', true)
-          and gm.role in ('owner', 'admin')
-      ));--> statement-breakpoint
-CREATE POLICY "group_invite_codes_delete" ON "librarian"."group_invite_codes" AS PERMISSIVE FOR DELETE TO "scholio_app" USING (exists (
-        select 1 from "librarian".group_members gm
-        where gm.group_id = "librarian"."group_invite_codes"."group_id"
-          and gm.user_id = current_setting('app.current_user_id', true)
-          and gm.role in ('owner', 'admin')
-      ));--> statement-breakpoint
-CREATE POLICY "group_members_select" ON "librarian"."group_members" AS PERMISSIVE FOR SELECT TO "scholio_app" USING ("librarian"."group_members"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
-CREATE POLICY "group_members_insert_self" ON "librarian"."group_members" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian"."group_members"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
-CREATE POLICY "group_members_delete" ON "librarian"."group_members" AS PERMISSIVE FOR DELETE TO "scholio_app" USING ("librarian"."group_members"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
-CREATE POLICY "groups_select" ON "librarian"."groups" AS PERMISSIVE FOR SELECT TO "scholio_app" USING (exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = "librarian"."groups"."id"
-				  and gm.user_id = current_setting('app.current_user_id', true)
-			));--> statement-breakpoint
+CREATE POLICY "group_invite_codes_insert" ON "librarian"."group_invite_codes" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian".is_group_admin("librarian"."group_invite_codes"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "group_invite_codes_update" ON "librarian"."group_invite_codes" AS PERMISSIVE FOR UPDATE TO "scholio_app" USING ("librarian".is_group_admin("librarian"."group_invite_codes"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "group_invite_codes_delete" ON "librarian"."group_invite_codes" AS PERMISSIVE FOR DELETE TO "scholio_app" USING ("librarian".is_group_admin("librarian"."group_invite_codes"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "group_members_select" ON "librarian"."group_members" AS PERMISSIVE FOR SELECT TO "scholio_app" USING ("librarian"."group_members"."user_id" = current_setting('app.current_user_id', true) or "librarian".is_group_member("librarian"."group_members"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "group_members_insert" ON "librarian"."group_members" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian".is_group_admin("librarian"."group_members"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "group_members_delete" ON "librarian"."group_members" AS PERMISSIVE FOR DELETE TO "scholio_app" USING ("librarian"."group_members"."user_id" = current_setting('app.current_user_id', true) or "librarian".is_group_admin("librarian"."group_members"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "groups_select" ON "librarian"."groups" AS PERMISSIVE FOR SELECT TO "scholio_app" USING ("librarian".is_group_member("librarian"."groups"."id", current_setting('app.current_user_id', true)));--> statement-breakpoint
 CREATE POLICY "groups_insert" ON "librarian"."groups" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian"."groups"."created_by" = current_setting('app.current_user_id', true));--> statement-breakpoint
-CREATE POLICY "groups_update" ON "librarian"."groups" AS PERMISSIVE FOR UPDATE TO "scholio_app" USING (exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = "librarian"."groups"."id"
-				  and gm.user_id = current_setting('app.current_user_id', true)
-				  and gm.role in ('owner', 'admin')
-			));--> statement-breakpoint
-CREATE POLICY "groups_delete" ON "librarian"."groups" AS PERMISSIVE FOR DELETE TO "scholio_app" USING (exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = "librarian"."groups"."id"
-				  and gm.user_id = current_setting('app.current_user_id', true)
-				  and gm.role = 'owner'
-			));--> statement-breakpoint
+CREATE POLICY "groups_update" ON "librarian"."groups" AS PERMISSIVE FOR UPDATE TO "scholio_app" USING ("librarian".is_group_admin("librarian"."groups"."id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "groups_delete" ON "librarian"."groups" AS PERMISSIVE FOR DELETE TO "scholio_app" USING ("librarian".is_group_admin("librarian"."groups"."id", current_setting('app.current_user_id', true)));--> statement-breakpoint
 CREATE POLICY "loans_select" ON "librarian"."loans" AS PERMISSIVE FOR SELECT TO "scholio_app" USING ("librarian"."loans"."owner_id" = current_setting('app.current_user_id', true)
 				or "librarian"."loans"."borrower_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
 CREATE POLICY "loans_insert" ON "librarian"."loans" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian"."loans"."borrower_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
@@ -201,24 +179,9 @@ CREATE POLICY "loans_update" ON "librarian"."loans" AS PERMISSIVE FOR UPDATE TO 
 				or "librarian"."loans"."borrower_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
 CREATE POLICY "loans_delete" ON "librarian"."loans" AS PERMISSIVE FOR DELETE TO "scholio_app" USING ("librarian"."loans"."borrower_id" = current_setting('app.current_user_id', true)
 				and "librarian"."loans"."status" = 'requested');--> statement-breakpoint
-CREATE POLICY "shared_tags_select" ON "librarian"."shared_tags" AS PERMISSIVE FOR SELECT TO "scholio_app" USING (exists (
-				select 1 from "librarian".group_members gm
-				where gm.group_id = "librarian"."shared_tags"."group_id"
-				  and gm.user_id = current_setting('app.current_user_id', true)
-			));--> statement-breakpoint
-CREATE POLICY "shared_tags_insert" ON "librarian"."shared_tags" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian"."shared_tags"."shared_by" = current_setting('app.current_user_id', true)
-				and exists (
-					select 1 from "librarian".group_members gm
-					where gm.group_id = "librarian"."shared_tags"."group_id"
-					  and gm.user_id = current_setting('app.current_user_id', true)
-				));--> statement-breakpoint
-CREATE POLICY "shared_tags_delete" ON "librarian"."shared_tags" AS PERMISSIVE FOR DELETE TO "scholio_app" USING ("librarian"."shared_tags"."shared_by" = current_setting('app.current_user_id', true)
-				or exists (
-					select 1 from "librarian".group_members gm
-					where gm.group_id = "librarian"."shared_tags"."group_id"
-					  and gm.user_id = current_setting('app.current_user_id', true)
-					  and gm.role in ('owner', 'admin')
-				));--> statement-breakpoint
+CREATE POLICY "shared_tags_select" ON "librarian"."shared_tags" AS PERMISSIVE FOR SELECT TO "scholio_app" USING ("librarian".is_group_member("librarian"."shared_tags"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "shared_tags_insert" ON "librarian"."shared_tags" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian"."shared_tags"."shared_by" = current_setting('app.current_user_id', true) and "librarian".is_group_member("librarian"."shared_tags"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
+CREATE POLICY "shared_tags_delete" ON "librarian"."shared_tags" AS PERMISSIVE FOR DELETE TO "scholio_app" USING ("librarian"."shared_tags"."shared_by" = current_setting('app.current_user_id', true) or "librarian".is_group_admin("librarian"."shared_tags"."group_id", current_setting('app.current_user_id', true)));--> statement-breakpoint
 CREATE POLICY "tags_select" ON "librarian"."tags" AS PERMISSIVE FOR SELECT TO "scholio_app" USING ("librarian"."tags"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
 CREATE POLICY "tags_select_in_group" ON "librarian"."tags" AS PERMISSIVE FOR SELECT TO "scholio_app" USING (exists (
 				select 1 from "librarian".shared_tags st
@@ -257,6 +220,11 @@ CREATE POLICY "user_books_select_in_group" ON "librarian"."user_books" AS PERMIS
 				join "librarian".group_members gm on gm.group_id = st.group_id
 				where ubt.user_book_id = "librarian"."user_books"."id"
 				  and gm.user_id = current_setting('app.current_user_id', true)
+			));--> statement-breakpoint
+CREATE POLICY "user_books_select_on_loan" ON "librarian"."user_books" AS PERMISSIVE FOR SELECT TO "scholio_app" USING (exists (
+				select 1 from "librarian".loans l
+				where l.user_book_id = "librarian"."user_books"."id"
+				  and l.borrower_id = current_setting('app.current_user_id', true)
 			));--> statement-breakpoint
 CREATE POLICY "user_books_insert" ON "librarian"."user_books" AS PERMISSIVE FOR INSERT TO "scholio_app" WITH CHECK ("librarian"."user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
 CREATE POLICY "user_books_update" ON "librarian"."user_books" AS PERMISSIVE FOR UPDATE TO "scholio_app" USING ("librarian"."user_books"."user_id" = current_setting('app.current_user_id', true));--> statement-breakpoint
