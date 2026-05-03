@@ -1,12 +1,36 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
+	import { enhance, applyAction, deserialize } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, BookOpen } from 'phosphor-svelte';
 	import type { LoanWithDetails } from '$lib/server/loans';
 	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let { data, form } = $props();
 	const loan = $derived(data.loan as LoanWithDetails);
 	const currentUserId = $derived(data.currentUserId as string);
+
+	let confirmMessage = $state('');
+	let pendingForm = $state<HTMLFormElement | null>(null);
+
+	function openConfirm(message: string, formEl: HTMLFormElement): void {
+		confirmMessage = message;
+		pendingForm = formEl;
+	}
+
+	async function submitConfirmed() {
+		if (!pendingForm) return;
+		const formEl = pendingForm;
+		pendingForm = null;
+		const response = await fetch(formEl.action, {
+			method: 'POST',
+			body: new FormData(formEl),
+			headers: { 'x-sveltekit-action': 'true' }
+		});
+		const result = deserialize(await response.text());
+		await applyAction(result);
+		invalidateAll();
+	}
 
 	const isOwner = $derived(loan.ownerId === currentUserId);
 	const isBorrower = $derived(loan.borrowerId === currentUserId);
@@ -23,54 +47,54 @@
 		if (isOwner) {
 			if (s === 'requested')
 				return [
-					{ label: 'Aceptar solicitud', toStatus: 'accepted', variant: 'primary' },
+					{ label: 'Accept request', toStatus: 'accepted', variant: 'primary' },
 					{
-						label: 'Rechazar',
+						label: 'Reject',
 						toStatus: 'rejected',
 						variant: 'danger',
-						confirm: '¿Rechazar esta solicitud?'
+						confirm: 'Reject this request?'
 					}
 				];
 			if (s === 'accepted')
-				return [{ label: 'Marcar como entregado', toStatus: 'active', variant: 'primary' }];
+				return [{ label: 'Mark as delivered', toStatus: 'active', variant: 'primary' }];
 			if (s === 'return_requested')
 				return [
-					{ label: 'Confirmar devolución', toStatus: 'returned', variant: 'primary' },
-					{ label: 'Mantener préstamo', toStatus: 'active', variant: 'ghost' }
+					{ label: 'Confirm return', toStatus: 'returned', variant: 'primary' },
+					{ label: 'keep loan', toStatus: 'active', variant: 'ghost' }
 				];
 		}
 		if (isBorrower) {
 			if (s === 'requested')
 				return [
 					{
-						label: 'Cancelar solicitud',
+						label: 'Cancel the request?',
 						toStatus: 'cancelled',
 						variant: 'danger',
-						confirm: '¿Cancelar?'
+						confirm: '¿Cancel?'
 					}
 				];
 			if (s === 'accepted')
 				return [
 					{
-						label: 'Cancelar',
+						label: 'Cancel',
 						toStatus: 'cancelled',
 						variant: 'danger',
-						confirm: '¿Cancelar el préstamo?'
+						confirm: 'Cancel the loan?'
 					}
 				];
 			if (s === 'active')
-				return [{ label: 'Solicitar devolución', toStatus: 'return_requested', variant: 'ghost' }];
+				return [{ label: 'Request return', toStatus: 'return_requested', variant: 'ghost' }];
 		}
 		return [];
 	});
 
 	const timeline = $derived(() =>
 		[
-			{ label: 'Solicitado', date: loan.requestedAt },
-			{ label: 'Aceptado', date: loan.acceptedAt },
-			{ label: 'Entregado', date: loan.activeAt },
-			{ label: 'Dev. solicitada', date: loan.returnRequestedAt },
-			{ label: 'Devuelto', date: loan.returnedAt }
+			{ label: 'Requested', date: loan.requestedAt },
+			{ label: 'Accepted', date: loan.acceptedAt },
+			{ label: 'Delivered', date: loan.activeAt },
+			{ label: 'Return requested', date: loan.returnRequestedAt },
+			{ label: 'Returned', date: loan.returnedAt }
 		].filter((e) => e.date !== null)
 	);
 
@@ -85,11 +109,8 @@
 </script>
 
 <div class="mx-auto max-w-md space-y-10">
-	<a
-		href="/loans"
-		class="inline-flex items-center gap-1.5 text-sm text-neutral-400 hover:text-neutral-900"
-	>
-		<ArrowLeft size={16} /> Préstamos
+	<a href="/loans" class="inline-flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink">
+		<ArrowLeft size={16} /> Loans
 	</a>
 
 	{#if form?.error}
@@ -105,39 +126,49 @@
 				class="h-32 w-22 flex-shrink-0 object-cover shadow-sm"
 			/>
 		{:else}
-			<div class="flex h-32 w-22 flex-shrink-0 items-center justify-center bg-neutral-100">
-				<BookOpen size={28} weight="thin" class="text-neutral-300" />
+			<div class="flex h-32 w-22 flex-shrink-0 items-center justify-center bg-paper-ui">
+				<BookOpen size={28} weight="thin" class="text-ink-faint" />
 			</div>
 		{/if}
 		<div class="min-w-0 space-y-2 pt-1">
-			<h1 class="font-serif text-2xl leading-tight font-normal text-neutral-900">{loan.title}</h1>
+			<h1 class="font-serif text-2xl leading-tight font-normal text-ink">{loan.title}</h1>
 			{#if loan.authors.length > 0}
-				<p class="text-sm text-neutral-500">{loan.authors.join(', ')}</p>
+				<p class="text-sm text-ink-muted">{loan.authors.join(', ')}</p>
 			{/if}
 			<LoanStatusBadge status={loan.status} variant="long" />
 		</div>
 	</div>
 
 	<!-- Partes -->
-	<div class="grid grid-cols-2 gap-px border border-neutral-200 bg-neutral-200">
-		<div class="bg-white px-4 py-4">
-			<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">Propietario</p>
-			<p class="mt-1 font-medium text-neutral-900">{isOwner ? 'Tú' : loan.ownerName}</p>
+	<div class="grid grid-cols-2 gap-px border border-paper-border bg-paper-border">
+		<div class="bg-paper px-4 py-4">
+			<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Owner</p>
+			<p class="mt-1 font-medium text-ink">{isOwner ? 'You' : loan.ownerName}</p>
 		</div>
-		<div class="bg-white px-4 py-4">
-			<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">Prestatario</p>
-			<p class="mt-1 font-medium text-neutral-900">{isBorrower ? 'Tú' : loan.borrowerName}</p>
+		<div class="bg-paper px-4 py-4">
+			<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Borrower</p>
+			<p class="mt-1 font-medium text-ink">{isBorrower ? 'You' : loan.borrowerName}</p>
 		</div>
 		{#if loan.dueDate}
-			<div class="col-span-2 bg-white px-4 py-4">
-				<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">Fecha límite</p>
-				<p class="mt-1 text-sm text-neutral-900">{fmt(loan.dueDate)}</p>
+			<div class="col-span-2 bg-paper px-4 py-4">
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">Deadline</p>
+				<p class="mt-1 text-sm text-ink">{fmt(loan.dueDate)}</p>
 			</div>
 		{/if}
 		{#if loan.notes}
-			<div class="col-span-2 bg-white px-4 py-4">
-				<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">Notas</p>
-				<p class="mt-1 text-sm text-neutral-700">{loan.notes}</p>
+			<div class="col-span-2 bg-paper px-4 py-4">
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">
+					Message from borrower
+				</p>
+				<p class="mt-1 text-sm text-ink-muted">{loan.notes}</p>
+			</div>
+		{/if}
+		{#if loan.ownerNotes}
+			<div class="col-span-2 bg-paper px-4 py-4">
+				<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">
+					Message from owner
+				</p>
+				<p class="mt-1 text-sm text-ink-muted">{loan.ownerNotes}</p>
 			</div>
 		{/if}
 	</div>
@@ -145,12 +176,12 @@
 	<!-- Timeline -->
 	{#if timeline().length > 0}
 		<div class="space-y-3">
-			<p class="text-xs font-medium tracking-widest text-neutral-400 uppercase">Historial</p>
-			<ol class="space-y-2 border-l border-neutral-200 pl-4">
-				{#each timeline() as ev}
+			<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">History</p>
+			<ol class="space-y-2 border-l border-paper-border pl-4">
+				{#each timeline() as ev (ev.label)}
 					<li class="flex items-baseline justify-between gap-4 text-sm">
-						<span class="text-neutral-700">{ev.label}</span>
-						<span class="shrink-0 text-xs text-neutral-400">{fmt(ev.date)}</span>
+						<span class="text-ink-muted">{ev.label}</span>
+						<span class="shrink-0 text-xs text-ink-faint">{fmt(ev.date)}</span>
 					</li>
 				{/each}
 			</ol>
@@ -159,34 +190,60 @@
 
 	<!-- Acciones -->
 	{#if actions().length > 0}
-		<div class="space-y-2 border-t border-neutral-100 pt-4">
-			{#each actions() as action}
-				<form
-					method="POST"
-					action="?/transition"
-					use:enhance
-					onsubmit={(e) => {
-						if (action.confirm && !confirm(action.confirm)) e.preventDefault();
-					}}
-				>
+		<div class="space-y-2 border-t border-paper-border pt-4">
+			{#each actions() as action (action.toStatus)}
+				{#snippet formBody()}
 					<input type="hidden" name="toStatus" value={action.toStatus} />
+					{#if action.toStatus === 'accepted'}
+						<textarea
+							name="ownerNotes"
+							placeholder="Message to the borrower (optional)"
+							rows="2"
+							class="mb-2 w-full resize-none border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+						></textarea>
+					{/if}
 					<button
 						type="submit"
 						class="w-full py-2.5 text-sm transition-colors
-						{action.variant === 'primary'
-							? 'border border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-800'
-							: ''}
+						{action.variant === 'primary' ? 'border border-ink bg-ink text-paper hover:bg-ink/90' : ''}
 						{action.variant === 'danger'
-							? 'border border-neutral-200 text-red-500 hover:border-red-300 hover:bg-red-50'
+							? 'border border-paper-border text-red-500 hover:border-red-300 hover:bg-red-50'
 							: ''}
 						{action.variant === 'ghost'
-							? 'border border-neutral-200 text-neutral-600 hover:border-neutral-400'
+							? 'border border-paper-border text-ink-muted hover:border-ink-faint'
 							: ''}"
 					>
 						{action.label}
 					</button>
-				</form>
+				{/snippet}
+
+				{#if action.confirm}
+					<form
+						method="POST"
+						action="?/transition"
+						onsubmit={(e) => {
+							e.preventDefault();
+							openConfirm(action.confirm!, e.currentTarget as HTMLFormElement);
+						}}
+					>
+						{@render formBody()}
+					</form>
+				{:else}
+					<form method="POST" action="?/transition" use:enhance>
+						{@render formBody()}
+					</form>
+				{/if}
 			{/each}
 		</div>
+	{/if}
+
+	{#if pendingForm}
+		<ConfirmDialog
+			message={confirmMessage}
+			onconfirm={submitConfirmed}
+			oncancel={() => {
+				pendingForm = null;
+			}}
+		/>
 	{/if}
 </div>

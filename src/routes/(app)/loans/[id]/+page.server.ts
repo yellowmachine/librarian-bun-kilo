@@ -12,10 +12,11 @@ export const actions = {
 	transition: async ({ locals, params, request }: RequestEvent) => {
 		const data = await request.formData();
 		const toStatus = data.get('toStatus') as LoanStatus;
+		const ownerNotes = (data.get('ownerNotes') as string | null)?.trim() || undefined;
 
 		if (!toStatus) return fail(400, { error: 'toStatus requerido' });
 
-		const result = await transitionLoan(locals.user!.id, params.id!, toStatus);
+		const result = await transitionLoan(locals.user!.id, params.id!, toStatus, ownerNotes);
 
 		if (!result.success) return fail(400, { error: result.error });
 

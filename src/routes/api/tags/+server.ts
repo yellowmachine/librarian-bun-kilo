@@ -7,7 +7,7 @@ import { tags } from '$lib/server/db/schema';
 
 // GET /api/tags — lista las etiquetas del usuario
 export async function GET({ locals }: RequestEvent) {
-	if (!locals.user) error(401, 'No autenticado');
+	if (!locals.user) error(401, 'Not authenticated.');
 
 	const result = await withRLS(locals.user.id, (tx) =>
 		tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
@@ -18,13 +18,13 @@ export async function GET({ locals }: RequestEvent) {
 // POST /api/tags — crea una etiqueta
 // Body: { name: string, color?: string }
 export async function POST({ locals, request }: RequestEvent) {
-	if (!locals.user) error(401, 'No autenticado');
+	if (!locals.user) error(401, 'Not authenticated.');
 
 	const body = await request.json();
 	const name: string = body.name?.trim();
 	const color: string | undefined = body.color?.trim() || undefined;
 
-	if (!name) error(400, 'El nombre es obligatorio');
+	if (!name) error(400, 'A name is required.');
 
 	const id = nanoid();
 	await withRLS(locals.user.id, (tx) =>

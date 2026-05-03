@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, type TestDb } from '../test-db';
-import { books, userBooks, tags, userBookTags } from '../schema';
+import { books, userBooks, tags } from '../schema';
 import { eq } from 'drizzle-orm';
 
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ async function seedUsers(tdb: TestDb) {
 			VALUES
 				('${ALICE}', 'Alice', 'alice@test.com', true, now(), now()),
 				('${BOB}',   'Bob',   'bob@test.com',   true, now(), now())
-		` as any
+		` as string
 		);
 	});
 }

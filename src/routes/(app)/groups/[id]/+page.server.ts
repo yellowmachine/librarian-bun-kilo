@@ -14,7 +14,7 @@ import {
 
 export const load = async ({ locals, params }: RequestEvent) => {
 	const group = await getGroup(locals.user!.id, params.id!);
-	if (!group) error(404, 'Grupo no encontrado');
+	if (!group) error(404, 'Group not found');
 
 	const [members, sharedTagsList, myTags] = await Promise.all([
 		getGroupMembers(locals.user!.id, params.id!),
@@ -30,7 +30,7 @@ export const actions = {
 	shareTag: async ({ locals, params, request }: RequestEvent) => {
 		const data = await request.formData();
 		const tagId = data.get('tagId') as string;
-		if (!tagId) return fail(400, { error: 'tagId requerido' });
+		if (!tagId) return fail(400, { error: 'tagId required' });
 
 		await shareTagWithGroup(locals.user!.id, tagId, params.id!);
 		return { success: true };
@@ -40,7 +40,7 @@ export const actions = {
 	unshareTag: async ({ locals, params, request }: RequestEvent) => {
 		const data = await request.formData();
 		const tagId = data.get('tagId') as string;
-		if (!tagId) return fail(400, { error: 'tagId requerido' });
+		if (!tagId) return fail(400, { error: 'tagId required' });
 
 		await unshareTag(locals.user!.id, tagId, params.id!);
 		return { success: true };
@@ -56,7 +56,7 @@ export const actions = {
 	removeMember: async ({ locals, params, request }: RequestEvent) => {
 		const data = await request.formData();
 		const targetUserId = data.get('userId') as string;
-		if (!targetUserId) return fail(400, { error: 'userId requerido' });
+		if (!targetUserId) return fail(400, { error: 'userId required' });
 
 		await removeMember(locals.user!.id, params.id!, targetUserId);
 		return { success: true };

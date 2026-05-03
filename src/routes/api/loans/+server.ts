@@ -11,12 +11,12 @@ export async function POST({ locals, request }: RequestEvent) {
 	const userBookId: string = body.userBookId?.trim();
 	const notes: string | undefined = body.notes?.trim() || undefined;
 
-	if (!userBookId) error(400, 'userBookId es obligatorio');
+	if (!userBookId) error(400, 'An userBookId is required.');
 
 	try {
 		const loanId = await requestLoan(locals.user.id, userBookId, notes);
 		return json({ loanId }, { status: 201 });
 	} catch (e) {
-		error(400, e instanceof Error ? e.message : 'Error al solicitar el préstamo');
+		error(400, e instanceof Error ? e.message : 'Error requesting the loan.');
 	}
 }

@@ -1,15 +1,19 @@
-import { nanoid } from 'nanoid';
-import { eq, and, inArray } from 'drizzle-orm';
+import { nanoid, customAlphabet } from 'nanoid';
+
+const nanoidCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { db } from './db/index';
 import {
 	groups,
 	groupMembers,
+	groupInviteCodes,
 	sharedTags,
 	tags,
 	userBooks,
 	books,
 	userBookTags
 } from './db/schema';
+import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -47,7 +51,7 @@ export type SharedTagWithBooks = {
 
 export type GroupBookResult = {
 	userBookId: string;
-	bookId: string;
+	bookId: string | null;
 	title: string;
 	authors: string[];
 	coverUrl: string | null;
@@ -65,27 +69,18 @@ export async function createGroup(
 	data: { name: string; description?: string }
 ): Promise<string> {
 	const id = nanoid();
-	const inviteCode = nanoid(8).toUpperCase();
 
-	// Insertar el grupo con RLS (la política valida que createdBy = currentUser)
-	await withRLS(userId, (tx) =>
-		tx.insert(groups).values({
+	await withRLS(userId, async (tx) => {
+		await tx.insert(groups).values({
 			id,
 			name: data.name,
 			description: data.description ?? null,
-			inviteCode,
 			createdBy: userId
-		})
-	);
-
-	// Añadir al creador como owner sin RLS: en el momento de insertar el primer
-	// miembro todavía no hay ningún admin en el grupo, así que la política
-	// group_members_insert (que requiere ser admin preexistente) bloquearía
-	// esta operación si se hiciera con app_user. El superuser bypasea RLS.
-	await db.insert(groupMembers).values({
-		groupId: id,
-		userId,
-		role: 'owner'
+		});
+		await tx.insert(groupMembers).values({ groupId: id, userId, role: 'owner' });
+		// El invite code se inserta después del member para que la policy
+		// group_invite_codes_insert (requiere ser owner/admin) lo encuentre.
+		await tx.insert(groupInviteCodes).values({ groupId: id, code: nanoidCode() });
 	});
 
 	return id;
@@ -94,9 +89,6 @@ export async function createGroup(
 // ─── Listar grupos del usuario ────────────────────────────────────────────────
 
 export async function getUserGroups(userId: string): Promise<GroupWithRole[]> {
-	// Importar user desde auth schema para el join
-	const { user } = await import('./db/schema');
-
 	return withRLS(userId, async (tx) => {
 		// Obtener membresías del usuario
 		const memberships = await tx
@@ -112,11 +104,23 @@ export async function getUserGroups(userId: string): Promise<GroupWithRole[]> {
 		const groupIds = memberships.map((m) => m.groupId);
 		const roleMap = new Map(memberships.map((m) => [m.groupId, m.role]));
 
-		// Obtener los grupos
-		const groupRows = await tx.select().from(groups).where(inArray(groups.id, groupIds));
+		// Obtener grupos con su invite code
+		const groupRows = await tx
+			.select({
+				id: groups.id,
+				name: groups.name,
+				description: groups.description,
+				createdBy: groups.createdBy,
+				createdAt: groups.createdAt,
+				updatedAt: groups.updatedAt,
+				inviteCode: groupInviteCodes.code
+			})
+			.from(groups)
+			.leftJoin(groupInviteCodes, eq(groups.id, groupInviteCodes.groupId))
+			.where(inArray(groups.id, groupIds));
 
-		// Contar miembros por grupo (sin RLS para conteo global)
-		const memberCounts = await db
+		// Contar miembros por grupo (dentro del contexto RLS)
+		const memberCounts = await tx
 			.select({ groupId: groupMembers.groupId })
 			.from(groupMembers)
 			.where(inArray(groupMembers.groupId, groupIds));
@@ -138,7 +142,19 @@ export async function getUserGroups(userId: string): Promise<GroupWithRole[]> {
 
 export async function getGroup(userId: string, groupId: string): Promise<GroupWithRole | null> {
 	return withRLS(userId, async (tx) => {
-		const rows = await tx.select().from(groups).where(eq(groups.id, groupId));
+		const rows = await tx
+			.select({
+				id: groups.id,
+				name: groups.name,
+				description: groups.description,
+				createdBy: groups.createdBy,
+				createdAt: groups.createdAt,
+				updatedAt: groups.updatedAt,
+				inviteCode: groupInviteCodes.code
+			})
+			.from(groups)
+			.leftJoin(groupInviteCodes, eq(groups.id, groupInviteCodes.groupId))
+			.where(eq(groups.id, groupId));
 
 		if (rows.length === 0) return null;
 
@@ -165,37 +181,27 @@ export async function getGroup(userId: string, groupId: string): Promise<GroupWi
 // ─── Listar miembros de un grupo ──────────────────────────────────────────────
 
 export async function getGroupMembers(userId: string, groupId: string): Promise<GroupMember[]> {
-	const { user } = await import('./db/schema');
+	return withRLS(userId, async (tx) => {
+		// Uses SECURITY DEFINER function in Scholio — bypasses RLS self-referential recursion
+		// on group_members while still validating that userId is a member of the group.
+		const rows = await tx.execute<{
+			user_id: string;
+			role: string;
+			joined_at: Date;
+			name: string;
+			email: string;
+		}>(sql`SELECT * FROM librarian.get_group_members(${groupId})`);
 
-	// Primero verificar que el solicitante es miembro del grupo (con RLS)
-	const membership = await withRLS(userId, (tx) =>
-		tx
-			.select({ role: groupMembers.role })
-			.from(groupMembers)
-			.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)))
-	);
+		if (rows.length === 0) return [];
 
-	if (membership.length === 0) return [];
-
-	// Listar todos los miembros sin RLS — la política solo permite ver filas propias,
-	// pero aquí necesitamos ver los demás miembros del grupo.
-	// El acceso ya está validado por la comprobación de membresía anterior.
-	const rows = await db
-		.select({
-			userId: groupMembers.userId,
-			role: groupMembers.role,
-			joinedAt: groupMembers.joinedAt,
-			name: user.name,
-			email: user.email
-		})
-		.from(groupMembers)
-		.innerJoin(user, eq(groupMembers.userId, user.id))
-		.where(eq(groupMembers.groupId, groupId));
-
-	return rows.map((r) => ({
-		...r,
-		role: r.role as GroupRole
-	}));
+		return rows.map((r) => ({
+			userId: r.user_id,
+			role: r.role as GroupRole,
+			joinedAt: r.joined_at,
+			name: r.name,
+			email: r.email
+		}));
+	});
 }
 
 // ─── Unirse a grupo por código de invitación ──────────────────────────────────
@@ -204,34 +210,34 @@ export async function joinGroupByCode(
 	userId: string,
 	inviteCode: string
 ): Promise<{ success: boolean; groupId?: string; error?: string }> {
-	// Buscar el grupo por código (sin RLS — el grupo puede no ser visible aún)
-	const groupRows = await db
-		.select({ id: groups.id, name: groups.name })
-		.from(groups)
-		.where(eq(groups.inviteCode, inviteCode.toUpperCase().trim()));
+	return withRLS(userId, async (tx) => {
+		// group_invite_codes tiene USING(true) — cualquier usuario autenticado puede leer
+		const codeRows = await tx
+			.select({ groupId: groupInviteCodes.groupId })
+			.from(groupInviteCodes)
+			.where(eq(groupInviteCodes.code, inviteCode.toUpperCase().trim()));
 
-	if (groupRows.length === 0) {
-		return { success: false, error: 'Código de invitación no válido' };
-	}
+		if (codeRows.length === 0) {
+			return { success: false, error: 'Invitation code not valid' };
+		}
 
-	const group = groupRows[0];
+		const { groupId } = codeRows[0];
 
-	// Comprobar si ya es miembro
-	const existing = await db
-		.select({ userId: groupMembers.userId })
-		.from(groupMembers)
-		.where(and(eq(groupMembers.groupId, group.id), eq(groupMembers.userId, userId)));
+		// group_members_select: user_id = current_user_id — comprueba si ya es miembro
+		const existing = await tx
+			.select({ userId: groupMembers.userId })
+			.from(groupMembers)
+			.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)));
 
-	if (existing.length > 0) {
-		return { success: false, groupId: group.id, error: 'Ya eres miembro de este grupo' };
-	}
+		if (existing.length > 0) {
+			return { success: false, groupId, error: 'You are already member of this group.' };
+		}
 
-	// Insertar sin RLS: el usuario aún no es miembro, así que la política
-	// group_members_insert (que requiere ser owner/admin) bloquearía este insert.
-	// La validación del código de invitación ya garantiza que el join es legítimo.
-	await db.insert(groupMembers).values({ groupId: group.id, userId, role: 'member' });
+		// group_members_insert_self: user_id = current_user_id — válido para unirse
+		await tx.insert(groupMembers).values({ groupId, userId, role: 'member' });
 
-	return { success: true, groupId: group.id };
+		return { success: true, groupId };
+	});
 }
 
 // ─── Expulsar / salir de un grupo ────────────────────────────────────────────
@@ -259,12 +265,15 @@ export async function removeMember(
 // ─── Regenerar código de invitación ──────────────────────────────────────────
 
 export async function regenerateInviteCode(userId: string, groupId: string): Promise<string> {
-	const newCode = nanoid(8).toUpperCase();
+	const newCode = nanoidCode();
 	await withRLS(userId, (tx) =>
 		tx
-			.update(groups)
-			.set({ inviteCode: newCode, updatedAt: new Date() })
-			.where(eq(groups.id, groupId))
+			.insert(groupInviteCodes)
+			.values({ groupId, code: newCode })
+			.onConflictDoUpdate({
+				target: groupInviteCodes.groupId,
+				set: { code: newCode, createdAt: new Date() }
+			})
 	);
 	return newCode;
 }
@@ -296,46 +305,38 @@ export async function getSharedTagsInGroup(
 	userId: string,
 	groupId: string
 ): Promise<SharedTagWithBooks[]> {
-	const { user } = await import('./db/schema');
+	return withRLS(userId, async (tx) => {
+		// tags_select_in_group policy allows seeing tags shared in groups the user belongs to
+		const rows = await tx
+			.select({
+				sharedTagId: sharedTags.id,
+				tagId: tags.id,
+				tagName: tags.name,
+				tagColor: tags.color,
+				ownerId: sharedTags.sharedBy,
+				ownerName: user.name
+			})
+			.from(sharedTags)
+			.innerJoin(tags, eq(sharedTags.tagId, tags.id))
+			.innerJoin(user, eq(sharedTags.sharedBy, user.id))
+			.where(eq(sharedTags.groupId, groupId));
 
-	// Verificar que el solicitante es miembro del grupo (con RLS)
-	const membership = await withRLS(userId, (tx) =>
-		tx
-			.select({ role: groupMembers.role })
-			.from(groupMembers)
-			.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, userId)))
-	);
+		if (rows.length === 0) return [];
 
-	if (membership.length === 0) return [];
-
-	// Consultar sin RLS — las etiquetas compartidas pueden ser de otros usuarios,
-	// la política de tags solo deja ver las propias y bloquearía el JOIN.
-	// El acceso está validado por la comprobación de membresía anterior.
-	const rows = await db
-		.select({
-			sharedTagId: sharedTags.id,
-			tagId: tags.id,
-			tagName: tags.name,
-			tagColor: tags.color,
-			ownerId: sharedTags.sharedBy,
-			ownerName: user.name
-		})
-		.from(sharedTags)
-		.innerJoin(tags, eq(sharedTags.tagId, tags.id))
-		.innerJoin(user, eq(sharedTags.sharedBy, user.id))
-		.where(eq(sharedTags.groupId, groupId));
-
-	// Contar libros por etiqueta compartida
-	const result: SharedTagWithBooks[] = [];
-	for (const row of rows) {
-		const bookCount = await db
-			.select({ id: userBookTags.userBookId })
+		// user_book_tags_select_in_group policy allows counting books via shared tags
+		const tagIds = rows.map((r) => r.tagId);
+		const allBookTags = await tx
+			.select({ tagId: userBookTags.tagId })
 			.from(userBookTags)
-			.where(eq(userBookTags.tagId, row.tagId));
+			.where(inArray(userBookTags.tagId, tagIds));
 
-		result.push({ ...row, bookCount: bookCount.length });
-	}
-	return result;
+		const bookCountMap = new Map<string, number>();
+		for (const bt of allBookTags) {
+			bookCountMap.set(bt.tagId, (bookCountMap.get(bt.tagId) ?? 0) + 1);
+		}
+
+		return rows.map((row) => ({ ...row, bookCount: bookCountMap.get(row.tagId) ?? 0 }));
+	});
 }
 
 // ─── Etiquetas propias del usuario que puede compartir en un grupo ────────────
@@ -364,94 +365,214 @@ export async function getUserTagsForGroup(
 	});
 }
 
-// ─── Buscar libros en un grupo ────────────────────────────────────────────────
-// Devuelve todos los libros accesibles a través de etiquetas compartidas en el grupo.
-// Opcionalmente filtra por query de texto o por tagId.
+// ─── Buscar libros de otros usuarios (cross-group) ───────────────────────────
+// Devuelve libros de otros usuarios visibles a través de shared_tags en
+// cualquier grupo al que pertenezca el usuario. Filtra por texto libre
+// (título, autores, nombre del propietario, nombre del tag).
 
-export async function searchBooksInGroup(
+export async function getSharedTagsForUser(
+	userId: string
+): Promise<{ id: string; name: string; color: string | null }[]> {
+	return withRLS(userId, async (tx) => {
+		const memberRows = await tx
+			.select({ groupId: groupMembers.groupId })
+			.from(groupMembers)
+			.where(eq(groupMembers.userId, userId));
+
+		if (memberRows.length === 0) return [];
+		const groupIds = memberRows.map((r) => r.groupId);
+
+		const rows = await tx
+			.select({ id: tags.id, name: tags.name, color: tags.color })
+			.from(sharedTags)
+			.innerJoin(tags, eq(sharedTags.tagId, tags.id))
+			.where(inArray(sharedTags.groupId, groupIds));
+
+		const seen = new Set<string>();
+		return rows
+			.filter((r) => {
+				if (seen.has(r.id)) return false;
+				seen.add(r.id);
+				return true;
+			})
+			.sort((a, b) => a.name.localeCompare(b.name));
+	});
+}
+
+export async function searchBooksFromOthers(
 	userId: string,
-	groupId: string,
-	opts: { query?: string; tagId?: string } = {}
+	query: string,
+	filterTagIds?: string[]
 ): Promise<GroupBookResult[]> {
-	const { user } = await import('./db/schema');
+	const hasQuery = query.trim().length > 0;
+	const hasTagFilter = filterTagIds && filterTagIds.length > 0;
+	if (!hasQuery && !hasTagFilter) return [];
+
+	const normalize = (s: string) =>
+		s
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.toLowerCase();
+	const q = hasQuery ? normalize(query.trim()) : '';
 
 	return withRLS(userId, async (tx) => {
-		// 1. Obtener las etiquetas compartidas en el grupo
+		// 1. Grupos del usuario
+		const memberRows = await tx
+			.select({ groupId: groupMembers.groupId })
+			.from(groupMembers)
+			.where(eq(groupMembers.userId, userId));
+
+		if (memberRows.length === 0) return [];
+		const groupIds = memberRows.map((r) => r.groupId);
+
+		// 2. Tags compartidos en esos grupos
 		const sharedTagRows = await tx
 			.select({ tagId: sharedTags.tagId })
 			.from(sharedTags)
-			.where(eq(sharedTags.groupId, groupId));
+			.where(inArray(sharedTags.groupId, groupIds));
 
 		if (sharedTagRows.length === 0) return [];
+		const tagIds = [...new Set(sharedTagRows.map((r) => r.tagId))];
 
-		const tagIds = opts.tagId ? [opts.tagId] : sharedTagRows.map((r) => r.tagId);
+		// 3. user_book_ids que tienen esos tags (RLS permite verlos via in_group policy)
+		// Si hay filtro de tags, solo usar los seleccionados (que estén en los compartidos)
+		const effectiveTagIds = hasTagFilter
+			? filterTagIds!.filter((id) => tagIds.includes(id))
+			: tagIds;
+		if (effectiveTagIds.length === 0) return [];
 
-		// 2. Obtener user_books que tienen alguna de esas etiquetas
-		const ubRows = await db
-			.select({
-				userBookId: userBookTags.userBookId,
-				tagId: userBookTags.tagId
-			})
+		const ubTagRows = await tx
+			.select({ userBookId: userBookTags.userBookId })
 			.from(userBookTags)
-			.where(inArray(userBookTags.tagId, tagIds));
+			.where(inArray(userBookTags.tagId, effectiveTagIds));
 
-		if (ubRows.length === 0) return [];
+		if (ubTagRows.length === 0) return [];
+		const userBookIds = [...new Set(ubTagRows.map((r) => r.userBookId))];
 
-		const userBookIds = [...new Set(ubRows.map((r) => r.userBookId))];
-
-		// 3. Obtener detalles de esos user_books con su libro y propietario
-		const detailRows = await db
+		// 4. Detalle de los libros, excluyendo los propios
+		const detailRows = await tx
 			.select({
 				userBookId: userBooks.id,
-				bookId: books.id,
-				title: books.title,
-				authors: books.authors,
+				bookId: userBooks.bookId,
+				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
 				coverUrl: books.coverUrl,
-				publishYear: books.publishYear,
+				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
 				isAvailable: userBooks.isAvailable,
 				ownerId: userBooks.userId,
 				ownerName: user.name
 			})
 			.from(userBooks)
-			.innerJoin(books, eq(userBooks.bookId, books.id))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
 			.innerJoin(user, eq(userBooks.userId, user.id))
-			.where(inArray(userBooks.id, userBookIds));
+			.where(and(inArray(userBooks.id, userBookIds), sql`${userBooks.userId} != ${userId}`));
 
-		// 4. Filtrar por query de texto si se indica
-		let filtered = detailRows;
-		if (opts.query) {
-			const q = opts.query.toLowerCase();
-			filtered = detailRows.filter(
-				(r) =>
-					r.title.toLowerCase().includes(q) ||
-					(r.authors ?? []).some((a) => a.toLowerCase().includes(q)) ||
-					r.ownerName.toLowerCase().includes(q)
+		if (detailRows.length === 0) return [];
+
+		// 5. Tags visibles por libro (solo los shared)
+		const filteredIds = detailRows.map((r) => r.userBookId);
+		const bookTagRows = await tx
+			.select({
+				userBookId: userBookTags.userBookId,
+				id: tags.id,
+				name: tags.name,
+				color: tags.color
+			})
+			.from(userBookTags)
+			.innerJoin(tags, eq(userBookTags.tagId, tags.id))
+			.where(
+				and(inArray(userBookTags.userBookId, filteredIds), inArray(userBookTags.tagId, tagIds))
 			);
+
+		const tagsMap = new Map<string, { id: string; name: string; color: string | null }[]>();
+		for (const bt of bookTagRows) {
+			const list = tagsMap.get(bt.userBookId) ?? [];
+			list.push({ id: bt.id, name: bt.name, color: bt.color });
+			tagsMap.set(bt.userBookId, list);
 		}
 
-		// 5. Obtener etiquetas de cada libro (solo las compartidas en este grupo)
-		const sharedTagIdSet = new Set(sharedTagRows.map((r) => r.tagId));
-		const result: GroupBookResult[] = [];
+		// 6. Filtro de texto en JS (título, autores, propietario, tags)
+		const results = detailRows.map((row) => ({
+			...row,
+			authors: row.authors ?? [],
+			tags: tagsMap.get(row.userBookId) ?? []
+		}));
 
-		for (const row of filtered) {
-			const bookTagRows = await db
-				.select({ id: tags.id, name: tags.name, color: tags.color })
-				.from(userBookTags)
-				.innerJoin(tags, eq(userBookTags.tagId, tags.id))
-				.where(
-					and(
-						eq(userBookTags.userBookId, row.userBookId),
-						inArray(userBookTags.tagId, [...sharedTagIdSet])
-					)
-				);
+		if (!hasQuery) return results;
 
-			result.push({
-				...row,
-				authors: row.authors ?? [],
-				tags: bookTagRows
-			});
-		}
-
-		return result;
+		return results.filter(
+			(book) =>
+				normalize(book.title).includes(q) ||
+				book.authors.some((a: string) => normalize(a).includes(q)) ||
+				normalize(book.ownerName).includes(q) ||
+				book.tags.some((t) => normalize(t.name).includes(q))
+		);
 	});
+}
+
+// ─── Actividad reciente en grupos (libros añadidos por cualquier miembro visible) ─
+
+export type GroupActivityBook = {
+	userBookId: string;
+	bookId: string | null;
+	title: string;
+	authors: string[];
+	coverUrl: string | null;
+	publishYear: number | null;
+	isAvailable: boolean;
+	addedAt: Date;
+	ownerId: string;
+	ownerName: string;
+};
+
+export async function getGroupRecentBooks(
+	userId: string,
+	limit = 50
+): Promise<GroupActivityBook[]> {
+	return withRLS(userId, async (tx) => {
+		const rows = await tx
+			.select({
+				userBookId: userBooks.id,
+				bookId: userBooks.bookId,
+				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
+				coverUrl: books.coverUrl,
+				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
+				isAvailable: userBooks.isAvailable,
+				addedAt: userBooks.addedAt,
+				ownerId: userBooks.userId,
+				ownerName: user.name
+			})
+			.from(userBooks)
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.innerJoin(user, eq(userBooks.userId, user.id))
+			.orderBy(desc(userBooks.addedAt))
+			.limit(limit);
+
+		return rows.map((row) => ({ ...row, authors: row.authors ?? [] }));
+	});
+}
+
+// ─── Contactos del usuario (todos los miembros de sus grupos, sin él mismo) ───
+
+export type Contact = {
+	userId: string;
+	name: string;
+};
+
+export async function getContacts(userId: string): Promise<Contact[]> {
+	const userGroupList = await getUserGroups(userId);
+	if (userGroupList.length === 0) return [];
+
+	const contactMap = new Map<string, string>();
+	for (const group of userGroupList) {
+		const members = await getGroupMembers(userId, group.id);
+		for (const m of members) {
+			if (m.userId !== userId) contactMap.set(m.userId, m.name);
+		}
+	}
+
+	return [...contactMap.entries()]
+		.map(([uid, name]) => ({ userId: uid, name }))
+		.sort((a, b) => a.name.localeCompare(b.name));
 }

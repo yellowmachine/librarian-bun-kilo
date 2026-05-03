@@ -1,12 +1,186 @@
 {
-  "id": "087f2dae-6979-4274-9f6e-901733987903",
+  "id": "51bc4acf-09ee-4362-a352-ffbfab97a72a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.books": {
+    "librarian.book_reviews": {
+      "name": "book_reviews",
+      "schema": "librarian",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rating": {
+          "name": "rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "book_reviews_book_user_idx": {
+          "name": "book_reviews_book_user_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "book_reviews_book_idx": {
+          "name": "book_reviews_book_idx",
+          "columns": [
+            {
+              "expression": "book_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "book_reviews_user_idx": {
+          "name": "book_reviews_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "book_reviews_book_id_books_id_fk": {
+          "name": "book_reviews_book_id_books_id_fk",
+          "tableFrom": "book_reviews",
+          "tableTo": "books",
+          "schemaTo": "librarian",
+          "columnsFrom": [
+            "book_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "book_reviews_user_id_user_id_fk": {
+          "name": "book_reviews_user_id_user_id_fk",
+          "tableFrom": "book_reviews",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "book_reviews_select": {
+          "name": "book_reviews_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "true"
+        },
+        "book_reviews_insert": {
+          "name": "book_reviews_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "scholio_app"
+          ],
+          "withCheck": "\"librarian\".\"book_reviews\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "book_reviews_update": {
+          "name": "book_reviews_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "\"librarian\".\"book_reviews\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "book_reviews_delete": {
+          "name": "book_reviews_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "\"librarian\".\"book_reviews\".\"user_id\" = current_setting('app.current_user_id', true)"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "librarian.books": {
       "name": "books",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "id": {
           "name": "id",
@@ -109,7 +283,7 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
           "using": "true"
         },
@@ -118,7 +292,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
           "withCheck": "true"
         },
@@ -127,7 +301,7 @@
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
           "using": "true"
         }
@@ -135,9 +309,101 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.group_members": {
+    "librarian.group_invite_codes": {
+      "name": "group_invite_codes",
+      "schema": "librarian",
+      "columns": {
+        "group_id": {
+          "name": "group_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "group_invite_codes_group_id_groups_id_fk": {
+          "name": "group_invite_codes_group_id_groups_id_fk",
+          "tableFrom": "group_invite_codes",
+          "tableTo": "groups",
+          "schemaTo": "librarian",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "group_invite_codes_code_unique": {
+          "name": "group_invite_codes_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
+      "policies": {
+        "group_invite_codes_select": {
+          "name": "group_invite_codes_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "true"
+        },
+        "group_invite_codes_insert": {
+          "name": "group_invite_codes_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "scholio_app"
+          ],
+          "withCheck": "\"librarian\".is_group_admin(\"librarian\".\"group_invite_codes\".\"group_id\", current_setting('app.current_user_id', true))"
+        },
+        "group_invite_codes_update": {
+          "name": "group_invite_codes_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"group_invite_codes\".\"group_id\", current_setting('app.current_user_id', true))"
+        },
+        "group_invite_codes_delete": {
+          "name": "group_invite_codes_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"group_invite_codes\".\"group_id\", current_setting('app.current_user_id', true))"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "librarian.group_members": {
       "name": "group_members",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "group_id": {
           "name": "group_id",
@@ -154,7 +420,7 @@
         "role": {
           "name": "role",
           "type": "group_role",
-          "typeSchema": "public",
+          "typeSchema": "librarian",
           "primaryKey": false,
           "notNull": true,
           "default": "'member'"
@@ -210,6 +476,7 @@
           "name": "group_members_group_id_groups_id_fk",
           "tableFrom": "group_members",
           "tableTo": "groups",
+          "schemaTo": "librarian",
           "columnsFrom": [
             "group_id"
           ],
@@ -241,35 +508,35 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm2\n\t\t\t\t\twhere gm2.group_id = \"group_members\".\"group_id\"\n\t\t\t\t\t  and gm2.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t)"
+          "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true) or \"librarian\".is_group_member(\"librarian\".\"group_members\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "group_members_insert": {
           "name": "group_members_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "withCheck": "\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"group_members\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+          "withCheck": "\"librarian\".is_group_admin(\"librarian\".\"group_members\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "group_members_delete": {
           "name": "group_members_delete",
           "as": "PERMISSIVE",
           "for": "DELETE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"group_members\".\"user_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"group_members\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+          "using": "\"librarian\".\"group_members\".\"user_id\" = current_setting('app.current_user_id', true) or \"librarian\".is_group_admin(\"librarian\".\"group_members\".\"group_id\", current_setting('app.current_user_id', true))"
         }
       },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.groups": {
+    "librarian.groups": {
       "name": "groups",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "id": {
           "name": "id",
@@ -285,12 +552,6 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "invite_code": {
-          "name": "invite_code",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -333,59 +594,51 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "groups_invite_code_unique": {
-          "name": "groups_invite_code_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "invite_code"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {
         "groups_select": {
           "name": "groups_select",
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "\"librarian\".is_group_member(\"librarian\".\"groups\".\"id\", current_setting('app.current_user_id', true))"
         },
         "groups_insert": {
           "name": "groups_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "withCheck": "\"groups\".\"created_by\" = current_setting('app.current_user_id', true)"
+          "withCheck": "\"librarian\".\"groups\".\"created_by\" = current_setting('app.current_user_id', true)"
         },
         "groups_update": {
           "name": "groups_update",
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t)"
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"groups\".\"id\", current_setting('app.current_user_id', true))"
         },
         "groups_delete": {
           "name": "groups_delete",
           "as": "PERMISSIVE",
           "for": "DELETE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"groups\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t  and gm.role = 'owner'\n\t\t\t)"
+          "using": "\"librarian\".is_group_admin(\"librarian\".\"groups\".\"id\", current_setting('app.current_user_id', true))"
         }
       },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.loans": {
+    "librarian.loans": {
       "name": "loans",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "id": {
           "name": "id",
@@ -414,7 +667,7 @@
         "status": {
           "name": "status",
           "type": "loan_status",
-          "typeSchema": "public",
+          "typeSchema": "librarian",
           "primaryKey": false,
           "notNull": true,
           "default": "'requested'"
@@ -458,6 +711,12 @@
         },
         "notes": {
           "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owner_notes": {
+          "name": "owner_notes",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -530,6 +789,7 @@
           "name": "loans_user_book_id_user_books_id_fk",
           "tableFrom": "loans",
           "tableTo": "user_books",
+          "schemaTo": "librarian",
           "columnsFrom": [
             "user_book_id"
           ],
@@ -574,44 +834,44 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"loans\".\"owner_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor \"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"loans\".\"owner_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor \"librarian\".\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
         },
         "loans_insert": {
           "name": "loans_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "withCheck": "\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
+          "withCheck": "\"librarian\".\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
         },
         "loans_update": {
           "name": "loans_update",
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"loans\".\"owner_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor \"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"loans\".\"owner_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tor \"librarian\".\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)"
         },
         "loans_delete": {
           "name": "loans_delete",
           "as": "PERMISSIVE",
           "for": "DELETE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tand \"loans\".\"status\" = 'requested'"
+          "using": "\"librarian\".\"loans\".\"borrower_id\" = current_setting('app.current_user_id', true)\n\t\t\t\tand \"librarian\".\"loans\".\"status\" = 'requested'"
         }
       },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.shared_tags": {
+    "librarian.shared_tags": {
       "name": "shared_tags",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "id": {
           "name": "id",
@@ -688,6 +948,7 @@
           "name": "shared_tags_tag_id_tags_id_fk",
           "tableFrom": "shared_tags",
           "tableTo": "tags",
+          "schemaTo": "librarian",
           "columnsFrom": [
             "tag_id"
           ],
@@ -701,6 +962,7 @@
           "name": "shared_tags_group_id_groups_id_fk",
           "tableFrom": "shared_tags",
           "tableTo": "groups",
+          "schemaTo": "librarian",
           "columnsFrom": [
             "group_id"
           ],
@@ -732,35 +994,35 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from group_members gm\n\t\t\t\twhere gm.group_id = \"shared_tags\".\"group_id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "\"librarian\".is_group_member(\"librarian\".\"shared_tags\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "shared_tags_insert": {
           "name": "shared_tags_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "withCheck": "\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true)\n\t\t\t\tand exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"shared_tags\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t)"
+          "withCheck": "\"librarian\".\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true) and \"librarian\".is_group_member(\"librarian\".\"shared_tags\".\"group_id\", current_setting('app.current_user_id', true))"
         },
         "shared_tags_delete": {
           "name": "shared_tags_delete",
           "as": "PERMISSIVE",
           "for": "DELETE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true)\n\t\t\t\tor exists (\n\t\t\t\t\tselect 1 from group_members gm\n\t\t\t\t\twhere gm.group_id = \"shared_tags\".\"group_id\"\n\t\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t\t\t  and gm.role in ('owner', 'admin')\n\t\t\t\t)"
+          "using": "\"librarian\".\"shared_tags\".\"shared_by\" = current_setting('app.current_user_id', true) or \"librarian\".is_group_admin(\"librarian\".\"shared_tags\".\"group_id\", current_setting('app.current_user_id', true))"
         }
       },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.tags": {
+    "librarian.tags": {
       "name": "tags",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "id": {
           "name": "id",
@@ -855,44 +1117,53 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "tags_select_in_group": {
+          "name": "tags_select_in_group",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".shared_tags st\n\t\t\t\tjoin \"librarian\".group_members gm on gm.group_id = st.group_id\n\t\t\t\twhere st.tag_id = \"librarian\".\"tags\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         },
         "tags_insert": {
           "name": "tags_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "withCheck": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "withCheck": "\"librarian\".\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
         "tags_update": {
           "name": "tags_update",
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
         "tags_delete": {
           "name": "tags_delete",
           "as": "PERMISSIVE",
           "for": "DELETE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"tags\".\"user_id\" = current_setting('app.current_user_id', true)"
         }
       },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.user_book_tags": {
+    "librarian.user_book_tags": {
       "name": "user_book_tags",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "user_book_id": {
           "name": "user_book_id",
@@ -950,6 +1221,7 @@
           "name": "user_book_tags_user_book_id_user_books_id_fk",
           "tableFrom": "user_book_tags",
           "tableTo": "user_books",
+          "schemaTo": "librarian",
           "columnsFrom": [
             "user_book_id"
           ],
@@ -963,6 +1235,7 @@
           "name": "user_book_tags_tag_id_tags_id_fk",
           "tableFrom": "user_book_tags",
           "tableTo": "tags",
+          "schemaTo": "librarian",
           "columnsFrom": [
             "tag_id"
           ],
@@ -981,35 +1254,44 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from user_books ub\n\t\t\t\twhere ub.id = \"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".tags t\n\t\t\t\twhere t.id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and t.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
+        "user_book_tags_select_in_group": {
+          "name": "user_book_tags_select_in_group",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".shared_tags st\n\t\t\t\tjoin \"librarian\".group_members gm on gm.group_id = st.group_id\n\t\t\t\twhere st.tag_id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         },
         "user_book_tags_insert": {
           "name": "user_book_tags_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "withCheck": "exists (\n\t\t\t\tselect 1 from user_books ub\n\t\t\t\twhere ub.id = \"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "withCheck": "exists (\n\t\t\t\tselect 1 from \"librarian\".tags t\n\t\t\t\twhere t.id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and t.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         },
         "user_book_tags_delete": {
           "name": "user_book_tags_delete",
           "as": "PERMISSIVE",
           "for": "DELETE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "exists (\n\t\t\t\tselect 1 from user_books ub\n\t\t\t\twhere ub.id = \"user_book_tags\".\"user_book_id\"\n\t\t\t\t  and ub.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".tags t\n\t\t\t\twhere t.id = \"librarian\".\"user_book_tags\".\"tag_id\"\n\t\t\t\t  and t.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         }
       },
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.user_books": {
+    "librarian.user_books": {
       "name": "user_books",
-      "schema": "",
+      "schema": "librarian",
       "columns": {
         "id": {
           "name": "id",
@@ -1027,7 +1309,37 @@
           "name": "book_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "authors": {
+          "name": "authors",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isbn": {
+          "name": "isbn",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publish_year": {
+          "name": "publish_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "notes": {
           "name": "notes",
@@ -1075,6 +1387,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"librarian\".\"user_books\".\"book_id\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -1128,6 +1441,7 @@
           "name": "user_books_book_id_books_id_fk",
           "tableFrom": "user_books",
           "tableTo": "books",
+          "schemaTo": "librarian",
           "columnsFrom": [
             "book_id"
           ],
@@ -1146,307 +1460,76 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "user_books_select_in_group": {
+          "name": "user_books_select_in_group",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".user_book_tags ubt\n\t\t\t\tjoin \"librarian\".shared_tags st on st.tag_id = ubt.tag_id\n\t\t\t\tjoin \"librarian\".group_members gm on gm.group_id = st.group_id\n\t\t\t\twhere ubt.user_book_id = \"librarian\".\"user_books\".\"id\"\n\t\t\t\t  and gm.user_id = current_setting('app.current_user_id', true)\n\t\t\t)"
+        },
+        "user_books_select_on_loan": {
+          "name": "user_books_select_on_loan",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "exists (\n\t\t\t\tselect 1 from \"librarian\".loans l\n\t\t\t\twhere l.user_book_id = \"librarian\".\"user_books\".\"id\"\n\t\t\t\t  and l.borrower_id = current_setting('app.current_user_id', true)\n\t\t\t)"
         },
         "user_books_insert": {
           "name": "user_books_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "withCheck": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "withCheck": "\"librarian\".\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
         "user_books_update": {
           "name": "user_books_update",
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
         },
         "user_books_delete": {
           "name": "user_books_delete",
           "as": "PERMISSIVE",
           "for": "DELETE",
           "to": [
-            "app_user"
+            "scholio_app"
           ],
-          "using": "\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
+          "using": "\"librarian\".\"user_books\".\"user_id\" = current_setting('app.current_user_id', true)"
         }
       },
-      "checkConstraints": {},
+      "checkConstraints": {
+        "user_books_book_or_title": {
+          "name": "user_books_book_or_title",
+          "value": "\"librarian\".\"user_books\".\"book_id\" IS NOT NULL OR \"librarian\".\"user_books\".\"title\" IS NOT NULL"
+        }
+      },
       "isRLSEnabled": false
     },
-    "public.account": {
-      "name": "account",
-      "schema": "",
+    "librarian.user_profile": {
+      "name": "user_profile",
+      "schema": "librarian",
       "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "account_id": {
-          "name": "account_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider_id": {
-          "name": "provider_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "user_id": {
           "name": "user_id",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "access_token": {
-          "name": "access_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refresh_token": {
-          "name": "refresh_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "id_token": {
-          "name": "id_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "access_token_expires_at": {
-          "name": "access_token_expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refresh_token_expires_at": {
-          "name": "refresh_token_expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scope": {
-          "name": "scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "password": {
-          "name": "password",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "account_userId_idx": {
-          "name": "account_userId_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "account_user_id_user_id_fk": {
-          "name": "account_user_id_user_id_fk",
-          "tableFrom": "account",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.session": {
-      "name": "session",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
           "primaryKey": true,
           "notNull": true
         },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "token": {
-          "name": "token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ip_address": {
-          "name": "ip_address",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_agent": {
-          "name": "user_agent",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        }
-      },
-      "indexes": {
-        "session_userId_idx": {
-          "name": "session_userId_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "session_user_id_user_id_fk": {
-          "name": "session_user_id_user_id_fk",
-          "tableFrom": "session",
-          "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "session_token_unique": {
-          "name": "session_token_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.user": {
-      "name": "user",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "email": {
-          "name": "email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "email_verified": {
-          "name": "email_verified",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "image": {
-          "name": "image",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -1454,102 +1537,60 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "user_email_unique": {
-          "name": "user_email_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.verification": {
-      "name": "verification",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "identifier": {
-          "name": "identifier",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "value": {
-          "name": "value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "verification_identifier_idx": {
-          "name": "verification_identifier_idx",
-          "columns": [
-            {
-              "expression": "identifier",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
+      "foreignKeys": {
+        "user_profile_user_id_user_id_fk": {
+          "name": "user_profile_user_id_user_id_fk",
+          "tableFrom": "user_profile",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
           ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "policies": {},
+      "policies": {
+        "user_profile_select": {
+          "name": "user_profile_select",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "scholio_app"
+          ],
+          "using": "\"librarian\".\"user_profile\".\"user_id\" = current_setting('app.current_user_id', true)"
+        },
+        "user_profile_insert": {
+          "name": "user_profile_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "scholio_app"
+          ],
+          "withCheck": "\"librarian\".\"user_profile\".\"user_id\" = current_setting('app.current_user_id', true)"
+        }
+      },
       "checkConstraints": {},
       "isRLSEnabled": false
     }
   },
   "enums": {
-    "public.group_role": {
+    "librarian.group_role": {
       "name": "group_role",
-      "schema": "public",
+      "schema": "librarian",
       "values": [
         "owner",
         "admin",
         "member"
       ]
     },
-    "public.loan_status": {
+    "librarian.loan_status": {
       "name": "loan_status",
-      "schema": "public",
+      "schema": "librarian",
       "values": [
         "requested",
         "accepted",

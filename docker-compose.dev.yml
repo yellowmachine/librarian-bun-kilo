@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '${PORT:-3001}:3000'
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-postgres://scholarly_app:scholarly_app_dev@host.docker.internal:5433/scholarly}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:-postgres://scholarly:scholarly_dev@host.docker.internal:5433/scholarly}
+      ORIGIN: ${ORIGIN:-http://localhost:3001}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev_secret_librarian}
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'

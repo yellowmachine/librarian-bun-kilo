@@ -1,8 +1,14 @@
 import { nanoid } from 'nanoid';
-import { eq, and, or, inArray } from 'drizzle-orm';
+import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import { loans, userBooks, books } from './db/schema';
+import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
+import { sendLoanRequestEmail, sendLoanAcceptedEmail } from './email';
+
+// COALESCE helpers: userBooks manual fields override books catalog fields
+const effectiveTitle = sql<string>`COALESCE(${userBooks.title}, ${books.title})`;
+const effectiveAuthors = sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`;
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -25,9 +31,10 @@ export type LoanWithDetails = {
 	returnedAt: Date | null;
 	dueDate: Date | null;
 	notes: string | null;
+	ownerNotes: string | null;
 	// Libro
 	userBookId: string;
-	bookId: string;
+	bookId: string | null;
 	title: string;
 	authors: string[];
 	coverUrl: string | null;
@@ -47,45 +54,71 @@ export async function requestLoan(
 	userBookId: string,
 	notes?: string
 ): Promise<string> {
-	// Obtener el propietario del libro sin RLS (lectura pública de userBooks necesaria)
-	const ubRows = await db
-		.select({ userId: userBooks.userId, isAvailable: userBooks.isAvailable })
-		.from(userBooks)
-		.where(eq(userBooks.id, userBookId));
+	const { loanId, ownerId, bookTitle } = await withRLS(borrowerId, async (tx) => {
+		// user_books_select_in_group policy allows borrower to read the book via shared tags
+		const ubRows = await tx
+			.select({
+				userId: userBooks.userId,
+				isAvailable: userBooks.isAvailable,
+				bookId: userBooks.bookId,
+				manualTitle: userBooks.title
+			})
+			.from(userBooks)
+			.where(eq(userBooks.id, userBookId));
 
-	if (ubRows.length === 0) throw new Error('Libro no encontrado');
-	const { userId: ownerId, isAvailable } = ubRows[0];
+		if (ubRows.length === 0) throw new Error('Book not found');
+		const { userId: ownerId, isAvailable, bookId, manualTitle } = ubRows[0];
 
-	if (!isAvailable) throw new Error('El libro no está disponible');
-	if (ownerId === borrowerId) throw new Error('No puedes solicitar tu propio libro');
+		if (!isAvailable) throw new Error('Book is not available');
+		if (ownerId === borrowerId) throw new Error("You can't request your own book.");
 
-	// Comprobar que no hay ya un préstamo activo o pendiente para este libro
-	const existing = await db
-		.select({ id: loans.id })
-		.from(loans)
-		.where(
-			and(
-				eq(loans.userBookId, userBookId),
-				inArray(loans.status, ['requested', 'accepted', 'active'])
-			)
-		);
-	if (existing.length > 0) throw new Error('Ya existe una solicitud activa para este libro');
+		// Check for existing active/pending loan (loans are visible to both parties via RLS)
+		const existing = await tx
+			.select({ id: loans.id })
+			.from(loans)
+			.where(
+				and(
+					eq(loans.userBookId, userBookId),
+					inArray(loans.status, ['requested', 'accepted', 'active'])
+				)
+			);
+		if (existing.length > 0) throw new Error('There is already an active request for this book.');
 
-	const id = nanoid();
+		const bookRows = bookId
+			? await tx.select({ title: books.title }).from(books).where(eq(books.id, bookId))
+			: [];
 
-	// El INSERT con RLS requiere borrower_id = current_user
-	await withRLS(borrowerId, (tx) =>
-		tx.insert(loans).values({
+		const id = nanoid();
+		await tx.insert(loans).values({
 			id,
 			userBookId,
 			borrowerId,
 			ownerId,
 			status: 'requested',
 			notes: notes ?? null
-		})
-	);
+		});
 
-	return id;
+		return { loanId: id, ownerId, bookTitle: bookRows[0]?.title ?? manualTitle ?? '' };
+	});
+
+	// Notificar al owner — queries solo a la tabla user (sin RLS) para obtener nombres y emails
+	const [borrowerRow, ownerRow] = await Promise.all([
+		db.select({ name: user.name }).from(user).where(eq(user.id, borrowerId)),
+		db.select({ email: user.email, name: user.name }).from(user).where(eq(user.id, ownerId))
+	]);
+
+	if (ownerRow[0]?.email && bookTitle) {
+		sendLoanRequestEmail({
+			to: ownerRow[0].email,
+			ownerName: ownerRow[0].name ?? '',
+			borrowerName: borrowerRow[0]?.name ?? '',
+			bookTitle,
+			loanId,
+			notes
+		}).catch((err) => console.error('[email] sendLoanRequestEmail failed:', err));
+	}
+
+	return loanId;
 }
 
 // ─── Listar préstamos del usuario ─────────────────────────────────────────────
@@ -94,14 +127,9 @@ export async function getUserLoans(userId: string): Promise<{
 	asOwner: LoanWithDetails[];
 	asBorrower: LoanWithDetails[];
 }> {
-	const { user } = await import('./db/schema');
-
 	const rows = await withRLS(userId, async (tx) => {
-		const borrower = user; // alias para claridad
-
-		// Drizzle no soporta bien self-joins, usamos db directamente con alias via SQL
-		// Hacemos dos queries separadas y las combinamos
-		const ownerLoans = await db
+		// Dos queries separadas porque Drizzle no soporta bien self-joins con alias
+		const ownerLoans = await tx
 			.select({
 				id: loans.id,
 				status: loans.status,
@@ -112,20 +140,21 @@ export async function getUserLoans(userId: string): Promise<{
 				returnedAt: loans.returnedAt,
 				dueDate: loans.dueDate,
 				notes: loans.notes,
+				ownerNotes: loans.ownerNotes,
 				userBookId: loans.userBookId,
-				bookId: books.id,
-				title: books.title,
-				authors: books.authors,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
 				coverUrl: books.coverUrl,
 				borrowerId: loans.borrowerId,
 				ownerId: loans.ownerId
 			})
 			.from(loans)
 			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-			.innerJoin(books, eq(userBooks.bookId, books.id))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
 			.where(eq(loans.ownerId, userId));
 
-		const borrowerLoans = await db
+		const borrowerLoans = await tx
 			.select({
 				id: loans.id,
 				status: loans.status,
@@ -136,24 +165,24 @@ export async function getUserLoans(userId: string): Promise<{
 				returnedAt: loans.returnedAt,
 				dueDate: loans.dueDate,
 				notes: loans.notes,
+				ownerNotes: loans.ownerNotes,
 				userBookId: loans.userBookId,
-				bookId: books.id,
-				title: books.title,
-				authors: books.authors,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
 				coverUrl: books.coverUrl,
 				borrowerId: loans.borrowerId,
 				ownerId: loans.ownerId
 			})
 			.from(loans)
 			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-			.innerJoin(books, eq(userBooks.bookId, books.id))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
 			.where(eq(loans.borrowerId, userId));
 
 		return { ownerLoans, borrowerLoans };
 	});
 
 	// Resolver nombres de usuarios implicados
-	const { user: userTable } = await import('./db/schema');
 	const allUserIds = [
 		...new Set([
 			...rows.ownerLoans.map((r) => r.borrowerId),
@@ -164,19 +193,19 @@ export async function getUserLoans(userId: string): Promise<{
 	const userRows =
 		allUserIds.length > 0
 			? await db
-					.select({ id: userTable.id, name: userTable.name, email: userTable.email })
-					.from(userTable)
-					.where(inArray(userTable.id, allUserIds))
+					.select({ id: user.id, name: user.name, email: user.email })
+					.from(user)
+					.where(inArray(user.id, allUserIds))
 			: [];
 
 	const userMap = new Map(userRows.map((u) => [u.id, u]));
 
 	// Datos del propio usuario
 	const selfRows = await db
-		.select({ id: userTable.id, name: userTable.name, email: userTable.email })
-		.from(userTable)
-		.where(eq(userTable.id, userId));
-	const self = selfRows[0] ?? { id: userId, name: 'Tú', email: '' };
+		.select({ id: user.id, name: user.name, email: user.email })
+		.from(user)
+		.where(eq(user.id, userId));
+	const self = selfRows[0] ?? { id: userId, name: 'You', email: '' };
 
 	function enrich(row: (typeof rows.ownerLoans)[0], asOwner: boolean): LoanWithDetails {
 		const borrowerInfo = asOwner ? (userMap.get(row.borrowerId) ?? { name: '?', email: '' }) : self;
@@ -201,10 +230,8 @@ export async function getUserLoans(userId: string): Promise<{
 // ─── Obtener préstamo por ID ──────────────────────────────────────────────────
 
 export async function getLoan(userId: string, loanId: string): Promise<LoanWithDetails | null> {
-	const { user: userTable } = await import('./db/schema');
-
 	const rows = await withRLS(userId, (tx) =>
-		db
+		tx
 			.select({
 				id: loans.id,
 				status: loans.status,
@@ -215,17 +242,18 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
 				returnedAt: loans.returnedAt,
 				dueDate: loans.dueDate,
 				notes: loans.notes,
+				ownerNotes: loans.ownerNotes,
 				userBookId: loans.userBookId,
-				bookId: books.id,
-				title: books.title,
-				authors: books.authors,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
 				coverUrl: books.coverUrl,
 				borrowerId: loans.borrowerId,
 				ownerId: loans.ownerId
 			})
 			.from(loans)
 			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-			.innerJoin(books, eq(userBooks.bookId, books.id))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
 			.where(eq(loans.id, loanId))
 	);
 
@@ -234,9 +262,9 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
 
 	const involvedIds = [...new Set([row.borrowerId, row.ownerId])];
 	const userRows = await db
-		.select({ id: userTable.id, name: userTable.name, email: userTable.email })
-		.from(userTable)
-		.where(inArray(userTable.id, involvedIds));
+		.select({ id: user.id, name: user.name, email: user.email })
+		.from(user)
+		.where(inArray(user.id, involvedIds));
 
 	const userMap = new Map(userRows.map((u) => [u.id, u]));
 	const borrower = userMap.get(row.borrowerId) ?? { name: '?', email: '' };
@@ -287,13 +315,13 @@ const TRANSITIONS: StatusTransition[] = [
 export async function transitionLoan(
 	userId: string,
 	loanId: string,
-	toStatus: LoanStatus
+	toStatus: LoanStatus,
+	ownerNotes?: string
 ): Promise<{ success: boolean; error?: string }> {
 	const loan = await getLoan(userId, loanId);
 	if (!loan) return { success: false, error: 'Préstamo no encontrado' };
 
 	const isOwner = loan.ownerId === userId;
-	const isBorrower = loan.borrowerId === userId;
 	const actor: 'owner' | 'borrower' = isOwner ? 'owner' : 'borrower';
 
 	const transition = TRANSITIONS.find(
@@ -311,30 +339,114 @@ export async function transitionLoan(
 	if (toStatus === 'return_requested') extraFields.returnRequestedAt = new Date();
 	if (toStatus === 'returned') extraFields.returnedAt = new Date();
 
-	await withRLS(userId, (tx) =>
-		tx
+	await withRLS(userId, async (tx) => {
+		await tx
 			.update(loans)
-			.set({ status: toStatus, ...extraFields })
-			.where(eq(loans.id, loanId))
-	);
+			.set({
+				status: toStatus,
+				...extraFields,
+				...(toStatus === 'accepted' && ownerNotes ? { ownerNotes } : {})
+			})
+			.where(eq(loans.id, loanId));
 
-	// Si el préstamo se activa, marcar el libro como no disponible
-	if (toStatus === 'active') {
-		await db
-			.update(userBooks)
-			.set({ isAvailable: false, updatedAt: new Date() })
-			.where(eq(userBooks.id, loan.userBookId));
-	}
+		// Si el préstamo se activa, marcar el libro como no disponible
+		if (toStatus === 'active') {
+			await tx
+				.update(userBooks)
+				.set({ isAvailable: false, updatedAt: new Date() })
+				.where(eq(userBooks.id, loan.userBookId));
+		}
 
-	// Si se devuelve, cancelar o rechazar → libro disponible de nuevo
-	if (['returned', 'rejected', 'cancelled'].includes(toStatus)) {
-		await db
-			.update(userBooks)
-			.set({ isAvailable: true, updatedAt: new Date() })
-			.where(eq(userBooks.id, loan.userBookId));
+		// Si se devuelve, cancela o rechaza → libro disponible de nuevo
+		if (['returned', 'rejected', 'cancelled'].includes(toStatus)) {
+			await tx
+				.update(userBooks)
+				.set({ isAvailable: true, updatedAt: new Date() })
+				.where(eq(userBooks.id, loan.userBookId));
+		}
+	});
+
+	// Notificar al borrower cuando el owner acepta
+	if (toStatus === 'accepted') {
+		sendLoanAcceptedEmail({
+			to: loan.borrowerEmail,
+			borrowerName: loan.borrowerName,
+			ownerName: loan.ownerName,
+			bookTitle: loan.title,
+			loanId,
+			notes: ownerNotes ?? null
+		}).catch((err) => console.error('[email] sendLoanAcceptedEmail failed:', err));
 	}
 
 	return { success: true };
+}
+
+// ─── Cargar libro ajeno para solicitar préstamo ───────────────────────────────
+
+export type BorrowableBook = {
+	userBookId: string;
+	bookId: string | null;
+	title: string;
+	authors: string[];
+	coverUrl: string | null;
+	publishYear: number | null;
+	isAvailable: boolean;
+	ownerId: string;
+	ownerName: string;
+	existingLoanId: string | null;
+	existingLoanStatus: LoanStatus | null;
+};
+
+export async function getBookForBorrow(
+	userId: string,
+	userBookId: string
+): Promise<BorrowableBook | null> {
+	return withRLS(userId, async (tx) => {
+		// RLS user_books_select_in_group permite ver libros ajenos vía shared_tags
+		const rows = await tx
+			.select({
+				userBookId: userBooks.id,
+				bookId: userBooks.bookId,
+				title: effectiveTitle,
+				authors: effectiveAuthors,
+				coverUrl: books.coverUrl,
+				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
+				isAvailable: userBooks.isAvailable,
+				ownerId: userBooks.userId
+			})
+			.from(userBooks)
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(userBooks.id, userBookId));
+
+		if (rows.length === 0) return null;
+		const row = rows[0];
+		if (row.ownerId === userId) return null; // No se puede pedir el propio libro
+
+		const ownerRows = await db
+			.select({ name: user.name })
+			.from(user)
+			.where(eq(user.id, row.ownerId));
+
+		// Préstamo activo del usuario para este libro (borrower = userId)
+		const existingRows = await tx
+			.select({ id: loans.id, status: loans.status })
+			.from(loans)
+			.where(
+				and(
+					eq(loans.userBookId, userBookId),
+					eq(loans.borrowerId, userId),
+					inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+				)
+			);
+
+		return {
+			...row,
+			authors: row.authors ?? [],
+			ownerName: ownerRows[0]?.name ?? '?',
+			existingLoanId: existingRows[0]?.id ?? null,
+			existingLoanStatus: (existingRows[0]?.status as LoanStatus) ?? null
+		};
+	});
 }
 
 // ─── Contar préstamos pendientes de acción ────────────────────────────────────
@@ -342,7 +454,7 @@ export async function transitionLoan(
 
 export async function getPendingCount(userId: string): Promise<number> {
 	const rows = await withRLS(userId, (tx) =>
-		db
+		tx
 			.select({
 				id: loans.id,
 				status: loans.status,

@@ -17,7 +17,7 @@ async function seedBase(tdb: TestDb) {
 				('${ALICE}', 'Alice', 'alice@test.com', true, now(), now()),
 				('${BOB}',   'Bob',   'bob@test.com',   true, now(), now()),
 				('${CAROL}', 'Carol', 'carol@test.com', true, now(), now())
-		` as any
+		` as string
 		);
 
 		// Libro en el catálogo
