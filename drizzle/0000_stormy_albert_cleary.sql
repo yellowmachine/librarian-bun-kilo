@@ -1,3 +1,27 @@
+-- SECURITY DEFINER helpers usados por las RLS policies para evitar recursión
+-- auto-referencial en group_members. Se crean con LANGUAGE plpgsql para que
+-- PostgreSQL no valide el cuerpo en tiempo de creación (group_members aún no existe).
+CREATE OR REPLACE FUNCTION librarian.is_group_member(p_group_id text, p_user_id text)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER STABLE AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM librarian.group_members
+        WHERE group_id = p_group_id AND user_id = p_user_id
+    );
+END;
+$$;
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION librarian.is_group_admin(p_group_id text, p_user_id text)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER STABLE AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM librarian.group_members
+        WHERE group_id = p_group_id AND user_id = p_user_id
+          AND role IN ('owner', 'admin')
+    );
+END;
+$$;
+--> statement-breakpoint
 CREATE TYPE "librarian"."group_role" AS ENUM('owner', 'admin', 'member');--> statement-breakpoint
 CREATE TYPE "librarian"."loan_status" AS ENUM('requested', 'accepted', 'active', 'return_requested', 'returned', 'rejected', 'cancelled');--> statement-breakpoint
 CREATE TABLE "librarian"."book_reviews" (

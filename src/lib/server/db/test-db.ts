@@ -79,34 +79,8 @@ export async function createTestDb() {
 		);
 	`);
 
-	// Funciones SECURITY DEFINER que usan las RLS policies para evitar recursión.
-	// check_function_bodies=off porque group_members aún no existe — las migraciones
-	// lo crean a continuación.
-	await client.exec(`
-		SET check_function_bodies = off;
-
-		CREATE OR REPLACE FUNCTION librarian.is_group_member(p_group_id text, p_user_id text)
-		RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
-			SELECT EXISTS (
-				SELECT 1 FROM librarian.group_members
-				WHERE group_id = p_group_id AND user_id = p_user_id
-			)
-		$$;
-
-		CREATE OR REPLACE FUNCTION librarian.is_group_admin(p_group_id text, p_user_id text)
-		RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
-			SELECT EXISTS (
-				SELECT 1 FROM librarian.group_members
-				WHERE group_id = p_group_id AND user_id = p_user_id
-				  AND role IN ('owner', 'admin')
-			)
-		$$;
-
-		SET check_function_bodies = on;
-	`);
-
-	// Aplicar migraciones — incluyen tablas, índices y RLS policies.
-	// Las policies ya usan librarian.is_group_member / is_group_admin, sin recursión.
+	// Aplicar migraciones — crean las funciones SECURITY DEFINER (is_group_member,
+	// is_group_admin), las tablas, índices y RLS policies. Sin hardcode.
 	for (const stmt of getMigrationStatements()) {
 		await client.exec(stmt);
 	}
