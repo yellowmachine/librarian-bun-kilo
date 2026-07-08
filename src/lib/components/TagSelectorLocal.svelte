@@ -100,7 +100,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div bind:this={containerEl} class="space-y-2" onblur={handleBlur} onkeydown={handleKeydown}>
+<div bind:this={containerEl} class="space-y-2" onfocusout={handleBlur} onkeydown={handleKeydown}>
 	<!-- Chips de tags seleccionados -->
 	{#if selectedTagObjects.length > 0 || tagsToCreate.length > 0}
 		<div class="flex flex-wrap gap-1.5">
