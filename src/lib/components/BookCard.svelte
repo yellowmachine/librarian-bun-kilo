@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BookOpen } from 'phosphor-svelte';
+	import { BookOpen, X } from 'phosphor-svelte';
 
 	interface Props {
 		title: string;
@@ -29,6 +29,16 @@
 		href,
 		onclick
 	}: Props = $props();
+
+	let coverModalOpen = $state(false);
+
+	function openCoverModal() {
+		if (coverUrl) coverModalOpen = true;
+	}
+
+	function closeCoverModal() {
+		coverModalOpen = false;
+	}
 </script>
 
 {#snippet cover(classes: string)}
@@ -53,6 +63,12 @@
 		{/if}
 	</div>
 {/snippet}
+
+<svelte:window
+	onkeydown={(e) => {
+		if (coverModalOpen && e.key === 'Escape') closeCoverModal();
+	}}
+/>
 
 {#if variant === 'grid'}
 	<!-- ── Grid: portada vertical + título/autor debajo ─────────────────── -->
@@ -113,7 +129,18 @@
 {:else if variant === 'detail'}
 	<!-- ── Detail: portada grande + metadatos al lado ────────────────────── -->
 	<div class="flex gap-6">
-		{@render cover('h-40 w-28 shadow-sm')}
+		{#if coverUrl}
+			<button
+				type="button"
+				onclick={openCoverModal}
+				class="flex-shrink-0 cursor-zoom-in transition-opacity duration-200 hover:opacity-80"
+				aria-label="View cover in full size"
+			>
+				{@render cover('h-40 w-28 shadow-sm')}
+			</button>
+		{:else}
+			{@render cover('h-40 w-28 shadow-sm')}
+		{/if}
 		<div class="min-w-0 space-y-2 pt-1">
 			<h1 class="font-serif text-2xl leading-tight font-normal text-ink">{title}</h1>
 			{#if authors.length > 0}
@@ -124,4 +151,28 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if coverModalOpen && coverUrl}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Book cover"
+			tabindex="-1"
+			onclick={(e) => {
+				if (e.target === e.currentTarget) closeCoverModal();
+			}}
+		>
+			<button
+				type="button"
+				onclick={closeCoverModal}
+				aria-label="Close"
+				class="absolute top-4 right-4 text-white/80 transition-colors hover:text-white"
+			>
+				<X size={36} weight="light" />
+			</button>
+			<img src={coverUrl} alt={title} class="max-h-[85vh] max-w-[90vw] object-contain shadow-lg" />
+		</div>
+	{/if}
 {/if}
