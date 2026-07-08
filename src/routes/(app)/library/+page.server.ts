@@ -12,7 +12,7 @@ export const load = async ({ locals, url }: RequestEvent) => {
 		getSharedTagsForUser(locals.user!.id),
 		getUserLibraries(locals.user!.id)
 	]);
-	return { userBooks, contacts, sharedTagsForOthers, userLibraries };
+	return { userBooks, contacts, sharedTagsForOthers, userLibraries, libraryId };
 };
 
 export const actions = {

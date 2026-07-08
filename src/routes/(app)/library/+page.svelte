@@ -20,7 +20,11 @@
 	let activeTab = $state<'mine' | 'others' | 'contacts'>('mine');
 
 	let { data, form } = $props();
-	const { userBooks, contacts, sharedTagsForOthers, userLibraries } = $derived(data);
+	const { userBooks, contacts, sharedTagsForOthers, userLibraries, libraryId } = $derived(data);
+
+	const currentLibraryName = $derived(
+		libraryId ? (userLibraries.find((lib) => lib.id === libraryId)?.name ?? 'Library') : 'Library'
+	);
 
 	function normalize(s: string) {
 		return s
@@ -244,7 +248,7 @@
 	<!-- ── Cabecera + acciones ───────────────────────────────────────────── -->
 	<div class="flex items-end justify-between gap-4">
 		<div>
-			<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">Library</h1>
+			<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{currentLibraryName}</h1>
 		</div>
 		<div class="flex shrink-0 items-center gap-2">
 			<a
