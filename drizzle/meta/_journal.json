@@ -8,6 +8,27 @@
       "when": 1777785203979,
       "tag": "0000_stormy_albert_cleary",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783501331989,
+      "tag": "0001_careless_husk",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783501349897,
+      "tag": "0002_backfill_default_libraries",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783501371451,
+      "tag": "0003_special_silhouette",
+      "breakpoints": true
     }
   ]
 }

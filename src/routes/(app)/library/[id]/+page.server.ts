@@ -15,6 +15,7 @@ import {
 	deleteReview
 } from '$lib/server/reviews';
 import { getBookForBorrow, requestLoan } from '$lib/server/loans';
+import { getUserLibraries, moveBookToLibrary } from '$lib/server/libraries';
 
 export const load = async ({ locals, params }: RequestEvent) => {
 	const book = await getUserBook(locals.user!.id, params.id!);
@@ -22,7 +23,7 @@ export const load = async ({ locals, params }: RequestEvent) => {
 
 	const isOwner = book.ownerId === locals.user!.id;
 
-	const [userTags, myReview, reviews, reviewStats, borrowInfo] = await Promise.all([
+	const [userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries] = await Promise.all([
 		isOwner
 			? withRLS(locals.user!.id, (tx) =>
 					tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
@@ -31,10 +32,11 @@ export const load = async ({ locals, params }: RequestEvent) => {
 		book.bookId ? getMyReview(locals.user!.id, book.bookId) : null,
 		book.bookId ? getBookReviews(locals.user!.id, book.bookId) : [],
 		book.bookId ? getBookReviewStats(locals.user!.id, book.bookId) : null,
-		!isOwner ? getBookForBorrow(locals.user!.id, params.id!) : Promise.resolve(null)
+		!isOwner ? getBookForBorrow(locals.user!.id, params.id!) : Promise.resolve(null),
+		isOwner ? getUserLibraries(locals.user!.id) : Promise.resolve([])
 	]);
 
-	return { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo };
+	return { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries };
 };
 
 export const actions = {
@@ -50,6 +52,21 @@ export const actions = {
 		});
 
 		return { success: true };
+	},
+
+	// Mover el libro a otra biblioteca del usuario
+	moveLibrary: async ({ locals, params, request }: RequestEvent) => {
+		const data = await request.formData();
+		const libraryId = (data.get('libraryId') as string)?.trim();
+		if (!libraryId) return fail(400, { error: 'libraryId is required' });
+
+		try {
+			await moveBookToLibrary(locals.user!.id, params.id!, libraryId);
+		} catch (e) {
+			return fail(400, { error: e instanceof Error ? e.message : 'Error moving book.' });
+		}
+
+		return { moved: true };
 	},
 
 	// Crear etiqueta nueva y asignarla al libro
