@@ -64,6 +64,46 @@ export async function createLibrary(userId: string, name: string): Promise<strin
 	});
 }
 
+// ─── Renombrar biblioteca ─────────────────────────────────────────────────────
+
+export async function renameLibrary(
+	userId: string,
+	libraryId: string,
+	name: string
+): Promise<void> {
+	await withRLS(userId, async (tx) => {
+		await tx
+			.update(libraries)
+			.set({ name, updatedAt: new Date() })
+			.where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+	});
+}
+
+// ─── Borrar biblioteca (solo si no es la default y no tiene libros) ──────────
+
+export async function deleteLibrary(userId: string, libraryId: string): Promise<void> {
+	await withRLS(userId, async (tx) => {
+		const [target] = await tx
+			.select({ isDefault: libraries.isDefault })
+			.from(libraries)
+			.where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+
+		if (!target) throw new Error('Library not found.');
+		if (target.isDefault) throw new Error('The default library can’t be deleted.');
+
+		const [{ count }] = await tx
+			.select({ count: sql<number>`count(*)::int` })
+			.from(userBooks)
+			.where(eq(userBooks.libraryId, libraryId));
+
+		if (count > 0) throw new Error('Move or remove the books in this library before deleting it.');
+
+		await tx
+			.delete(libraries)
+			.where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+	});
+}
+
 // ─── Mover un libro a otra biblioteca del mismo usuario ──────────────────────
 
 export async function moveBookToLibrary(
