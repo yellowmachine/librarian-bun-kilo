@@ -79,6 +79,32 @@ export async function renameLibrary(
 	});
 }
 
+// ─── Cambiar cuál es la biblioteca default ────────────────────────────────────
+// Desmarca la default actual y marca la nueva, en la misma transacción para no
+// violar el índice único parcial (como máximo una default por usuario).
+
+export async function setDefaultLibrary(userId: string, libraryId: string): Promise<void> {
+	await withRLS(userId, async (tx) => {
+		const [target] = await tx
+			.select({ isDefault: libraries.isDefault })
+			.from(libraries)
+			.where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+
+		if (!target) throw new Error('Library not found.');
+		if (target.isDefault) return;
+
+		await tx
+			.update(libraries)
+			.set({ isDefault: false, updatedAt: new Date() })
+			.where(and(eq(libraries.userId, userId), eq(libraries.isDefault, true)));
+
+		await tx
+			.update(libraries)
+			.set({ isDefault: true, updatedAt: new Date() })
+			.where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+	});
+}
+
 // ─── Borrar biblioteca (solo si no es la default y no tiene libros) ──────────
 
 export async function deleteLibrary(userId: string, libraryId: string): Promise<void> {

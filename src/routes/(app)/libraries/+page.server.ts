@@ -4,7 +4,8 @@ import {
 	getUserLibraries,
 	createLibrary,
 	renameLibrary,
-	deleteLibrary
+	deleteLibrary,
+	setDefaultLibrary
 } from '$lib/server/libraries';
 
 export const load = async ({ locals }: RequestEvent) => {
@@ -32,6 +33,22 @@ export const actions = {
 
 		await renameLibrary(locals.user!.id, libraryId, name);
 		return { renamed: true };
+	},
+
+	setDefault: async ({ locals, request }: RequestEvent) => {
+		const data = await request.formData();
+		const libraryId = (data.get('libraryId') as string)?.trim();
+		if (!libraryId) return fail(400, { setDefaultError: 'libraryId is required.' });
+
+		try {
+			await setDefaultLibrary(locals.user!.id, libraryId);
+		} catch (e) {
+			return fail(400, {
+				setDefaultError: e instanceof Error ? e.message : 'Error setting default library.'
+			});
+		}
+
+		return { setDefault: true };
 	},
 
 	delete: async ({ locals, request }: RequestEvent) => {
