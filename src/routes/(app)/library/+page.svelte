@@ -304,7 +304,7 @@
 			</div>
 
 			<a
-				href="/library/add"
+				href={libraryId ? `/library/add?libraryId=${libraryId}` : '/library/add'}
 				class="flex items-center gap-1.5 border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
 			>
 				<Plus size={15} weight="bold" />

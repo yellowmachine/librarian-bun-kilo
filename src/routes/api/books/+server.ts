@@ -142,6 +142,10 @@ export async function POST({ locals, request }: RequestEvent) {
 	} catch (e) {
 		if (isHttpError(e)) throw e;
 
+		if (e instanceof Error && e.message === 'Library not found.') {
+			error(404, e.message);
+		}
+
 		console.error('POST /api/books/detail failed', e);
 		error(500, 'Unexpected error');
 	}

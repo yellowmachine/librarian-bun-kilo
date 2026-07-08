@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { books, userBooks, tags, userBookTags } from './db/schema';
+import { books, userBooks, tags, userBookTags, libraries } from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
@@ -77,7 +77,19 @@ export async function addBookToLibrary(
 			if (dup.length > 0) return dup[0].id;
 		}
 
-		const resolvedLibraryId = libraryId ?? (await getOrCreateDefaultLibrary(userId, tx));
+		let resolvedLibraryId: string;
+		if (libraryId) {
+			// Comprobamos explícitamente que la biblioteca destino es del usuario:
+			// la RLS de inserción solo valida userBooks.userId, no libraryId.
+			const target = await tx
+				.select({ id: libraries.id })
+				.from(libraries)
+				.where(and(eq(libraries.id, libraryId), eq(libraries.userId, userId)));
+			if (target.length === 0) throw new Error('Library not found.');
+			resolvedLibraryId = libraryId;
+		} else {
+			resolvedLibraryId = await getOrCreateDefaultLibrary(userId, tx);
+		}
 
 		const id = nanoid();
 		await tx.insert(userBooks).values({

@@ -1,10 +1,17 @@
 <script lang="ts">
 	import { Barcode, MagnifyingGlass, ArrowLeft, Plus, Trash } from 'phosphor-svelte';
+	import { page } from '$app/state';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import type { BookSearchResult } from '$lib/types';
+
+	interface Library {
+		id: string;
+		name: string;
+		isDefault: boolean;
+	}
 
 	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'form' | 'adding';
 
@@ -26,6 +33,8 @@
 	let availableTags = $state<Tag[]>([]);
 	let selectedTagIds = $state<string[]>([]);
 	let tagsToCreate = $state<{ name: string; color: string | null }[]>([]);
+	let availableLibraries = $state<Library[]>([]);
+	let selectedLibraryId = $state('');
 
 	// ── Manual form state ─────────────────────────────────────────────────────
 	let formTitle = $state('');
@@ -57,7 +66,7 @@
 
 	async function enterFormMode() {
 		resetFormFields();
-		await fetchUserTags();
+		await Promise.all([fetchUserTags(), fetchUserLibraries()]);
 		mode = 'form';
 	}
 
@@ -97,6 +106,25 @@
 		}
 	}
 
+	async function fetchUserLibraries(): Promise<void> {
+		try {
+			const res = await fetch('/api/libraries');
+			if (!res.ok) return;
+			availableLibraries = await res.json();
+			if (!selectedLibraryId) {
+				const fromUrl = page.url.searchParams.get('libraryId');
+				const preselected = availableLibraries.find((lib) => lib.id === fromUrl);
+				selectedLibraryId =
+					preselected?.id ??
+					availableLibraries.find((lib) => lib.isDefault)?.id ??
+					availableLibraries[0]?.id ??
+					'';
+			}
+		} catch {
+			// falls back to the server-side default library
+		}
+	}
+
 	async function selectBook(book: BookSearchResult) {
 		selectedBook = book;
 		descriptionExpanded = false;
@@ -110,7 +138,8 @@
 				selectedDescription = d;
 				loadingDescription = false;
 			}),
-			fetchUserTags()
+			fetchUserTags(),
+			fetchUserLibraries()
 		]);
 	}
 
@@ -164,6 +193,7 @@
 					workId: selectedBook.id,
 					isbn: selectedBook.isbn ?? undefined,
 					notes: notes || undefined,
+					libraryId: selectedLibraryId || undefined,
 					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
 					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 				})
@@ -201,6 +231,7 @@
 					publishYear: year && !isNaN(year) ? year : undefined,
 					description: formDescription.trim() || undefined,
 					notes: notes.trim() || undefined,
+					libraryId: selectedLibraryId || undefined,
 					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
 					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 				})
@@ -392,6 +423,26 @@
 				></textarea>
 			</div>
 
+			{#if availableLibraries.length > 1}
+				<div>
+					<label
+						for="confirm-library"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						Library
+					</label>
+					<select
+						id="confirm-library"
+						bind:value={selectedLibraryId}
+						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					>
+						{#each availableLibraries as lib (lib.id)}
+							<option value={lib.id}>{lib.name}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+
 			<div>
 				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
 					Tags <span class="tracking-normal normal-case">(optional)</span>
@@ -538,6 +589,26 @@
 					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 				></textarea>
 			</div>
+
+			{#if availableLibraries.length > 1}
+				<div>
+					<label
+						for="form-library"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						Library
+					</label>
+					<select
+						id="form-library"
+						bind:value={selectedLibraryId}
+						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					>
+						{#each availableLibraries as lib (lib.id)}
+							<option value={lib.id}>{lib.name}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
 
 			<div>
 				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
