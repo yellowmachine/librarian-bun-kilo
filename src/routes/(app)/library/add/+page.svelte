@@ -289,7 +289,10 @@
 				<span class="text-xs text-ink-muted">ISBN scan</span>
 			</button>
 			<button
-				onclick={() => (mode = 'manual')}
+				onclick={() => {
+					manualQuery = '';
+					mode = 'manual';
+				}}
 				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
 			>
 				<MagnifyingGlass size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
