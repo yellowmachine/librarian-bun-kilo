@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import { libraries, userBooks } from './db/schema';
 import { withRLS } from './db/rls';
@@ -130,13 +130,15 @@ export async function deleteLibrary(userId: string, libraryId: string): Promise<
 	});
 }
 
-// ─── Mover un libro a otra biblioteca del mismo usuario ──────────────────────
+// ─── Mover uno o varios libros a otra biblioteca del mismo usuario ────────────
 
-export async function moveBookToLibrary(
+export async function moveBooksToLibrary(
 	userId: string,
-	userBookId: string,
+	userBookIds: string[],
 	libraryId: string
 ): Promise<void> {
+	if (userBookIds.length === 0) return;
+
 	await withRLS(userId, async (tx) => {
 		// RLS ya limita libraries/user_books al propio usuario, pero comprobamos
 		// explícitamente que el destino existe y es suyo para devolver un error claro.
@@ -150,6 +152,14 @@ export async function moveBookToLibrary(
 		await tx
 			.update(userBooks)
 			.set({ libraryId, updatedAt: new Date() })
-			.where(and(eq(userBooks.id, userBookId), eq(userBooks.userId, userId)));
+			.where(and(inArray(userBooks.id, userBookIds), eq(userBooks.userId, userId)));
 	});
+}
+
+export async function moveBookToLibrary(
+	userId: string,
+	userBookId: string,
+	libraryId: string
+): Promise<void> {
+	return moveBooksToLibrary(userId, [userBookId], libraryId);
 }

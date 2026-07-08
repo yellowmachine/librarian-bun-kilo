@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { MagnifyingGlass, Tag, BookOpen, Export, Plus, CaretDown } from 'phosphor-svelte';
+	import {
+		MagnifyingGlass,
+		Tag,
+		BookOpen,
+		Export,
+		Plus,
+		CaretDown,
+		CheckSquare
+	} from 'phosphor-svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import type { GroupBookResult } from '$lib/server/groups';
@@ -11,7 +20,7 @@
 	let activeTab = $state<'mine' | 'others' | 'contacts'>('mine');
 
 	let { data, form } = $props();
-	const { userBooks, contacts, sharedTagsForOthers } = $derived(data);
+	const { userBooks, contacts, sharedTagsForOthers, userLibraries } = $derived(data);
 
 	function normalize(s: string) {
 		return s
@@ -96,10 +105,65 @@
 	}
 
 	function toggleMineTag(id: string) {
-		const next = new SvelteSet(activeMineTagIds);
-		if (next.has(id)) next.delete(id);
-		else next.add(id);
-		activeMineTagIds = next;
+		if (activeMineTagIds.has(id)) activeMineTagIds.delete(id);
+		else activeMineTagIds.add(id);
+	}
+
+	// ── Selección en bloque + mover a otra biblioteca ────────────────────────────
+	let selectionMode = $state(false);
+	let selectedIds = new SvelteSet<string>();
+	let moveTargetLibraryId = $state('');
+	let moving = $state(false);
+	let moveError = $state('');
+
+	function exitSelectionMode() {
+		selectionMode = false;
+		selectedIds.clear();
+		moveTargetLibraryId = '';
+		moveError = '';
+	}
+
+	function toggleSelect(userBookId: string) {
+		if (selectedIds.has(userBookId)) selectedIds.delete(userBookId);
+		else selectedIds.add(userBookId);
+	}
+
+	const allFilteredSelected = $derived(
+		filtered().length > 0 && filtered().every((b) => selectedIds.has(b.userBookId))
+	);
+
+	function toggleSelectAll() {
+		if (allFilteredSelected) {
+			selectedIds.clear();
+		} else {
+			for (const b of filtered()) selectedIds.add(b.userBookId);
+		}
+	}
+
+	async function moveSelected() {
+		if (selectedIds.size === 0 || !moveTargetLibraryId) return;
+		moving = true;
+		moveError = '';
+		try {
+			const response = await fetch('/api/books/library', {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					userBookIds: [...selectedIds],
+					libraryId: moveTargetLibraryId
+				})
+			});
+			if (!response.ok) {
+				const body = await response.json().catch(() => null);
+				throw new Error(body?.message ?? 'Error moving books.');
+			}
+			await invalidateAll();
+			exitSelectionMode();
+		} catch (e) {
+			moveError = e instanceof Error ? e.message : 'Error moving books.';
+		} finally {
+			moving = false;
+		}
 	}
 
 	// ── Sección ajenos ────────────────────────────────────────────────────────
@@ -115,15 +179,14 @@
 	$effect(() => {
 		if (othersSearched) {
 			activeTab = 'others';
-			activeOtherTagIds = new SvelteSet(othersTagIds);
+			activeOtherTagIds.clear();
+			for (const id of othersTagIds) activeOtherTagIds.add(id);
 		}
 	});
 
 	function toggleOtherTag(id: string) {
-		const next = new SvelteSet(activeOtherTagIds);
-		if (next.has(id)) next.delete(id);
-		else next.add(id);
-		activeOtherTagIds = next;
+		if (activeOtherTagIds.has(id)) activeOtherTagIds.delete(id);
+		else activeOtherTagIds.add(id);
 	}
 
 	// ── Sección contactos ─────────────────────────────────────────────────────
@@ -167,15 +230,13 @@
 	$effect(() => {
 		if (contactsFetched) {
 			activeTab = 'contacts';
-			activeContactTagIds = new SvelteSet();
+			activeContactTagIds.clear();
 		}
 	});
 
 	function toggleContactTag(id: string) {
-		const next = new SvelteSet(activeContactTagIds);
-		if (next.has(id)) next.delete(id);
-		else next.add(id);
-		activeContactTagIds = next;
+		if (activeContactTagIds.has(id)) activeContactTagIds.delete(id);
+		else activeContactTagIds.add(id);
 	}
 </script>
 
@@ -263,7 +324,10 @@
 			</span>
 		</button>
 		<button
-			onclick={() => (activeTab = 'others')}
+			onclick={() => {
+				exitSelectionMode();
+				activeTab = 'others';
+			}}
 			class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
 			{activeTab === 'others'
 				? 'border-ink font-medium text-ink'
@@ -273,7 +337,10 @@
 		</button>
 		{#if contacts.length > 0}
 			<button
-				onclick={() => (activeTab = 'contacts')}
+				onclick={() => {
+					exitSelectionMode();
+					activeTab = 'contacts';
+				}}
 				class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
 				{activeTab === 'contacts'
 					? 'border-ink font-medium text-ink'
@@ -308,7 +375,7 @@
 					{/each}
 					{#if activeMineTagIds.size > 0}
 						<button
-							onclick={() => (activeMineTagIds = new SvelteSet())}
+							onclick={() => activeMineTagIds.clear()}
 							class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
 						>
 							Clear
@@ -366,19 +433,70 @@
 				</div>
 			</div>
 
-			<!-- Búsqueda -->
-			<div class="relative">
-				<MagnifyingGlass
-					size={16}
-					class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
-				/>
-				<input
-					type="search"
-					bind:value={search}
-					placeholder="Search by title or author..."
-					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
-				/>
+			<!-- Búsqueda + selección en bloque -->
+			<div class="flex items-center gap-2">
+				<div class="relative flex-1">
+					<MagnifyingGlass
+						size={16}
+						class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
+					/>
+					<input
+						type="search"
+						bind:value={search}
+						placeholder="Search by title or author..."
+						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
+					/>
+				</div>
+				<button
+					type="button"
+					onclick={() => (selectionMode ? exitSelectionMode() : (selectionMode = true))}
+					class="flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm transition-colors
+					{selectionMode
+						? 'border-ink bg-ink text-paper'
+						: 'border-paper-border text-ink-muted hover:border-ink-faint hover:text-ink'}"
+				>
+					<CheckSquare size={15} />
+					<span class="hidden sm:inline">{selectionMode ? 'Cancel' : 'Select'}</span>
+				</button>
 			</div>
+
+			{#if selectionMode}
+				<div
+					class="flex flex-wrap items-center gap-3 border border-paper-border bg-paper-ui px-4 py-3"
+				>
+					<button
+						type="button"
+						onclick={toggleSelectAll}
+						class="text-sm text-ink-muted underline underline-offset-2 hover:text-ink"
+					>
+						{allFilteredSelected ? 'Deselect all' : 'Select all'}
+					</button>
+					<span class="text-sm text-ink-faint">{selectedIds.size} selected</span>
+
+					{#if selectedIds.size > 0}
+						<select
+							bind:value={moveTargetLibraryId}
+							class="border border-paper-border bg-paper px-3 py-1.5 text-sm focus:border-ink focus:ring-0"
+						>
+							<option value="">Move to…</option>
+							{#each userLibraries as lib (lib.id)}
+								<option value={lib.id}>{lib.name}</option>
+							{/each}
+						</select>
+						<button
+							type="button"
+							onclick={moveSelected}
+							disabled={!moveTargetLibraryId || moving}
+							class="border border-ink bg-ink px-4 py-1.5 text-sm text-paper hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+						>
+							{moving ? 'Moving…' : 'Move'}
+						</button>
+						{#if moveError}
+							<span class="text-xs text-red-600">{moveError}</span>
+						{/if}
+					{/if}
+				</div>
+			{/if}
 
 			{#if filtered().length === 0}
 				<p class="py-12 text-center text-sm text-ink-faint">No results.</p>
@@ -393,6 +511,9 @@
 						isAvailable: b.isAvailable,
 						href: `/library/${b.userBookId}`
 					}))}
+					selectable={selectionMode}
+					{selectedIds}
+					onToggleSelect={toggleSelect}
 				/>
 			{/if}
 		{:else}
@@ -428,7 +549,7 @@
 				{/each}
 				{#if activeOtherTagIds.size > 0}
 					<button
-						onclick={() => (activeOtherTagIds = new SvelteSet())}
+						onclick={() => activeOtherTagIds.clear()}
 						class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
 					>
 						Clear
@@ -555,7 +676,7 @@
 						{/each}
 						{#if activeContactTagIds.size > 0}
 							<button
-								onclick={() => (activeContactTagIds = new SvelteSet())}
+								onclick={() => activeContactTagIds.clear()}
 								class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
 							>
 								Clear
