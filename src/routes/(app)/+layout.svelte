@@ -5,7 +5,8 @@
 		Books,
 		ArrowsLeftRight,
 		SignOut,
-		ClockCounterClockwise
+		ClockCounterClockwise,
+		Plus
 	} from 'phosphor-svelte';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 
@@ -66,6 +67,14 @@
 
 			<!-- Usuario + salir -->
 			<div class="flex items-center gap-3">
+				<a
+					href="/library/add"
+					title="Add book"
+					class="flex items-center gap-1.5 rounded-md border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
+				>
+					<Plus size={15} weight="bold" />
+					<span class="hidden sm:inline">Add</span>
+				</a>
 				<span class="hidden text-sm text-ink-faint sm:block">{user.name}</span>
 				<form method="POST" action="/logout">
 					<button

@@ -78,7 +78,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div bind:this={containerEl} class="relative" onblur={handleBlur} onkeydown={handleKeydown}>
+<div bind:this={containerEl} class="relative" onfocusout={handleBlur} onkeydown={handleKeydown}>
 	{#if creatingNew}
 		<!-- Formulario de creación con color picker -->
 		<form
