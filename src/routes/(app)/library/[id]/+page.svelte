@@ -285,7 +285,16 @@
 
 	<!-- Biblioteca (solo propietario) -->
 	{#if isOwner && userLibraries.length > 1}
-		<form method="POST" action="?/moveLibrary" use:enhance class="space-y-2">
+		<form
+			method="POST"
+			action="?/moveLibrary"
+			use:enhance={() => {
+				return async ({ update }) => {
+					await update({ reset: false });
+				};
+			}}
+			class="space-y-2"
+		>
 			<label
 				for="library-id"
 				class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
@@ -319,7 +328,16 @@
 
 	<!-- Notas y disponibilidad (solo propietario) -->
 	{#if isOwner}
-		<form method="POST" action="?/update" use:enhance class="space-y-5">
+		<form
+			method="POST"
+			action="?/update"
+			use:enhance={() => {
+				return async ({ update }) => {
+					await update({ reset: false });
+				};
+			}}
+			class="space-y-5"
+		>
 			<div>
 				<label
 					for="notes"
@@ -514,7 +532,16 @@
 						<p class="text-xs text-red-600">{form.reviewError}</p>
 					{/if}
 
-					<form method="POST" action="?/saveReview" use:enhance class="space-y-3">
+					<form
+						method="POST"
+						action="?/saveReview"
+						use:enhance={() => {
+							return async ({ update }) => {
+								await update({ reset: false });
+							};
+						}}
+						class="space-y-3"
+					>
 						<div>
 							<StarRating bind:value={reviewRating} name="rating" size={24} />
 						</div>
