@@ -39,6 +39,10 @@
 	function closeCoverModal() {
 		coverModalOpen = false;
 	}
+
+	// OpenLibrary covers are stored as "-M" (180x280). "-L" (320x500) is the
+	// largest fixed size the covers API offers, so request it for the lightbox.
+	const modalCoverUrl = $derived(coverUrl?.replace(/-M\.jpg$/, '-L.jpg') ?? coverUrl);
 </script>
 
 {#snippet cover(classes: string)}
@@ -172,7 +176,11 @@
 			>
 				<X size={36} weight="light" />
 			</button>
-			<img src={coverUrl} alt={title} class="max-h-[85vh] max-w-[90vw] object-contain shadow-lg" />
+			<img
+				src={modalCoverUrl}
+				alt={title}
+				class="h-auto max-h-[85vh] w-[min(28rem,90vw)] object-contain shadow-lg"
+			/>
 		</div>
 	{/if}
 {/if}
