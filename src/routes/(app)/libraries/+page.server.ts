@@ -1,6 +1,11 @@
 import { fail } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { getUserLibraries, createLibrary } from '$lib/server/libraries';
+import {
+	getUserLibraries,
+	createLibrary,
+	renameLibrary,
+	deleteLibrary
+} from '$lib/server/libraries';
 
 export const load = async ({ locals }: RequestEvent) => {
 	const userLibraries = await getUserLibraries(locals.user!.id);
@@ -16,5 +21,30 @@ export const actions = {
 
 		await createLibrary(locals.user!.id, name);
 		return { created: true };
+	},
+
+	rename: async ({ locals, request }: RequestEvent) => {
+		const data = await request.formData();
+		const libraryId = (data.get('libraryId') as string)?.trim();
+		const name = (data.get('name') as string)?.trim();
+
+		if (!libraryId || !name) return fail(400, { renameError: 'Name is required.' });
+
+		await renameLibrary(locals.user!.id, libraryId, name);
+		return { renamed: true };
+	},
+
+	delete: async ({ locals, request }: RequestEvent) => {
+		const data = await request.formData();
+		const libraryId = (data.get('libraryId') as string)?.trim();
+		if (!libraryId) return fail(400, { deleteError: 'libraryId is required.' });
+
+		try {
+			await deleteLibrary(locals.user!.id, libraryId);
+		} catch (e) {
+			return fail(400, { deleteError: e instanceof Error ? e.message : 'Error deleting library.' });
+		}
+
+		return { deleted: true };
 	}
 };
