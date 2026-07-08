@@ -95,9 +95,9 @@
 		</div>
 	{/if}
 
-	{#if form?.deleteError}
+	{#if form?.deleteError || form?.setDefaultError}
 		<p class="border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-			{form.deleteError}
+			{form.deleteError ?? form.setDefaultError}
 		</p>
 	{/if}
 
@@ -165,6 +165,19 @@
 							<ArrowRight size={16} class="text-ink-faint" />
 						</div>
 					</a>
+
+					{#if !library.isDefault}
+						<form method="POST" action="?/setDefault" use:enhance>
+							<input type="hidden" name="libraryId" value={library.id} />
+							<button
+								type="submit"
+								title="Make default"
+								class="shrink-0 p-2 text-ink-faint hover:text-ink"
+							>
+								<Star size={15} />
+							</button>
+						</form>
+					{/if}
 
 					<button
 						type="button"
