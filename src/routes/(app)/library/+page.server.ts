@@ -1,16 +1,18 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { getUserBooks, getContactBooks } from '$lib/server/books';
 import { searchBooksFromOthers, getContacts, getSharedTagsForUser } from '$lib/server/groups';
+import { getUserLibraries } from '$lib/server/libraries';
 
 export const load = async ({ locals, url }: RequestEvent) => {
 	const libraryId = url.searchParams.get('libraryId');
 
-	const [userBooks, contacts, sharedTagsForOthers] = await Promise.all([
+	const [userBooks, contacts, sharedTagsForOthers, userLibraries] = await Promise.all([
 		getUserBooks(locals.user!.id, libraryId ? { type: 'library', libraryId } : { type: 'all' }),
 		getContacts(locals.user!.id),
-		getSharedTagsForUser(locals.user!.id)
+		getSharedTagsForUser(locals.user!.id),
+		getUserLibraries(locals.user!.id)
 	]);
-	return { userBooks, contacts, sharedTagsForOthers };
+	return { userBooks, contacts, sharedTagsForOthers, userLibraries };
 };
 
 export const actions = {

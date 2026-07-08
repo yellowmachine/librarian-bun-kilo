@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Check } from 'phosphor-svelte';
 	import BookCard from './BookCard.svelte';
 
 	interface Book {
@@ -14,9 +15,13 @@
 
 	interface Props {
 		books: Book[];
+		/** Modo selección: oculta la navegación y muestra un checkbox por libro */
+		selectable?: boolean;
+		selectedIds?: Set<string>;
+		onToggleSelect?: (id: string) => void;
 	}
 
-	let { books }: Props = $props();
+	let { books, selectable = false, selectedIds, onToggleSelect }: Props = $props();
 </script>
 
 <div
@@ -24,15 +29,40 @@
 	style="column-gap: 1.5rem; row-gap: 2.5rem;"
 >
 	{#each books as book (book.id)}
-		<BookCard
-			title={book.title}
-			authors={book.authors}
-			coverUrl={book.coverUrl}
-			publishYear={book.publishYear}
-			isAvailable={book.isAvailable}
-			variant="grid"
-			href={book.href}
-			onclick={book.onclick}
-		/>
+		{#if selectable}
+			{@const checked = selectedIds?.has(book.id) ?? false}
+			<div class="relative">
+				<button
+					type="button"
+					onclick={() => onToggleSelect?.(book.id)}
+					aria-label={checked ? 'Deselect' : 'Select'}
+					aria-pressed={checked}
+					class="absolute top-1.5 left-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border transition-colors
+					{checked ? 'border-ink bg-ink text-paper' : 'border-paper-border bg-paper/90 text-transparent'}"
+				>
+					<Check size={12} weight="bold" />
+				</button>
+				<BookCard
+					title={book.title}
+					authors={book.authors}
+					coverUrl={book.coverUrl}
+					publishYear={book.publishYear}
+					isAvailable={book.isAvailable}
+					variant="grid"
+					onclick={() => onToggleSelect?.(book.id)}
+				/>
+			</div>
+		{:else}
+			<BookCard
+				title={book.title}
+				authors={book.authors}
+				coverUrl={book.coverUrl}
+				publishYear={book.publishYear}
+				isAvailable={book.isAvailable}
+				variant="grid"
+				href={book.href}
+				onclick={book.onclick}
+			/>
+		{/if}
 	{/each}
 </div>
