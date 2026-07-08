@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { MagnifyingGlass, Tag, Export, Plus, CaretDown } from 'phosphor-svelte';
+	import { MagnifyingGlass, Tag, BookOpen, Export, Plus, CaretDown } from 'phosphor-svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import type { GroupBookResult } from '$lib/server/groups';
@@ -186,6 +186,14 @@
 			<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">Library</h1>
 		</div>
 		<div class="flex shrink-0 items-center gap-2">
+			<a
+				href="/libraries"
+				class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+			>
+				<BookOpen size={15} />
+				<span class="hidden sm:inline">Libraries</span>
+			</a>
+
 			<a
 				href="/tags"
 				class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"

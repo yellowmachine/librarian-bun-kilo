@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, type TestDb } from '../test-db';
-import { books, userBooks, loans } from '../schema';
+import { books, userBooks, loans, libraries } from '../schema';
 import { eq } from 'drizzle-orm';
 
 const ALICE = 'user-alice'; // propietaria del libro
@@ -23,10 +23,16 @@ async function seedBase(tdb: TestDb) {
 		// Libro en el catálogo
 		await tx.insert(books).values({ id: 'OL1', title: 'Dune', authors: ['Frank Herbert'] });
 
+		// Biblioteca default de alice
+		await tx
+			.insert(libraries)
+			.values({ id: 'lib-alice', userId: ALICE, name: 'Default', isDefault: true });
+
 		// Alice tiene el libro
 		await tx.insert(userBooks).values({
 			id: 'ub-alice',
 			userId: ALICE,
+			libraryId: 'lib-alice',
 			bookId: 'OL1',
 			isAvailable: true,
 			addedAt: new Date(),
@@ -92,6 +98,7 @@ describe('RLS · loans · inserción', () => {
 			tx.insert(userBooks).values({
 				id: 'ub-alice-2',
 				userId: ALICE,
+				libraryId: 'lib-alice',
 				bookId: 'OL2',
 				isAvailable: true,
 				addedAt: new Date(),

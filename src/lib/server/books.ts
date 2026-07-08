@@ -3,6 +3,7 @@ import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import { books, userBooks, tags, userBookTags } from './db/schema';
 import { withRLS } from './db/rls';
+import { getOrCreateDefaultLibrary } from './libraries';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
 
 export const LIBRARY_RECENT_LIMIT = 50;
@@ -62,7 +63,8 @@ type BookSource =
 export async function addBookToLibrary(
 	userId: string,
 	source: BookSource,
-	notes?: string
+	notes?: string,
+	libraryId?: string
 ): Promise<string> {
 	return withRLS(userId, async (tx) => {
 		if (source.bookId !== null) {
@@ -75,10 +77,13 @@ export async function addBookToLibrary(
 			if (dup.length > 0) return dup[0].id;
 		}
 
+		const resolvedLibraryId = libraryId ?? (await getOrCreateDefaultLibrary(userId, tx));
+
 		const id = nanoid();
 		await tx.insert(userBooks).values({
 			id,
 			userId,
+			libraryId: resolvedLibraryId,
 			bookId: source.bookId ?? null,
 			title: source.bookId === null ? source.title : null,
 			authors: source.bookId === null ? (source.authors ?? null) : null,
@@ -97,6 +102,7 @@ export async function addBookToLibrary(
 export type UserBookWithDetails = {
 	userBookId: string;
 	ownerId: string;
+	libraryId: string;
 	bookId: string | null;
 	title: string;
 	authors: string[];
@@ -113,6 +119,7 @@ export type UserBookWithDetails = {
 export type LibraryFilter =
 	| { type: 'recent'; limit?: number }
 	| { type: 'all' }
+	| { type: 'library'; libraryId: string }
 	| { type: 'letter'; letter: string; by: 'title' | 'author' };
 
 export async function getUserBooks(
@@ -124,6 +131,7 @@ export async function getUserBooks(
 			.select({
 				userBookId: userBooks.id,
 				ownerId: userBooks.userId,
+				libraryId: userBooks.libraryId,
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
@@ -147,6 +155,10 @@ export async function getUserBooks(
 		} else if (filter.type === 'all') {
 			rows = await base
 				.where(eq(userBooks.userId, userId))
+				.orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
+		} else if (filter.type === 'library') {
+			rows = await base
+				.where(and(eq(userBooks.userId, userId), eq(userBooks.libraryId, filter.libraryId)))
 				.orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
 		} else if (filter.by === 'title') {
 			rows = await base
@@ -209,6 +221,7 @@ export async function getContactBooks(
 			.select({
 				userBookId: userBooks.id,
 				ownerId: userBooks.userId,
+				libraryId: userBooks.libraryId,
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
@@ -287,6 +300,7 @@ export async function getUserBook(
 			.select({
 				userBookId: userBooks.id,
 				ownerId: userBooks.userId,
+				libraryId: userBooks.libraryId,
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,

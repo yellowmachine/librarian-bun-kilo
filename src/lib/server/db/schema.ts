@@ -112,6 +112,52 @@ export const books = librarianSchema.table(
 	]
 );
 
+// ─── Libraries ────────────────────────────────────────────────────────────────
+// Un usuario puede tener varias bibliotecas (ej: "Casa", "Oficina"). Cada
+// usuario tiene exactamente una biblioteca marcada isDefault — se crea de forma
+// perezosa (getOrCreateDefaultLibrary) la primera vez que hace falta.
+
+export const libraries = librarianSchema.table(
+	'libraries',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		isDefault: boolean('is_default').default(false).notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	(table) => [
+		// Como máximo una biblioteca default por usuario (índice parcial)
+		uniqueIndex('libraries_user_default_idx')
+			.on(table.userId)
+			.where(sql`${table.isDefault} = true`),
+		index('libraries_user_idx').on(table.userId),
+		pgPolicy('libraries_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('libraries_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('libraries_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('libraries_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId} and not ${table.isDefault}`
+		})
+	]
+);
+
 // ─── User Books ───────────────────────────────────────────────────────────────
 
 export const userBooks = librarianSchema.table(
@@ -121,6 +167,9 @@ export const userBooks = librarianSchema.table(
 		userId: text('user_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
+		libraryId: text('library_id')
+			.notNull()
+			.references(() => libraries.id, { onDelete: 'restrict' }),
 		// Nullable: null means the book was entered manually (no OpenLibrary record)
 		bookId: text('book_id').references(() => books.id, { onDelete: 'restrict' }),
 		// Manual-entry fields — override books.* when bookId is null; ignored when bookId is set
@@ -141,6 +190,7 @@ export const userBooks = librarianSchema.table(
 			.where(sql`${table.bookId} IS NOT NULL`),
 		index('user_books_user_idx').on(table.userId),
 		index('user_books_book_idx').on(table.bookId),
+		index('user_books_library_idx').on(table.libraryId),
 		// Either bookId (OpenLibrary) or title (manual entry) must be present
 		check(
 			'user_books_book_or_title',
@@ -563,9 +613,15 @@ export const bookReviewsRelations = relations(bookReviews, ({ one }) => ({
 
 export const userBooksRelations = relations(userBooks, ({ one, many }) => ({
 	user: one(user, { fields: [userBooks.userId], references: [user.id] }),
+	library: one(libraries, { fields: [userBooks.libraryId], references: [libraries.id] }),
 	book: one(books, { fields: [userBooks.bookId], references: [books.id] }),
 	tags: many(userBookTags),
 	loans: many(loans)
+}));
+
+export const librariesRelations = relations(libraries, ({ one, many }) => ({
+	user: one(user, { fields: [libraries.userId], references: [user.id] }),
+	userBooks: many(userBooks)
 }));
 
 export const tagsRelations = relations(tags, ({ one, many }) => ({

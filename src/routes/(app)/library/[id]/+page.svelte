@@ -30,7 +30,8 @@
 	}
 
 	let { data, form } = $props();
-	let { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo } = $derived(data);
+	let { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries } =
+		$derived(data);
 
 	let assignedTagIds = $derived(new Set(book.tags.map((t: { id: string }) => t.id)));
 	let availableTags = $derived(userTags.filter((t: { id: string }) => !assignedTagIds.has(t.id)));
@@ -39,6 +40,10 @@
 	let notes = $state(book.notes ?? '');
 	let savedOk = $state(false);
 	let savedTimer: ReturnType<typeof setTimeout>;
+
+	let selectedLibraryId = $state(book.libraryId);
+	let movedOk = $state(false);
+	let movedTimer: ReturnType<typeof setTimeout>;
 
 	// Reseña
 	let reviewRating = $state(myReview?.rating ?? 0);
@@ -76,6 +81,11 @@
 		}
 		if (form?.editSaved) {
 			editOpen = false;
+		}
+		if (form?.moved) {
+			movedOk = true;
+			clearTimeout(movedTimer);
+			movedTimer = setTimeout(() => (movedOk = false), 2500);
 		}
 		if (form?.reviewSaved) {
 			reviewSavedOk = true;
@@ -271,6 +281,40 @@
 		>
 			View on Open Library ↗
 		</a>
+	{/if}
+
+	<!-- Biblioteca (solo propietario) -->
+	{#if isOwner && userLibraries.length > 1}
+		<form method="POST" action="?/moveLibrary" use:enhance class="space-y-2">
+			<label
+				for="library-id"
+				class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+			>
+				Library
+			</label>
+			<div class="flex items-center gap-3">
+				<select
+					id="library-id"
+					name="libraryId"
+					bind:value={selectedLibraryId}
+					class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				>
+					{#each userLibraries as library (library.id)}
+						<option value={library.id}>{library.name}</option>
+					{/each}
+				</select>
+				<button
+					type="submit"
+					disabled={selectedLibraryId === book.libraryId}
+					class="shrink-0 border border-paper-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					Move
+				</button>
+				{#if movedOk}
+					<span class="shrink-0 text-xs text-ink-faint">Moved</span>
+				{/if}
+			</div>
+		</form>
 	{/if}
 
 	<!-- Notas y disponibilidad (solo propietario) -->
