@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, type TestDb } from '../test-db';
-import { books, userBooks, tags } from '../schema';
+import { books, userBooks, tags, libraries } from '../schema';
 import { eq } from 'drizzle-orm';
 
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
@@ -27,6 +27,12 @@ async function seedBook(tdb: TestDb, bookId: string) {
 			.insert(books)
 			.values({ id: bookId, title: `Book ${bookId}`, authors: [] })
 			.onConflictDoNothing();
+	});
+}
+
+async function seedLibrary(tdb: TestDb, id: string, userId: string) {
+	await tdb.asSuperuser(async (tx) => {
+		await tx.insert(libraries).values({ id, userId, name: 'Default', isDefault: true });
 	});
 }
 
@@ -68,6 +74,8 @@ describe('RLS · user_books', () => {
 		await seedUsers(tdb);
 		await seedBook(tdb, 'OL1');
 		await seedBook(tdb, 'OL2');
+		await seedLibrary(tdb, 'lib-alice', ALICE);
+		await seedLibrary(tdb, 'lib-bob', BOB);
 
 		// Alice tiene OL1, Bob tiene OL2
 		await tdb.asSuperuser((tx) =>
@@ -75,6 +83,7 @@ describe('RLS · user_books', () => {
 				{
 					id: 'ub-alice',
 					userId: ALICE,
+					libraryId: 'lib-alice',
 					bookId: 'OL1',
 					isAvailable: true,
 					addedAt: new Date(),
@@ -83,6 +92,7 @@ describe('RLS · user_books', () => {
 				{
 					id: 'ub-bob',
 					userId: BOB,
+					libraryId: 'lib-bob',
 					bookId: 'OL2',
 					isAvailable: true,
 					addedAt: new Date(),
@@ -111,6 +121,7 @@ describe('RLS · user_books', () => {
 				tx.insert(userBooks).values({
 					id: 'ub-fraud',
 					userId: BOB, // intenta insertar como bob
+					libraryId: 'lib-bob',
 					bookId: 'OL1',
 					isAvailable: true,
 					addedAt: new Date(),

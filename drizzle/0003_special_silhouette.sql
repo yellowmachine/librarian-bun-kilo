@@ -1,0 +1,1 @@
+ALTER TABLE "librarian"."user_books" ALTER COLUMN "library_id" SET NOT NULL;

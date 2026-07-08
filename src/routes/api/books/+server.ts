@@ -19,6 +19,7 @@ const AddBookSchema = v.pipe(
 		publishYear: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(9999))),
 		// Common
 		notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
+		libraryId: v.optional(v.pipe(v.string(), v.trim())),
 		tagsToAdd: v.optional(v.array(v.pipe(v.string(), v.trim()))),
 		tagsToCreate: v.optional(
 			v.array(
@@ -68,6 +69,7 @@ export async function POST({ locals, request }: RequestEvent) {
 			description,
 			publishYear,
 			notes,
+			libraryId,
 			tagsToAdd,
 			tagsToCreate
 		} = result.output;
@@ -88,7 +90,8 @@ export async function POST({ locals, request }: RequestEvent) {
 					description,
 					publishYear
 				},
-				notes
+				notes,
+				libraryId
 			);
 			responseTitle = title;
 		} else {
@@ -98,7 +101,7 @@ export async function POST({ locals, request }: RequestEvent) {
 			if (!bookData) error(404, 'Book not found on OpenLibrary');
 
 			const bookId = await upsertBook(bookData);
-			userBookId = await addBookToLibrary(locals.user.id, { bookId }, notes);
+			userBookId = await addBookToLibrary(locals.user.id, { bookId }, notes, libraryId);
 			responseTitle = bookData.title;
 			responseBookId = bookId;
 		}
