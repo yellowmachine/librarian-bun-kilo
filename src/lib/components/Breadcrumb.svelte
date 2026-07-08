@@ -4,7 +4,8 @@
 	type Crumb = { label: string; href?: string };
 
 	interface PageData {
-		book?: { title?: string };
+		book?: { title?: string; libraryId?: string | null };
+		userLibraries?: { id: string; name: string }[];
 		group?: { name?: string };
 		loan?: { title?: string };
 	}
@@ -21,7 +22,14 @@
 				return [{ label: 'Library', href: '/library' }, { label: 'Add book' }];
 			}
 			if (/^\/library\/[^/]+$/.test(path)) {
-				return [{ label: 'Library', href: '/library' }, { label: data.book?.title ?? '…' }];
+				const library = data.userLibraries?.find((lib) => lib.id === data.book?.libraryId);
+				return [
+					{
+						label: library?.name ?? 'Library',
+						href: library ? `/library?libraryId=${library.id}` : '/library'
+					},
+					{ label: data.book?.title ?? '…' }
+				];
 			}
 		}
 
