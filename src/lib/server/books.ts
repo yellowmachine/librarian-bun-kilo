@@ -454,6 +454,22 @@ export async function removeFromLibrary(userId: string, userBookId: string): Pro
 	});
 }
 
+// ─── Título alternativo, para previsualizar antes de añadir ───────────────────
+// Si el libro ya está en el catálogo, devuelve el que ya se guardó (sin
+// recalcular). Si es nuevo (aún no dado de alta), lo resuelve al vuelo vía
+// Wikidata para poder mostrarlo antes de confirmar el alta — no se guarda
+// aquí, eso lo hace upsertBook() cuando el usuario confirma.
+export async function previewAlternateTitle(workId: string, title: string): Promise<string | null> {
+	const existing = await db
+		.select({ alternateTitle: books.alternateTitle })
+		.from(books)
+		.where(eq(books.id, workId));
+	if (existing.length > 0) return existing[0].alternateTitle;
+
+	const translated = await translateBookTitle(title, 'en', 'es');
+	return translated?.label ?? null;
+}
+
 // ─── Resolver libro desde ISBN o workId ──────────────────────────────────────
 // Busca en la BD primero; si no existe, va a OpenLibrary.
 

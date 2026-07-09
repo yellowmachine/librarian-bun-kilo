@@ -122,14 +122,19 @@
 
 	<!-- Libro -->
 	<div class="flex items-start justify-between gap-4">
-		<BookCard
-			title={book.title}
-			authors={book.authors}
-			coverUrl={book.coverUrl}
-			publishYear={book.publishYear}
-			isAvailable={book.isAvailable}
-			variant="detail"
-		/>
+		<div class="min-w-0 flex-1">
+			<BookCard
+				title={book.title}
+				authors={book.authors}
+				coverUrl={book.coverUrl}
+				publishYear={book.publishYear}
+				isAvailable={book.isAvailable}
+				variant="detail"
+			/>
+			{#if book.alternateTitle}
+				<p class="mt-2 text-xs text-ink-faint">Also known as: {book.alternateTitle}</p>
+			{/if}
+		</div>
 		{#if isOwner && !book.bookId}
 			<button
 				type="button"
