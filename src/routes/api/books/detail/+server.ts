@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { resolveBook } from '$lib/server/books';
+import { resolveBook, previewAlternateTitle } from '$lib/server/books';
 
 // GET /api/books/detail?workId=OL45804W
 // Devuelve la descripción y datos completos de un work sin añadirlo a la biblioteca.
@@ -13,5 +13,7 @@ export async function GET({ locals, url }: RequestEvent) {
 	const book = await resolveBook(workId);
 	if (!book) error(404, 'Book not found');
 
-	return json({ description: book.description });
+	const alternateTitle = await previewAlternateTitle(workId, book.title);
+
+	return json({ description: book.description, alternateTitle });
 }
