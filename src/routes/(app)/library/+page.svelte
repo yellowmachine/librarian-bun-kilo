@@ -15,6 +15,7 @@
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import type { GroupBookResult } from '$lib/server/groups';
 	import BookGrid from '$lib/components/BookGrid.svelte';
+	import { readableTagTextColor } from '$lib/tagColor';
 
 	let exportOpen = $state(false);
 	let activeTab = $state<'mine' | 'others' | 'contacts'>('mine');
@@ -368,10 +369,10 @@
 							class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
 							style={active
 								? tag.color
-									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${tag.color}`
+									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
 									: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
 								: tag.color
-									? `border-color: ${tag.color}44; color: ${tag.color}88`
+									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
 									: 'border-color: #e8e2da; color: #b0aaa4'}
 						>
 							{tag.name}
@@ -542,10 +543,10 @@
 						class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
 						style={active
 							? tag.color
-								? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${tag.color}`
+								? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
 								: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
 							: tag.color
-								? `border-color: ${tag.color}44; color: ${tag.color}88`
+								? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
 								: 'border-color: #e8e2da; color: #b0aaa4'}
 					>
 						{tag.name}
@@ -669,10 +670,10 @@
 								class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
 								style={active
 									? tag.color
-										? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${tag.color}`
+										? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
 										: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
 									: tag.color
-										? `border-color: ${tag.color}44; color: ${tag.color}88`
+										? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
 										: 'border-color: #e8e2da; color: #b0aaa4'}
 							>
 								{tag.name}
