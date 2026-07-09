@@ -30,8 +30,8 @@ describe('identifyBooksFromImage', () => {
 
 		const result = await identifyBooksFromImage('key', DATA_URL);
 		expect(result).toEqual([
-			{ title: 'Foundation', author: 'Isaac Asimov', confidence: 'high' },
-			{ title: 'Dune', author: null, confidence: 'medium' }
+			{ title: 'Foundation', author: 'Isaac Asimov', confidence: 'high', tags: [] },
+			{ title: 'Dune', author: null, confidence: 'medium', tags: [] }
 		]);
 	});
 
@@ -50,7 +50,7 @@ describe('identifyBooksFromImage', () => {
 		);
 
 		const result = await identifyBooksFromImage('key', DATA_URL);
-		expect(result).toEqual([{ title: 'Foundation', author: null, confidence: 'low' }]);
+		expect(result).toEqual([{ title: 'Foundation', author: null, confidence: 'low', tags: [] }]);
 	});
 
 	it('descarta candidatos sin título y usa "medium" si falta confidence', async () => {
@@ -67,7 +67,7 @@ describe('identifyBooksFromImage', () => {
 		);
 
 		const result = await identifyBooksFromImage('key', DATA_URL);
-		expect(result).toEqual([{ title: 'Dune', author: 'Herbert', confidence: 'medium' }]);
+		expect(result).toEqual([{ title: 'Dune', author: 'Herbert', confidence: 'medium', tags: [] }]);
 	});
 
 	it('devuelve lista vacía si la respuesta no es JSON válido', async () => {
@@ -88,5 +88,46 @@ describe('identifyBooksFromImage', () => {
 		vi.spyOn(global, 'fetch').mockRejectedValueOnce(new Error('network down'));
 
 		await expect(identifyBooksFromImage('key', DATA_URL)).resolves.toEqual([]);
+	});
+
+	it('solo acepta tags que coincidan (sin distinguir mayúsculas) con la lista dada, descartando alucinaciones', async () => {
+		vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+			jsonResponse({
+				choices: [
+					{
+						message: {
+							content: JSON.stringify([
+								{
+									title: 'Fascism',
+									author: 'Payne',
+									confidence: 'high',
+									tags: ['history', 'Made Up Tag', 'History']
+								}
+							])
+						}
+					}
+				]
+			})
+		);
+
+		const result = await identifyBooksFromImage('key', DATA_URL, ['History', 'Fiction']);
+		expect(result).toEqual([
+			{ title: 'Fascism', author: 'Payne', confidence: 'high', tags: ['History'] }
+		]);
+	});
+
+	it('no pide tags al modelo y devuelve tags: [] si no hay tags disponibles', async () => {
+		const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+			jsonResponse({
+				choices: [{ message: { content: JSON.stringify([{ title: 'Dune', confidence: 'high' }]) } }]
+			})
+		);
+
+		const result = await identifyBooksFromImage('key', DATA_URL, []);
+		expect(result).toEqual([{ title: 'Dune', author: null, confidence: 'high', tags: [] }]);
+
+		const requestBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+		const promptText = requestBody.messages[0].content[0].text;
+		expect(promptText).not.toContain('tags');
 	});
 });
