@@ -222,6 +222,80 @@ export async function getUserBooks(
 	});
 }
 
+// ─── Detección de duplicados al añadir ────────────────────────────────────────
+// Compara contra TODOS los libros del usuario (todas sus bibliotecas), no solo
+// los recientes. El cotejo se hace en memoria (normalización de texto/ISBN),
+// no en SQL — a escala de una biblioteca personal es trivial.
+
+export type DuplicateMatch = {
+	type: 'exact' | 'isbn' | 'title-author';
+	userBookId: string;
+	title: string;
+	authors: string[];
+	coverUrl: string | null;
+	libraryId: string;
+};
+
+function normalizeText(s: string): string {
+	return s
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.trim();
+}
+
+function normalizeIsbn(isbn: string): string {
+	return isbn.replace(/[^0-9Xx]/g, '').toUpperCase();
+}
+
+export async function findDuplicateUserBook(
+	userId: string,
+	criteria: { workId?: string; isbn?: string; title?: string; authors?: string[] }
+): Promise<DuplicateMatch | null> {
+	const { workId, isbn, title, authors } = criteria;
+	if (!workId && !isbn && !title) return null;
+
+	const candidates = await getUserBooks(userId, { type: 'all' });
+	if (candidates.length === 0) return null;
+
+	const toMatch = (c: UserBookWithDetails, type: DuplicateMatch['type']): DuplicateMatch => ({
+		type,
+		userBookId: c.userBookId,
+		title: c.title,
+		authors: c.authors,
+		coverUrl: c.coverUrl,
+		libraryId: c.libraryId
+	});
+
+	if (workId) {
+		const exact = candidates.find((c) => c.bookId === workId);
+		if (exact) return toMatch(exact, 'exact');
+	}
+
+	if (isbn) {
+		const normalizedIsbn = normalizeIsbn(isbn);
+		if (normalizedIsbn) {
+			const isbnMatch = candidates.find((c) => c.isbn && normalizeIsbn(c.isbn) === normalizedIsbn);
+			if (isbnMatch) return toMatch(isbnMatch, 'isbn');
+		}
+	}
+
+	if (title) {
+		const normalizedTitle = normalizeText(title);
+		const normalizedAuthors = new Set((authors ?? []).map(normalizeText));
+		if (normalizedTitle && normalizedAuthors.size > 0) {
+			const titleAuthorMatch = candidates.find(
+				(c) =>
+					normalizeText(c.title) === normalizedTitle &&
+					c.authors.some((a) => normalizedAuthors.has(normalizeText(a)))
+			);
+			if (titleAuthorMatch) return toMatch(titleAuthorMatch, 'title-author');
+		}
+	}
+
+	return null;
+}
+
 // ─── Libros de un contacto (RLS del viewer) ───────────────────────────────────
 
 export async function getContactBooks(
