@@ -1,8 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
 import * as v from 'valibot';
+import { eq } from 'drizzle-orm';
 import { getOpenRouterApiKey } from '$lib/server/openrouterKey';
 import { identifyBooksFromImage } from '$lib/server/openrouterVision';
+import { withRLS } from '$lib/server/db/rls';
+import { tags } from '$lib/server/db/schema';
 
 const ScanShelfSchema = v.object({
 	image: v.pipe(v.string(), v.regex(/^data:image\/\w+;base64,/), v.minLength(100))
@@ -25,6 +28,14 @@ export async function POST({ locals, request }: RequestEvent) {
 		error(400, 'No OpenRouter key connected. Connect one in Scholio settings, then try again.');
 	}
 
-	const candidates = await identifyBooksFromImage(apiKey, result.output.image);
+	const userTags = await withRLS(locals.user.id, (tx) =>
+		tx.select({ name: tags.name }).from(tags).where(eq(tags.userId, locals.user!.id))
+	);
+
+	const candidates = await identifyBooksFromImage(
+		apiKey,
+		result.output.image,
+		userTags.map((t) => t.name)
+	);
 	return json({ candidates });
 }

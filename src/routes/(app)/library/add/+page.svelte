@@ -55,6 +55,7 @@
 		title: string;
 		author: string | null;
 		confidence: 'high' | 'medium' | 'low';
+		tags: string[];
 	}
 
 	interface ShelfSummary {
@@ -93,6 +94,9 @@
 	let shelfCandidates = $state<ShelfCandidate[]>([]);
 	let selectedShelfIndices = new SvelteSet<number>();
 	let shelfSummary = $state<ShelfSummary | null>(null);
+	// Tags por candidato, indexados igual que shelfCandidates (por posición).
+	let shelfCandidateTagIds = $state<string[][]>([]);
+	let shelfCandidateNewTags = $state<{ name: string; color: string | null }[][]>([]);
 
 	const allShelfSelected = $derived(
 		shelfCandidates.length > 0 && shelfCandidates.every((_, i) => selectedShelfIndices.has(i))
@@ -135,15 +139,20 @@
 		errorMsg = '';
 		shelfSummary = null;
 		selectedShelfIndices.clear();
+		shelfCandidateTagIds = [];
+		shelfCandidateNewTags = [];
 		mode = 'shelf-analyzing';
 		try {
 			const dataUrl = await resizeImage(file);
 			shelfImagePreview = dataUrl;
-			const res = await fetch('/api/books/scan-shelf', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ image: dataUrl })
-			});
+			const [res] = await Promise.all([
+				fetch('/api/books/scan-shelf', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ image: dataUrl })
+				}),
+				fetchUserTags()
+			]);
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
 				errorMsg = body?.message ?? 'Could not analyze the photo.';
@@ -155,6 +164,13 @@
 			shelfCandidates.forEach((c, i) => {
 				if (c.confidence === 'high') selectedShelfIndices.add(i);
 			});
+			// Precarga los tags sugeridos por la IA, resolviendo el nombre a su id.
+			shelfCandidateTagIds = shelfCandidates.map((c) =>
+				c.tags
+					.map((name) => availableTags.find((t) => t.name === name)?.id)
+					.filter((id): id is string => Boolean(id))
+			);
+			shelfCandidateNewTags = shelfCandidates.map(() => []);
 			if (shelfCandidates.length === 0) errorMsg = 'No books were recognized in that photo.';
 			mode = 'shelf-review';
 		} catch {
@@ -165,32 +181,33 @@
 		}
 	}
 
-	async function addSelectedShelfBooks() {
-		mode = 'shelf-adding';
-		const summary: ShelfSummary = { added: 0, duplicate: 0, notFound: 0 };
+	async function addOneShelfCandidate(
+		candidate: ShelfCandidate,
+		summary: ShelfSummary,
+		index: number
+	) {
+		const authors = candidate.author ? [candidate.author] : [];
+		const tagIds = shelfCandidateTagIds[index];
+		const newTags = shelfCandidateNewTags[index];
 
-		for (const index of selectedShelfIndices) {
-			const candidate = shelfCandidates[index];
-			if (!candidate) continue;
-			const authors = candidate.author ? [candidate.author] : [];
+		try {
+			const dup = await fetch(
+				`/api/books/check-duplicate?title=${encodeURIComponent(candidate.title)}${authors
+					.map((a) => `&authors=${encodeURIComponent(a)}`)
+					.join('')}`
+			).then((r) => r.json());
+			if (dup?.match) {
+				summary.duplicate++;
+				return;
+			}
 
-			try {
-				const dup = await fetch(
-					`/api/books/check-duplicate?title=${encodeURIComponent(candidate.title)}${authors
-						.map((a) => `&authors=${encodeURIComponent(a)}`)
-						.join('')}`
-				).then((r) => r.json());
-				if (dup?.match) {
-					summary.duplicate++;
-					continue;
-				}
+			const query = [candidate.title, candidate.author].filter(Boolean).join(' ');
+			const searchResults: BookSearchResult[] = await fetch(
+				`/api/books/search?q=${encodeURIComponent(query)}`
+			).then((r) => (r.ok ? r.json() : []));
 
-				const query = [candidate.title, candidate.author].filter(Boolean).join(' ');
-				const searchResults: BookSearchResult[] = await fetch(
-					`/api/books/search?q=${encodeURIComponent(query)}`
-				).then((r) => (r.ok ? r.json() : []));
-
-				const body = searchResults[0]
+			const body = {
+				...(searchResults[0]
 					? {
 							workId: searchResults[0].id,
 							isbn: searchResults[0].isbn ?? undefined,
@@ -200,23 +217,48 @@
 							title: candidate.title,
 							authors: authors.length > 0 ? authors : undefined,
 							libraryId: selectedLibraryId || undefined
-						};
+						}),
+				tagsToAdd: tagIds?.length ? tagIds : undefined,
+				tagsToCreate: newTags?.length ? newTags : undefined
+			};
 
-				const res = await fetch('/api/books', {
-					method: 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify(body)
-				});
-				if (res.ok) summary.added++;
-				else summary.notFound++;
-			} catch {
-				summary.notFound++;
+			const res = await fetch('/api/books', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (res.ok) summary.added++;
+			else summary.notFound++;
+		} catch {
+			summary.notFound++;
+		}
+	}
+
+	async function addSelectedShelfBooks() {
+		mode = 'shelf-adding';
+		const summary: ShelfSummary = { added: 0, duplicate: 0, notFound: 0 };
+		const indices = Array.from(selectedShelfIndices);
+
+		// En paralelo pero con un tope de concurrencia — lanzar las 15 peticiones
+		// de golpe podría saturar/limitar la API de OpenLibrary.
+		const CONCURRENCY = 4;
+		let next = 0;
+		async function worker() {
+			while (next < indices.length) {
+				const index = indices[next++];
+				const candidate = shelfCandidates[index];
+				if (candidate) await addOneShelfCandidate(candidate, summary, index);
 			}
 		}
+		await Promise.all(
+			Array.from({ length: Math.min(CONCURRENCY, indices.length) }, () => worker())
+		);
 
 		shelfSummary = summary;
 		shelfCandidates = [];
 		selectedShelfIndices.clear();
+		shelfCandidateTagIds = [];
+		shelfCandidateNewTags = [];
 		shelfImagePreview = null;
 		lastAddedTitle = null;
 		mode = 'choose';
@@ -1057,30 +1099,40 @@
 			<ul class="divide-y divide-paper-border border border-paper-border">
 				{#each shelfCandidates as candidate, i (i)}
 					{@const checked = selectedShelfIndices.has(i)}
-					<li>
-						<button
-							type="button"
-							onclick={() => toggleShelfSelect(i)}
-							class="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-paper-ui"
-						>
-							<span
+					<li class="px-3 py-2.5">
+						<div class="flex items-center gap-3">
+							<button
+								type="button"
+								onclick={() => toggleShelfSelect(i)}
+								aria-label={checked ? 'Deselect' : 'Select'}
 								class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors
 								{checked ? 'border-ink bg-ink text-paper' : 'border-paper-border text-transparent'}"
 							>
 								<Check size={12} weight="bold" />
-							</span>
-							<span class="min-w-0 flex-1">
+							</button>
+							<button
+								type="button"
+								onclick={() => toggleShelfSelect(i)}
+								class="min-w-0 flex-1 text-left"
+							>
 								<span class="block truncate text-sm text-ink">{candidate.title}</span>
 								{#if candidate.author}
 									<span class="block truncate text-xs text-ink-faint">{candidate.author}</span>
 								{/if}
-							</span>
+							</button>
 							{#if candidate.confidence !== 'high'}
 								<span class="shrink-0 text-[10px] tracking-wide text-ink-faint uppercase">
 									{candidate.confidence}
 								</span>
 							{/if}
-						</button>
+						</div>
+						<div class="mt-2 pl-8">
+							<TagSelectorLocal
+								{availableTags}
+								bind:selectedTagIds={shelfCandidateTagIds[i]}
+								bind:tagsToCreate={shelfCandidateNewTags[i]}
+							/>
+						</div>
 					</li>
 				{/each}
 			</ul>
