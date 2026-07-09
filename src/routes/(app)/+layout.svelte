@@ -102,13 +102,6 @@
 	<footer class="hidden border-t border-paper-border py-4 sm:block">
 		<p class="text-center text-xs text-ink-faint">
 			Built with <a
-				href="https://kilo.ai"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="underline underline-offset-2 transition-colors hover:text-ink-muted">Kilo</a
-			>
-			and
-			<a
 				href="https://www.anthropic.com/claude"
 				target="_blank"
 				rel="noopener noreferrer"
