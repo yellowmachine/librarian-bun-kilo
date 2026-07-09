@@ -165,54 +165,67 @@
 		}
 	}
 
+	async function addOneShelfCandidate(candidate: ShelfCandidate, summary: ShelfSummary) {
+		const authors = candidate.author ? [candidate.author] : [];
+
+		try {
+			const dup = await fetch(
+				`/api/books/check-duplicate?title=${encodeURIComponent(candidate.title)}${authors
+					.map((a) => `&authors=${encodeURIComponent(a)}`)
+					.join('')}`
+			).then((r) => r.json());
+			if (dup?.match) {
+				summary.duplicate++;
+				return;
+			}
+
+			const query = [candidate.title, candidate.author].filter(Boolean).join(' ');
+			const searchResults: BookSearchResult[] = await fetch(
+				`/api/books/search?q=${encodeURIComponent(query)}`
+			).then((r) => (r.ok ? r.json() : []));
+
+			const body = searchResults[0]
+				? {
+						workId: searchResults[0].id,
+						isbn: searchResults[0].isbn ?? undefined,
+						libraryId: selectedLibraryId || undefined
+					}
+				: {
+						title: candidate.title,
+						authors: authors.length > 0 ? authors : undefined,
+						libraryId: selectedLibraryId || undefined
+					};
+
+			const res = await fetch('/api/books', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (res.ok) summary.added++;
+			else summary.notFound++;
+		} catch {
+			summary.notFound++;
+		}
+	}
+
 	async function addSelectedShelfBooks() {
 		mode = 'shelf-adding';
 		const summary: ShelfSummary = { added: 0, duplicate: 0, notFound: 0 };
+		const indices = Array.from(selectedShelfIndices);
 
-		for (const index of selectedShelfIndices) {
-			const candidate = shelfCandidates[index];
-			if (!candidate) continue;
-			const authors = candidate.author ? [candidate.author] : [];
-
-			try {
-				const dup = await fetch(
-					`/api/books/check-duplicate?title=${encodeURIComponent(candidate.title)}${authors
-						.map((a) => `&authors=${encodeURIComponent(a)}`)
-						.join('')}`
-				).then((r) => r.json());
-				if (dup?.match) {
-					summary.duplicate++;
-					continue;
-				}
-
-				const query = [candidate.title, candidate.author].filter(Boolean).join(' ');
-				const searchResults: BookSearchResult[] = await fetch(
-					`/api/books/search?q=${encodeURIComponent(query)}`
-				).then((r) => (r.ok ? r.json() : []));
-
-				const body = searchResults[0]
-					? {
-							workId: searchResults[0].id,
-							isbn: searchResults[0].isbn ?? undefined,
-							libraryId: selectedLibraryId || undefined
-						}
-					: {
-							title: candidate.title,
-							authors: authors.length > 0 ? authors : undefined,
-							libraryId: selectedLibraryId || undefined
-						};
-
-				const res = await fetch('/api/books', {
-					method: 'POST',
-					headers: { 'content-type': 'application/json' },
-					body: JSON.stringify(body)
-				});
-				if (res.ok) summary.added++;
-				else summary.notFound++;
-			} catch {
-				summary.notFound++;
+		// En paralelo pero con un tope de concurrencia — lanzar las 15 peticiones
+		// de golpe podría saturar/limitar la API de OpenLibrary.
+		const CONCURRENCY = 4;
+		let next = 0;
+		async function worker() {
+			while (next < indices.length) {
+				const candidate = shelfCandidates[indices[next++]];
+				if (candidate) await addOneShelfCandidate(candidate, summary);
 			}
 		}
+		await Promise.all(
+			Array.from({ length: Math.min(CONCURRENCY, indices.length) }, () => worker())
+		);
 
 		shelfSummary = summary;
 		shelfCandidates = [];
