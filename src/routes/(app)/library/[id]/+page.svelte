@@ -6,6 +6,7 @@
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
 	import StarRating from '$lib/components/StarRating.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import { readableTagTextColor } from '$lib/tagColor';
 
 	let confirmMessage = $state('');
 	let pendingForm = $state<HTMLFormElement | null>(null);
@@ -407,7 +408,7 @@
 								type="submit"
 								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-500"
 								style={tag.color
-									? `border-color: ${tag.color}44; color: ${tag.color}`
+									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
 									: 'border-color: #e8e2da; color: #3d3d3d'}
 							>
 								{tag.name}
