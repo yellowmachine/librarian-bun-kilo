@@ -2,7 +2,13 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
-import { getUserBook, updateUserBook, removeFromLibrary } from '$lib/server/books';
+import {
+	getUserBook,
+	updateUserBook,
+	removeFromLibrary,
+	resolveBook,
+	upsertBook
+} from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
 import { tags, userBookTags, loans, userBooks, books } from '$lib/server/db/schema';
 import { getWorkById } from '$lib/server/openlibrary';
@@ -188,6 +194,76 @@ export const actions = {
 		});
 
 		return { editSaved: true };
+	},
+
+	// Vincular una entrada manual a un libro real de OpenLibrary — el usuario
+	// ya ha buscado y elegido un resultado en el cliente, aquí solo se resuelve
+	// e inserta en el catálogo y se re-apunta la fila (mismo camino que usa el
+	// flujo de añadir: resolveBook + upsertBook, sin lógica nueva).
+	linkToBook: async ({ locals, params, request }: RequestEvent) => {
+		const book = await getUserBook(locals.user!.id, params.id!);
+		if (!book) return fail(404, { linkError: 'Book not found.' });
+		if (book.bookId !== null)
+			return fail(400, { linkError: 'This book is already linked to a catalog entry.' });
+
+		const data = await request.formData();
+		const workId = (data.get('workId') as string)?.trim();
+		if (!workId) return fail(400, { linkError: 'No book selected.' });
+
+		const bookData = await resolveBook(workId);
+		if (!bookData) return fail(404, { linkError: 'Book not found on OpenLibrary.' });
+
+		const catalogId = await upsertBook(bookData);
+
+		await withRLS(locals.user!.id, async (tx) => {
+			await tx
+				.update(userBooks)
+				.set({
+					bookId: catalogId,
+					// Los campos de entrada manual quedan ignorados en cuanto hay
+					// bookId (ver COALESCE en books.ts) — se limpian para no dejar
+					// datos obsoletos a medias.
+					title: null,
+					authors: null,
+					isbn: null,
+					description: null,
+					publishYear: null,
+					alternateTitle: null,
+					updatedAt: new Date()
+				})
+				.where(eq(userBooks.id, params.id!));
+		});
+
+		return { linked: true };
+	},
+
+	// Volver a pedir la portada a OpenLibrary (solo libros con bookId que no
+	// tienen portada guardada todavía). Nunca acepta una URL del usuario —
+	// siempre viene de la propia respuesta de OpenLibrary.
+	refreshCover: async ({ locals, params }: RequestEvent) => {
+		const book = await getUserBook(locals.user!.id, params.id!);
+		if (!book || !book.bookId) return fail(400, { coverError: 'Not an OpenLibrary book.' });
+
+		let coverUrl: string | null = null;
+		try {
+			const workData = await getWorkById(book.bookId);
+			coverUrl = workData?.coverUrl ?? null;
+		} catch {
+			// OL unreachable
+		}
+
+		if (!coverUrl) {
+			return fail(404, { coverError: 'No cover available for this book on OpenLibrary.' });
+		}
+
+		// books es catálogo global compartido, no una tabla por-usuario — se
+		// escribe directo, mismo patrón que upsertBook().
+		await db
+			.update(books)
+			.set({ coverUrl, updatedAt: new Date() })
+			.where(eq(books.id, book.bookId));
+
+		return { coverRefreshed: true };
 	},
 
 	// Actualizar descripción desde OpenLibrary (solo libros con bookId)
