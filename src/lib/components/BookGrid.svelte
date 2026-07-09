@@ -9,6 +9,8 @@
 		coverUrl?: string | null;
 		publishYear?: number | null;
 		isAvailable?: boolean;
+		/** "Copy 2 of 3" — shown when the user has more than one copy of this book */
+		copyLabel?: string;
 		href?: string;
 		onclick?: () => void;
 	}
@@ -48,6 +50,7 @@
 					coverUrl={book.coverUrl}
 					publishYear={book.publishYear}
 					isAvailable={book.isAvailable}
+					copyLabel={book.copyLabel}
 					variant="grid"
 					onclick={() => onToggleSelect?.(book.id)}
 				/>
@@ -59,6 +62,7 @@
 				coverUrl={book.coverUrl}
 				publishYear={book.publishYear}
 				isAvailable={book.isAvailable}
+				copyLabel={book.copyLabel}
 				variant="grid"
 				href={book.href}
 				onclick={book.onclick}

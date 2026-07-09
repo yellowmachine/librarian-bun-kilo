@@ -1,16 +1,26 @@
 <script lang="ts">
-	import { Barcode, MagnifyingGlass, ArrowLeft, Plus, Trash } from 'phosphor-svelte';
+	import { Barcode, MagnifyingGlass, ArrowLeft, Plus, Trash, Info } from 'phosphor-svelte';
 	import { page } from '$app/state';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
+	import DuplicateBookDialog from '$lib/components/DuplicateBookDialog.svelte';
 	import type { BookSearchResult } from '$lib/types';
 
 	interface Library {
 		id: string;
 		name: string;
 		isDefault: boolean;
+	}
+
+	interface DuplicateMatch {
+		type: 'exact' | 'isbn' | 'title-author';
+		userBookId: string;
+		title: string;
+		authors: string[];
+		coverUrl: string | null;
+		libraryId: string;
 	}
 
 	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'form' | 'adding';
@@ -35,6 +45,13 @@
 	let tagsToCreate = $state<{ name: string; color: string | null }[]>([]);
 	let availableLibraries = $state<Library[]>([]);
 	let selectedLibraryId = $state('');
+	let duplicateMatch = $state<DuplicateMatch | null>(null);
+	let showDuplicateDialog = $state(false);
+	let pendingConfirmedAdd: (() => void) | null = null;
+
+	const duplicateLibraryName = $derived(
+		availableLibraries.find((lib) => lib.id === duplicateMatch?.libraryId)?.name ?? 'your library'
+	);
 
 	// ── Manual form state ─────────────────────────────────────────────────────
 	let formTitle = $state('');
@@ -125,12 +142,40 @@
 		}
 	}
 
+	async function checkDuplicate(criteria: {
+		workId?: string;
+		isbn?: string;
+		title?: string;
+		authors?: string[];
+	}): Promise<void> {
+		try {
+			const params: string[] = [];
+			if (criteria.workId) params.push(`workId=${encodeURIComponent(criteria.workId)}`);
+			if (criteria.isbn) params.push(`isbn=${encodeURIComponent(criteria.isbn)}`);
+			if (criteria.title) params.push(`title=${encodeURIComponent(criteria.title)}`);
+			for (const author of criteria.authors ?? []) {
+				params.push(`authors=${encodeURIComponent(author)}`);
+			}
+
+			const res = await fetch(`/api/books/check-duplicate?${params.join('&')}`);
+			if (!res.ok) {
+				duplicateMatch = null;
+				return;
+			}
+			const data = await res.json();
+			duplicateMatch = data.match ?? null;
+		} catch {
+			duplicateMatch = null;
+		}
+	}
+
 	async function selectBook(book: BookSearchResult) {
 		selectedBook = book;
 		descriptionExpanded = false;
 		selectedDescription = null;
 		selectedTagIds = [];
 		tagsToCreate = [];
+		duplicateMatch = null;
 		loadingDescription = true;
 		mode = 'confirm';
 		await Promise.all([
@@ -139,9 +184,33 @@
 				loadingDescription = false;
 			}),
 			fetchUserTags(),
-			fetchUserLibraries()
+			fetchUserLibraries(),
+			checkDuplicate({
+				workId: book.id,
+				isbn: book.isbn ?? undefined,
+				title: book.title,
+				authors: book.authors
+			})
 		]);
 	}
+
+	// Comprueba duplicados en la entrada manual mientras se escribe (con debounce),
+	// ya que aquí no hay un "momento de selección" como en la ruta OpenLibrary.
+	$effect(() => {
+		const title = formTitle.trim();
+		const isbn = formIsbn.trim();
+		const authors = formAuthors.map((a) => a.trim()).filter(Boolean);
+
+		if (mode !== 'form' || title.length <= 2) {
+			duplicateMatch = null;
+			return;
+		}
+
+		const timer = setTimeout(() => {
+			checkDuplicate({ title, isbn: isbn || undefined, authors });
+		}, 400);
+		return () => clearTimeout(timer);
+	});
 
 	async function onIsbnDetected(isbn: string) {
 		mode = 'results';
@@ -181,7 +250,16 @@
 		}
 	}
 
-	async function addBook() {
+	function handleAddClick() {
+		if (duplicateMatch) {
+			pendingConfirmedAdd = () => addBook(true);
+			showDuplicateDialog = true;
+			return;
+		}
+		addBook(false);
+	}
+
+	async function addBook(allowDuplicate: boolean) {
 		if (!selectedBook) return;
 		mode = 'adding';
 		errorMsg = '';
@@ -194,6 +272,7 @@
 					isbn: selectedBook.isbn ?? undefined,
 					notes: notes || undefined,
 					libraryId: selectedLibraryId || undefined,
+					allowDuplicate: allowDuplicate || undefined,
 					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
 					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 				})
@@ -213,9 +292,30 @@
 		}
 	}
 
-	async function addManualBook(e: SubmitEvent) {
+	function onManualSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		if (!formTitle.trim()) return;
+		if (duplicateMatch) {
+			pendingConfirmedAdd = () => addManualBook(true);
+			showDuplicateDialog = true;
+			return;
+		}
+		addManualBook(false);
+	}
+
+	function confirmDuplicateAdd() {
+		showDuplicateDialog = false;
+		const run = pendingConfirmedAdd;
+		pendingConfirmedAdd = null;
+		run?.();
+	}
+
+	function cancelDuplicateAdd() {
+		showDuplicateDialog = false;
+		pendingConfirmedAdd = null;
+	}
+
+	async function addManualBook(allowDuplicate: boolean) {
 		mode = 'adding';
 		errorMsg = '';
 		const authors = formAuthors.map((a) => a.trim()).filter(Boolean);
@@ -232,6 +332,7 @@
 					description: formDescription.trim() || undefined,
 					notes: notes.trim() || undefined,
 					libraryId: selectedLibraryId || undefined,
+					allowDuplicate: allowDuplicate || undefined,
 					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
 					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 				})
@@ -385,6 +486,26 @@
 				{/if}
 			</div>
 
+			{#if duplicateMatch}
+				<div class="flex items-start gap-2.5 border border-paper-border bg-paper-ui px-4 py-3">
+					<Info size={16} class="mt-0.5 shrink-0 text-ink-faint" />
+					<p class="text-sm text-ink-muted">
+						{#if duplicateMatch.type === 'exact'}
+							You already have this book in <strong>{duplicateLibraryName}</strong>.
+						{:else}
+							You already have {duplicateMatch.type === 'isbn'
+								? 'a book with the same ISBN'
+								: 'a book with the same title and author'} in
+							<strong>{duplicateLibraryName}</strong>.
+						{/if}
+						<a
+							href="/library/{duplicateMatch.userBookId}"
+							class="underline underline-offset-2 hover:text-ink">View it</a
+						>
+					</p>
+				</div>
+			{/if}
+
 			{#if loadingDescription}
 				<div class="flex items-center gap-2 text-xs text-ink-faint">
 					<Spinner size="sm" />
@@ -463,7 +584,7 @@
 					Cancel
 				</button>
 				<button
-					onclick={addBook}
+					onclick={handleAddClick}
 					class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90"
 				>
 					Add to my library
@@ -473,7 +594,7 @@
 
 		<!-- Entrada manual -->
 	{:else if mode === 'form'}
-		<form onsubmit={addManualBook} class="space-y-5">
+		<form onsubmit={onManualSubmit} class="space-y-5">
 			<div>
 				<label
 					for="form-title"
@@ -491,6 +612,26 @@
 					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 				/>
 			</div>
+
+			{#if duplicateMatch}
+				<div class="flex items-start gap-2.5 border border-paper-border bg-paper-ui px-4 py-3">
+					<Info size={16} class="mt-0.5 shrink-0 text-ink-faint" />
+					<p class="text-sm text-ink-muted">
+						{#if duplicateMatch.type === 'exact'}
+							You already have this book in <strong>{duplicateLibraryName}</strong>.
+						{:else}
+							You already have {duplicateMatch.type === 'isbn'
+								? 'a book with the same ISBN'
+								: 'a book with the same title and author'} in
+							<strong>{duplicateLibraryName}</strong>.
+						{/if}
+						<a
+							href="/library/{duplicateMatch.userBookId}"
+							class="underline underline-offset-2 hover:text-ink">View it</a
+						>
+					</p>
+				</div>
+			{/if}
 
 			<div>
 				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
@@ -647,3 +788,17 @@
 		</div>
 	{/if}
 </div>
+
+{#if showDuplicateDialog && duplicateMatch}
+	<DuplicateBookDialog
+		book={{
+			title: duplicateMatch.title,
+			authors: duplicateMatch.authors,
+			coverUrl: duplicateMatch.coverUrl
+		}}
+		matchType={duplicateMatch.type}
+		libraryName={duplicateLibraryName}
+		onconfirm={confirmDuplicateAdd}
+		oncancel={cancelDuplicateAdd}
+	/>
+{/if}

@@ -1,0 +1,1 @@
+DROP INDEX "librarian"."user_books_user_book_idx";

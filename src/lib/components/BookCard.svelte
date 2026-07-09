@@ -8,6 +8,8 @@
 		publishYear?: number | null;
 		/** Muestra la banda "Prestado" sobre la portada */
 		isAvailable?: boolean;
+		/** "Copy 2 of 3" — solo variant 'grid', cuando hay más de una copia del mismo libro */
+		copyLabel?: string;
 		/** Modo de presentación:
 		 *  - 'grid'   → portada vertical con título y autor debajo (biblioteca, grid)
 		 *  - 'list'   → fila horizontal con portada pequeña (resultados de búsqueda)
@@ -25,6 +27,7 @@
 		coverUrl = null,
 		publishYear = null,
 		isAvailable = true,
+		copyLabel,
 		variant = 'grid',
 		href,
 		onclick
@@ -84,6 +87,9 @@
 				{#if authors.length > 0}
 					<p class="truncate text-xs text-ink-faint">{authors[0]}</p>
 				{/if}
+				{#if copyLabel}
+					<p class="text-[10px] text-ink-faint">{copyLabel}</p>
+				{/if}
 			</div>
 		</a>
 	{:else}
@@ -93,6 +99,9 @@
 				<p class="text-xs leading-snug font-medium text-ink">{title}</p>
 				{#if authors.length > 0}
 					<p class="truncate text-xs text-ink-faint">{authors[0]}</p>
+				{/if}
+				{#if copyLabel}
+					<p class="text-[10px] text-ink-faint">{copyLabel}</p>
 				{/if}
 			</div>
 		</button>
