@@ -1,6 +1,16 @@
 <script lang="ts">
-	import { Barcode, MagnifyingGlass, ArrowLeft, Plus, Trash, Info } from 'phosphor-svelte';
+	import {
+		Barcode,
+		MagnifyingGlass,
+		ArrowLeft,
+		Plus,
+		Trash,
+		Info,
+		Camera,
+		Check
+	} from 'phosphor-svelte';
 	import { page } from '$app/state';
+	import { SvelteSet } from 'svelte/reactivity';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
@@ -23,12 +33,34 @@
 		libraryId: string;
 	}
 
-	type Mode = 'choose' | 'scan' | 'manual' | 'results' | 'confirm' | 'form' | 'adding';
+	type Mode =
+		| 'choose'
+		| 'scan'
+		| 'manual'
+		| 'results'
+		| 'confirm'
+		| 'form'
+		| 'adding'
+		| 'shelf-analyzing'
+		| 'shelf-review'
+		| 'shelf-adding';
 
 	interface Tag {
 		id: string;
 		name: string;
 		color: string | null;
+	}
+
+	interface ShelfCandidate {
+		title: string;
+		author: string | null;
+		confidence: 'high' | 'medium' | 'low';
+	}
+
+	interface ShelfSummary {
+		added: number;
+		duplicate: number;
+		notFound: number;
 	}
 
 	let mode = $state<Mode>('choose');
@@ -54,6 +86,141 @@
 	const duplicateLibraryName = $derived(
 		availableLibraries.find((lib) => lib.id === duplicateMatch?.libraryId)?.name ?? 'your library'
 	);
+
+	// ── Escanear estantería ───────────────────────────────────────────────────
+	let shelfFileInput = $state<HTMLInputElement | null>(null);
+	let shelfImagePreview = $state<string | null>(null);
+	let shelfCandidates = $state<ShelfCandidate[]>([]);
+	let selectedShelfIndices = new SvelteSet<number>();
+	let shelfSummary = $state<ShelfSummary | null>(null);
+
+	const allShelfSelected = $derived(
+		shelfCandidates.length > 0 && shelfCandidates.every((_, i) => selectedShelfIndices.has(i))
+	);
+
+	function toggleShelfSelect(index: number) {
+		if (selectedShelfIndices.has(index)) selectedShelfIndices.delete(index);
+		else selectedShelfIndices.add(index);
+	}
+
+	function toggleShelfSelectAll() {
+		if (allShelfSelected) selectedShelfIndices.clear();
+		else shelfCandidates.forEach((_, i) => selectedShelfIndices.add(i));
+	}
+
+	// Redimensiona/comprime en cliente antes de mandarla — una foto de móvil sin
+	// comprimir son varios MB, y no hace falta esa resolución para leer lomos.
+	function resizeImage(file: File, maxDim = 1600): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const img = new window.Image();
+			img.onload = () => {
+				const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+				const canvas = document.createElement('canvas');
+				canvas.width = Math.round(img.width * scale);
+				canvas.height = Math.round(img.height * scale);
+				const ctx = canvas.getContext('2d');
+				if (!ctx) return reject(new Error('canvas unavailable'));
+				ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+				resolve(canvas.toDataURL('image/jpeg', 0.85));
+				URL.revokeObjectURL(img.src);
+			};
+			img.onerror = () => reject(new Error('Could not read image'));
+			img.src = URL.createObjectURL(file);
+		});
+	}
+
+	async function onShelfPhotoSelected(e: Event) {
+		const file = (e.currentTarget as HTMLInputElement).files?.[0];
+		if (!file) return;
+		errorMsg = '';
+		shelfSummary = null;
+		selectedShelfIndices.clear();
+		mode = 'shelf-analyzing';
+		try {
+			const dataUrl = await resizeImage(file);
+			shelfImagePreview = dataUrl;
+			const res = await fetch('/api/books/scan-shelf', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ image: dataUrl })
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				errorMsg = body?.message ?? 'Could not analyze the photo.';
+				mode = 'choose';
+				return;
+			}
+			const data = await res.json();
+			shelfCandidates = data.candidates ?? [];
+			shelfCandidates.forEach((c, i) => {
+				if (c.confidence === 'high') selectedShelfIndices.add(i);
+			});
+			if (shelfCandidates.length === 0) errorMsg = 'No books were recognized in that photo.';
+			mode = 'shelf-review';
+		} catch {
+			errorMsg = 'Could not analyze the photo. Check your connection.';
+			mode = 'choose';
+		} finally {
+			if (shelfFileInput) shelfFileInput.value = '';
+		}
+	}
+
+	async function addSelectedShelfBooks() {
+		mode = 'shelf-adding';
+		const summary: ShelfSummary = { added: 0, duplicate: 0, notFound: 0 };
+
+		for (const index of selectedShelfIndices) {
+			const candidate = shelfCandidates[index];
+			if (!candidate) continue;
+			const authors = candidate.author ? [candidate.author] : [];
+
+			try {
+				const dup = await fetch(
+					`/api/books/check-duplicate?title=${encodeURIComponent(candidate.title)}${authors
+						.map((a) => `&authors=${encodeURIComponent(a)}`)
+						.join('')}`
+				).then((r) => r.json());
+				if (dup?.match) {
+					summary.duplicate++;
+					continue;
+				}
+
+				const query = [candidate.title, candidate.author].filter(Boolean).join(' ');
+				const searchResults: BookSearchResult[] = await fetch(
+					`/api/books/search?q=${encodeURIComponent(query)}`
+				).then((r) => (r.ok ? r.json() : []));
+
+				const body = searchResults[0]
+					? {
+							workId: searchResults[0].id,
+							isbn: searchResults[0].isbn ?? undefined,
+							libraryId: selectedLibraryId || undefined
+						}
+					: {
+							title: candidate.title,
+							authors: authors.length > 0 ? authors : undefined,
+							libraryId: selectedLibraryId || undefined
+						};
+
+				const res = await fetch('/api/books', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify(body)
+				});
+				if (res.ok) summary.added++;
+				else summary.notFound++;
+			} catch {
+				summary.notFound++;
+			}
+		}
+
+		shelfSummary = summary;
+		shelfCandidates = [];
+		selectedShelfIndices.clear();
+		shelfImagePreview = null;
+		lastAddedTitle = null;
+		mode = 'choose';
+	}
 
 	// ── Manual form state ─────────────────────────────────────────────────────
 	let formTitle = $state('');
@@ -394,7 +561,19 @@
 				>
 			</div>
 		{/if}
-		<div class="grid grid-cols-3 gap-3">
+		{#if shelfSummary}
+			<div class="border border-paper-border bg-paper-ui px-4 py-2.5 text-sm text-ink-muted">
+				Added {shelfSummary.added}
+				{shelfSummary.added === 1 ? 'book' : 'books'} from the photo.
+				{#if shelfSummary.duplicate > 0}
+					{shelfSummary.duplicate} you already had.
+				{/if}
+				{#if shelfSummary.notFound > 0}
+					{shelfSummary.notFound} could not be added.
+				{/if}
+			</div>
+		{/if}
+		<div class="grid grid-cols-2 gap-3">
 			<button
 				onclick={() => (mode = 'scan')}
 				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
@@ -419,7 +598,26 @@
 				<Plus size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
 				<span class="text-xs text-ink-muted">Enter manually</span>
 			</button>
+			<button
+				onclick={() => {
+					errorMsg = '';
+					shelfSummary = null;
+					shelfFileInput?.click();
+				}}
+				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
+			>
+				<Camera size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
+				<span class="text-xs text-ink-muted">Scan shelf</span>
+			</button>
 		</div>
+		<input
+			bind:this={shelfFileInput}
+			type="file"
+			accept="image/*"
+			capture="environment"
+			class="hidden"
+			onchange={onShelfPhotoSelected}
+		/>
 
 		<!-- Escáner -->
 	{:else if mode === 'scan'}
@@ -822,6 +1020,99 @@
 	{:else if mode === 'adding'}
 		<div class="flex justify-center py-16">
 			<Spinner size="lg" class="text-ink-faint" />
+		</div>
+
+		<!-- Analizando la foto de la estantería -->
+	{:else if mode === 'shelf-analyzing'}
+		<div class="flex flex-col items-center gap-4 py-16">
+			{#if shelfImagePreview}
+				<img
+					src={shelfImagePreview}
+					alt="Shelf preview"
+					class="max-h-48 border border-paper-border object-contain"
+				/>
+			{/if}
+			<div class="flex items-center gap-2 text-sm text-ink-muted">
+				<Spinner size="sm" />
+				Analyzing photo…
+			</div>
+		</div>
+
+		<!-- Revisar libros detectados -->
+	{:else if mode === 'shelf-review'}
+		<div class="space-y-4">
+			<div class="flex items-center justify-between">
+				<span class="text-xs tracking-widest text-ink-faint uppercase">
+					{shelfCandidates.length}
+					{shelfCandidates.length === 1 ? 'book' : 'books'} detected
+				</span>
+				<button
+					onclick={toggleShelfSelectAll}
+					class="text-xs text-ink underline underline-offset-2"
+				>
+					{allShelfSelected ? 'Deselect all' : 'Select all'}
+				</button>
+			</div>
+
+			<ul class="divide-y divide-paper-border border border-paper-border">
+				{#each shelfCandidates as candidate, i (i)}
+					{@const checked = selectedShelfIndices.has(i)}
+					<li>
+						<button
+							type="button"
+							onclick={() => toggleShelfSelect(i)}
+							class="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-paper-ui"
+						>
+							<span
+								class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors
+								{checked ? 'border-ink bg-ink text-paper' : 'border-paper-border text-transparent'}"
+							>
+								<Check size={12} weight="bold" />
+							</span>
+							<span class="min-w-0 flex-1">
+								<span class="block truncate text-sm text-ink">{candidate.title}</span>
+								{#if candidate.author}
+									<span class="block truncate text-xs text-ink-faint">{candidate.author}</span>
+								{/if}
+							</span>
+							{#if candidate.confidence !== 'high'}
+								<span class="shrink-0 text-[10px] tracking-wide text-ink-faint uppercase">
+									{candidate.confidence}
+								</span>
+							{/if}
+						</button>
+					</li>
+				{/each}
+			</ul>
+
+			<div class="flex gap-3">
+				<button
+					onclick={() => {
+						shelfCandidates = [];
+						selectedShelfIndices.clear();
+						shelfImagePreview = null;
+						mode = 'choose';
+					}}
+					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={addSelectedShelfBooks}
+					disabled={selectedShelfIndices.size === 0}
+					class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					Add {selectedShelfIndices.size || ''}
+					{selectedShelfIndices.size === 1 ? 'book' : 'books'}
+				</button>
+			</div>
+		</div>
+
+		<!-- Añadiendo los libros seleccionados -->
+	{:else if mode === 'shelf-adding'}
+		<div class="flex flex-col items-center gap-2 py-16">
+			<Spinner size="lg" class="text-ink-faint" />
+			<p class="text-sm text-ink-faint">Adding books…</p>
 		</div>
 	{/if}
 </div>
