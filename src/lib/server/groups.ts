@@ -56,6 +56,7 @@ export type GroupBookResult = {
 	authors: string[];
 	coverUrl: string | null;
 	publishYear: number | null;
+	alternateTitle: string | null;
 	ownerName: string;
 	ownerId: string;
 	isAvailable: boolean;
@@ -458,6 +459,9 @@ export async function searchBooksFromOthers(
 				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
 				coverUrl: books.coverUrl,
 				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
+				alternateTitle: sql<
+					string | null
+				>`COALESCE(${userBooks.alternateTitle}, ${books.alternateTitle})`,
 				isAvailable: userBooks.isAvailable,
 				ownerId: userBooks.userId,
 				ownerName: user.name
@@ -505,7 +509,8 @@ export async function searchBooksFromOthers(
 				normalize(book.title).includes(q) ||
 				book.authors.some((a: string) => normalize(a).includes(q)) ||
 				normalize(book.ownerName).includes(q) ||
-				book.tags.some((t) => normalize(t.name).includes(q))
+				book.tags.some((t) => normalize(t.name).includes(q)) ||
+				(book.alternateTitle && normalize(book.alternateTitle).includes(q))
 		);
 	});
 }

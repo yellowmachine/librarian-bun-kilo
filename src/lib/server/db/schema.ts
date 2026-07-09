@@ -99,6 +99,10 @@ export const books = librarianSchema.table(
 		publisher: text('publisher'),
 		language: text('language'),
 		description: text('description'),
+		// Título en otro idioma (p.ej. castellano), resuelto vía Wikidata al dar
+		// de alta el libro — ver src/lib/server/wikidata.ts. Best-effort: null si
+		// no se encontró.
+		alternateTitle: text('alternate_title'),
 		openlibraryData: text('openlibrary_data'), // JSON raw guardado como text
 		createdAt: timestamp('created_at').defaultNow().notNull(),
 		updatedAt: timestamp('updated_at').defaultNow().notNull()
@@ -178,6 +182,9 @@ export const userBooks = librarianSchema.table(
 		isbn: text('isbn'),
 		description: text('description'),
 		publishYear: integer('publish_year'),
+		// Título alternativo anotado a mano (entrada manual); mismo patrón de
+		// override que el resto de estos campos.
+		alternateTitle: text('alternate_title'),
 		notes: text('notes'),
 		isAvailable: boolean('is_available').default(true).notNull(),
 		addedAt: timestamp('added_at').defaultNow().notNull(),
