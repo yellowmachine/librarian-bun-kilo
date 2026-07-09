@@ -184,10 +184,8 @@ export const userBooks = librarianSchema.table(
 		updatedAt: timestamp('updated_at').defaultNow().notNull()
 	},
 	(table) => [
-		// Partial unique index: only one entry per (userId, bookId) when bookId is not null
-		uniqueIndex('user_books_user_book_idx')
-			.on(table.userId, table.bookId)
-			.where(sql`${table.bookId} IS NOT NULL`),
+		// Un usuario puede tener varias copias físicas del mismo libro de catálogo,
+		// así que (userId, bookId) NO es único — cada copia es su propia fila.
 		index('user_books_user_idx').on(table.userId),
 		index('user_books_book_idx').on(table.bookId),
 		index('user_books_library_idx').on(table.libraryId),
