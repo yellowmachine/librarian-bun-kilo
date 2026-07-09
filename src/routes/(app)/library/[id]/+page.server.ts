@@ -196,6 +196,57 @@ export const actions = {
 		return { editSaved: true };
 	},
 
+	// Corregir título/autor de un libro de catálogo (bookId IS NOT NULL) —
+	// corrección local, guardada en userBooks y no en el catálogo compartido
+	// (ver comentario de titleOverridden en books.ts). ISBN/año/sinopsis
+	// siguen viniendo solo de OpenLibrary, esto es solo título/autor.
+	correctTitleAuthor: async ({ locals, params, request }: RequestEvent) => {
+		const book = await getUserBook(locals.user!.id, params.id!);
+		if (!book) return fail(404, { correctError: 'Book not found.' });
+		if (!book.bookId) return fail(400, { correctError: 'Not a catalog book.' });
+
+		const data = await request.formData();
+		const title = (data.get('title') as string)?.trim();
+		const authorsRaw = (data.get('authors') as string)?.trim();
+
+		if (!title) return fail(400, { correctError: 'Title is required.' });
+
+		const authors = authorsRaw
+			? authorsRaw
+					.split('\n')
+					.map((a) => a.trim())
+					.filter(Boolean)
+			: [];
+
+		await withRLS(locals.user!.id, async (tx) => {
+			await tx
+				.update(userBooks)
+				.set({
+					title,
+					authors: authors.length > 0 ? authors : null,
+					updatedAt: new Date()
+				})
+				.where(eq(userBooks.id, params.id!));
+		});
+
+		return { correctSaved: true };
+	},
+
+	// Deshacer la corrección local de título/autor, volviendo al valor del catálogo.
+	resetTitleAuthor: async ({ locals, params }: RequestEvent) => {
+		const book = await getUserBook(locals.user!.id, params.id!);
+		if (!book || !book.bookId) return fail(400, { correctError: 'Not a catalog book.' });
+
+		await withRLS(locals.user!.id, async (tx) => {
+			await tx
+				.update(userBooks)
+				.set({ title: null, authors: null, updatedAt: new Date() })
+				.where(eq(userBooks.id, params.id!));
+		});
+
+		return { correctReset: true };
+	},
+
 	// Vincular una entrada manual a un libro real de OpenLibrary — el usuario
 	// ya ha buscado y elegido un resultado en el cliente, aquí solo se resuelve
 	// e inserta en el catálogo y se re-apunta la fila (mismo camino que usa el
