@@ -34,6 +34,7 @@
 	let mode = $state<Mode>('choose');
 	let manualQuery = $state('');
 	let searchResults = $state<BookSearchResult[]>([]);
+	let translatedQuery = $state<string | null>(null);
 	let selectedBook = $state<BookSearchResult | null>(null);
 	let selectedDescription = $state<string | null>(null);
 	let notes = $state('');
@@ -59,6 +60,7 @@
 	let formIsbn = $state('');
 	let formPublishYear = $state('');
 	let formDescription = $state('');
+	let formAlternateTitle = $state('');
 
 	function addAuthorField() {
 		formAuthors = [...formAuthors, ''];
@@ -75,6 +77,7 @@
 		formIsbn = '';
 		formPublishYear = '';
 		formDescription = '';
+		formAlternateTitle = '';
 		notes = '';
 		selectedTagIds = [];
 		tagsToCreate = [];
@@ -217,6 +220,7 @@
 		searching = true;
 		errorMsg = '';
 		searchResults = [];
+		translatedQuery = null;
 		try {
 			const res = await fetch(`/api/books/search?isbn=${encodeURIComponent(isbn)}`);
 			const data = await res.json();
@@ -239,9 +243,12 @@
 		searching = true;
 		errorMsg = '';
 		searchResults = [];
+		translatedQuery = null;
 		try {
 			const res = await fetch(`/api/books/search?q=${encodeURIComponent(manualQuery)}`);
 			searchResults = await res.json();
+			const translatedHeader = res.headers.get('X-Translated-Query');
+			translatedQuery = translatedHeader ? decodeURIComponent(translatedHeader) : null;
 			if (searchResults.length === 0) errorMsg = 'Without results.';
 		} catch {
 			errorMsg = 'Search error.';
@@ -330,6 +337,7 @@
 					manualIsbn: formIsbn.trim() || undefined,
 					publishYear: year && !isNaN(year) ? year : undefined,
 					description: formDescription.trim() || undefined,
+					alternateTitle: formAlternateTitle.trim() || undefined,
 					notes: notes.trim() || undefined,
 					libraryId: selectedLibraryId || undefined,
 					allowDuplicate: allowDuplicate || undefined,
@@ -448,6 +456,11 @@
 					New search
 				</button>
 			</div>
+			{#if translatedQuery}
+				<p class="mb-4 text-xs text-ink-faint">
+					Also showing results for <strong class="text-ink-muted">"{translatedQuery}"</strong>.
+				</p>
+			{/if}
 			{#if searching}
 				<div class="flex justify-center py-12">
 					<Spinner size="md" class="text-ink-faint" />
@@ -665,6 +678,22 @@
 						<Plus size={12} /> Add author
 					</button>
 				</div>
+			</div>
+
+			<div>
+				<label
+					for="form-alternate-title"
+					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+				>
+					Alternate title <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
+				</label>
+				<input
+					id="form-alternate-title"
+					type="text"
+					bind:value={formAlternateTitle}
+					placeholder="Title in another language..."
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				/>
 			</div>
 
 			<div class="grid grid-cols-2 gap-3">

@@ -16,6 +16,7 @@ const AddBookSchema = v.pipe(
 		authors: v.optional(v.array(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
 		manualIsbn: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(13))),
 		description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(5000))),
+		alternateTitle: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
 		publishYear: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(9999))),
 		// Common
 		notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
@@ -68,6 +69,7 @@ export async function POST({ locals, request }: RequestEvent) {
 			authors,
 			manualIsbn,
 			description,
+			alternateTitle,
 			publishYear,
 			notes,
 			libraryId,
@@ -90,7 +92,8 @@ export async function POST({ locals, request }: RequestEvent) {
 					authors: authors?.filter(Boolean),
 					isbn: manualIsbn,
 					description,
-					publishYear
+					publishYear,
+					alternateTitle
 				},
 				notes,
 				libraryId,

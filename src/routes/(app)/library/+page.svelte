@@ -112,7 +112,9 @@
 			const q = normalize(search);
 			list = list.filter(
 				(b) =>
-					normalize(b.title).includes(q) || b.authors.some((a: string) => normalize(a).includes(q))
+					normalize(b.title).includes(q) ||
+					b.authors.some((a: string) => normalize(a).includes(q)) ||
+					(b.alternateTitle && normalize(b.alternateTitle).includes(q))
 			);
 		}
 
@@ -244,7 +246,9 @@
 			const q = normalize(contactSearch);
 			list = list.filter(
 				(b) =>
-					normalize(b.title).includes(q) || b.authors.some((a: string) => normalize(a).includes(q))
+					normalize(b.title).includes(q) ||
+					b.authors.some((a: string) => normalize(a).includes(q)) ||
+					(b.alternateTitle && normalize(b.alternateTitle).includes(q))
 			);
 		}
 
