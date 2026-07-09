@@ -4,7 +4,7 @@
 
 A personal book library manager built as a PWA. Scan ISBNs with your phone camera, search the OpenLibrary catalogue, track loans, and share your collection with reading groups.
 
-Built with [Kilo](https://kilo.ai) and [Claude Sonnet 4.6](https://www.anthropic.com/claude).
+Built with [Claude Sonnet 4.6](https://www.anthropic.com/claude).
 
 ---
 

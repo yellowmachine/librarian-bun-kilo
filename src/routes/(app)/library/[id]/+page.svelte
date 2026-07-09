@@ -63,6 +63,11 @@
 	let editPublishYear = $state(book.publishYear?.toString() ?? '');
 	let editDescription = $state(book.description ?? '');
 
+	// Corrección local de título/autor (libros de catálogo, bookId presente)
+	let correctOpen = $state(false);
+	let correctTitle = $state(book.title);
+	let correctAuthors = $state((book.authors as string[]).join('\n'));
+
 	// Search & link (upgrade a manual entry to a real catalog book)
 	let linkSearchOpen = $state(false);
 	let linkQuery = $state([book.title, ...(book.authors as string[])].filter(Boolean).join(' '));
@@ -125,6 +130,9 @@
 		}
 		if (form?.editSaved) {
 			editOpen = false;
+		}
+		if (form?.correctSaved || form?.correctReset) {
+			correctOpen = false;
 		}
 		if (form?.linked) {
 			linkSearchOpen = false;
@@ -191,6 +199,13 @@
 					<p class="mt-1 text-xs text-red-600">{form.coverError}</p>
 				{/if}
 			{/if}
+			{#if isOwner && book.bookId && book.titleOverridden}
+				<form method="POST" action="?/resetTitleAuthor" use:enhance class="mt-2">
+					<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
+						↻ Reset to catalog title
+					</button>
+				</form>
+			{/if}
 		</div>
 		{#if isOwner && !book.bookId}
 			<div class="flex shrink-0 flex-col items-end gap-2">
@@ -211,7 +226,68 @@
 				</button>
 			</div>
 		{/if}
+		{#if isOwner && book.bookId}
+			<div class="flex shrink-0 flex-col items-end gap-2">
+				<button
+					type="button"
+					onclick={() => (correctOpen = !correctOpen)}
+					class="flex items-center gap-1 text-xs text-ink-faint hover:text-ink"
+				>
+					<PencilSimple size={13} />
+					{correctOpen ? 'Cancel' : 'Edit'}
+				</button>
+			</div>
+		{/if}
 	</div>
+
+	<!-- Corregir título/autor de un libro de catálogo (corrección local) -->
+	{#if isOwner && correctOpen && book.bookId}
+		<form
+			method="POST"
+			action="?/correctTitleAuthor"
+			use:enhance
+			class="space-y-4 border border-paper-border p-4"
+		>
+			{#if form?.correctError}
+				<p class="text-xs text-red-600">{form.correctError}</p>
+			{/if}
+			<div>
+				<label
+					for="correct-title"
+					class="block text-xs font-medium tracking-widest text-ink-muted uppercase">Title *</label
+				>
+				<input
+					id="correct-title"
+					name="title"
+					type="text"
+					required
+					bind:value={correctTitle}
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				/>
+			</div>
+			<div>
+				<label
+					for="correct-authors"
+					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+				>
+					Authors <span class="tracking-normal text-ink-faint normal-case">(one per line)</span>
+				</label>
+				<textarea
+					id="correct-authors"
+					name="authors"
+					rows="2"
+					bind:value={correctAuthors}
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				></textarea>
+			</div>
+			<button
+				type="submit"
+				class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90"
+			>
+				Save changes
+			</button>
+		</form>
+	{/if}
 
 	<!-- Search & link a manual entry to a real catalog book -->
 	{#if isOwner && linkSearchOpen && !book.bookId}

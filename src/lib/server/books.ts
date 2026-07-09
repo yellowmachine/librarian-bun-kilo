@@ -396,7 +396,7 @@ export async function getLibraryLetters(userId: string, by: 'title' | 'author'):
 export async function getUserBook(
 	userId: string,
 	userBookId: string
-): Promise<UserBookWithDetails | null> {
+): Promise<(UserBookWithDetails & { titleOverridden: boolean }) | null> {
 	return withRLS(userId, async (tx) => {
 		const rows = await tx
 			.select({
@@ -413,7 +413,11 @@ export async function getUserBook(
 				alternateTitle: effectiveAlternateTitle,
 				isAvailable: userBooks.isAvailable,
 				notes: userBooks.notes,
-				addedAt: userBooks.addedAt
+				addedAt: userBooks.addedAt,
+				// Solo es relevante para libros de catálogo: indica si el título/autor
+				// llevan una corrección local (userBooks.title no nulo) en vez de venir
+				// del catálogo — el detalle del libro lo usa para mostrar "Reset".
+				titleOverridden: sql<boolean>`(${userBooks.title} IS NOT NULL)`
 			})
 			.from(userBooks)
 			.leftJoin(books, eq(userBooks.bookId, books.id))
