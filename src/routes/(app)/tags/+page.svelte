@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { ArrowLeft, PencilSimple, Check, X, Trash, Plus } from 'phosphor-svelte';
+	import { readableTagTextColor } from '$lib/tagColor';
 
 	let { data } = $props();
 	let { tags } = $derived(data);
@@ -163,7 +164,7 @@
 							<span
 								class="border px-3 py-0.5 text-xs"
 								style={tag.color
-									? `border-color: ${tag.color}44; color: ${tag.color}`
+									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
 									: 'border-color: #e8e2da; color: #3d3d3d'}
 							>
 								{tag.name}
@@ -212,7 +213,7 @@
 							<span
 								class="border px-3 py-0.5 text-xs"
 								style={tag.color
-									? `border-color: ${tag.color}44; color: ${tag.color}`
+									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
 									: 'border-color: #e8e2da; color: #3d3d3d'}
 							>
 								{tag.name}
