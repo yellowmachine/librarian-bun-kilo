@@ -3,10 +3,12 @@
 	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Tag, Trash, Star, PencilSimple } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
 	import StarRating from '$lib/components/StarRating.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { readableTagTextColor } from '$lib/tagColor';
+	import type { BookSearchResult } from '$lib/types';
 
 	let confirmMessage = $state('');
 	let pendingForm = $state<HTMLFormElement | null>(null);
@@ -61,6 +63,47 @@
 	let editPublishYear = $state(book.publishYear?.toString() ?? '');
 	let editDescription = $state(book.description ?? '');
 
+	// Search & link (upgrade a manual entry to a real catalog book)
+	let linkSearchOpen = $state(false);
+	let linkQuery = $state([book.title, ...(book.authors as string[])].filter(Boolean).join(' '));
+	let linkResults = $state<BookSearchResult[]>([]);
+	let linkSearching = $state(false);
+
+	function toggleLinkSearch() {
+		linkSearchOpen = !linkSearchOpen;
+		if (linkSearchOpen) {
+			linkQuery = [book.title, ...(book.authors as string[])].filter(Boolean).join(' ');
+			linkResults = [];
+		}
+	}
+
+	async function searchToLink(e: SubmitEvent) {
+		e.preventDefault();
+		if (!linkQuery.trim()) return;
+		linkSearching = true;
+		try {
+			const res = await fetch(`/api/books/search?q=${encodeURIComponent(linkQuery)}`);
+			linkResults = res.ok ? await res.json() : [];
+		} catch {
+			linkResults = [];
+		} finally {
+			linkSearching = false;
+		}
+	}
+
+	async function pickLinkResult(result: BookSearchResult) {
+		const body = new FormData();
+		body.set('workId', result.id);
+		const response = await fetch('?/linkToBook', {
+			method: 'POST',
+			body,
+			headers: { 'x-sveltekit-action': 'true' }
+		});
+		const parsedResult = deserialize(await response.text());
+		await applyAction(parsedResult);
+		invalidateAll();
+	}
+
 	const DESCRIPTION_LIMIT = 300;
 	let descriptionExpanded = $state(false);
 	let descriptionTruncated = $derived(
@@ -82,6 +125,10 @@
 		}
 		if (form?.editSaved) {
 			editOpen = false;
+		}
+		if (form?.linked) {
+			linkSearchOpen = false;
+			linkResults = [];
 		}
 		if (form?.moved) {
 			movedOk = true;
@@ -134,18 +181,80 @@
 			{#if book.alternateTitle}
 				<p class="mt-2 text-xs text-ink-faint">Also known as: {book.alternateTitle}</p>
 			{/if}
+			{#if isOwner && book.bookId && !book.coverUrl}
+				<form method="POST" action="?/refreshCover" use:enhance class="mt-2">
+					<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
+						↻ Fetch cover from OpenLibrary
+					</button>
+				</form>
+				{#if form?.coverError}
+					<p class="mt-1 text-xs text-red-600">{form.coverError}</p>
+				{/if}
+			{/if}
 		</div>
 		{#if isOwner && !book.bookId}
-			<button
-				type="button"
-				onclick={() => (editOpen = !editOpen)}
-				class="mt-1 flex shrink-0 items-center gap-1 text-xs text-ink-faint hover:text-ink"
-			>
-				<PencilSimple size={13} />
-				{editOpen ? 'Cancel' : 'Edit'}
-			</button>
+			<div class="flex shrink-0 flex-col items-end gap-2">
+				<button
+					type="button"
+					onclick={() => (editOpen = !editOpen)}
+					class="flex items-center gap-1 text-xs text-ink-faint hover:text-ink"
+				>
+					<PencilSimple size={13} />
+					{editOpen ? 'Cancel' : 'Edit'}
+				</button>
+				<button
+					type="button"
+					onclick={toggleLinkSearch}
+					class="text-xs text-ink-faint hover:text-ink"
+				>
+					{linkSearchOpen ? 'Cancel' : 'Search OpenLibrary'}
+				</button>
+			</div>
 		{/if}
 	</div>
+
+	<!-- Search & link a manual entry to a real catalog book -->
+	{#if isOwner && linkSearchOpen && !book.bookId}
+		<div class="space-y-4 border border-paper-border p-4">
+			{#if form?.linkError}
+				<p class="text-xs text-red-600">{form.linkError}</p>
+			{/if}
+			<form onsubmit={searchToLink} class="flex gap-2">
+				<input
+					type="text"
+					bind:value={linkQuery}
+					placeholder="Title, author or ISBN..."
+					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				/>
+				<button
+					type="submit"
+					class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
+				>
+					Search
+				</button>
+			</form>
+			{#if linkSearching}
+				<div class="flex justify-center py-8">
+					<Spinner size="md" class="text-ink-faint" />
+				</div>
+			{:else if linkResults.length > 0}
+				<ul class="divide-y divide-paper-border border border-paper-border">
+					{#each linkResults as result (result.id)}
+						<li>
+							<BookCard
+								title={result.title}
+								authors={result.authors}
+								coverUrl={result.coverUrl}
+								publishYear={result.publishYear}
+								variant="list"
+								onclick={() => pickLinkResult(result)}
+							/>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Edit form (manual books only) -->
 	{#if isOwner && editOpen && !book.bookId}
