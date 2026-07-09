@@ -37,6 +37,7 @@
 	let translatedQuery = $state<string | null>(null);
 	let selectedBook = $state<BookSearchResult | null>(null);
 	let selectedDescription = $state<string | null>(null);
+	let selectedAlternateTitle = $state<string | null>(null);
 	let notes = $state('');
 	let errorMsg = $state('');
 	let lastAddedTitle = $state<string | null>(null);
@@ -106,14 +107,16 @@
 			: null
 	);
 
-	async function fetchDescription(workId: string): Promise<string | null> {
+	async function fetchDetail(
+		workId: string
+	): Promise<{ description: string | null; alternateTitle: string | null }> {
 		try {
 			const res = await fetch(`/api/books/detail?workId=${encodeURIComponent(workId)}`);
-			if (!res.ok) return null;
+			if (!res.ok) return { description: null, alternateTitle: null };
 			const data = await res.json();
-			return data.description ?? null;
+			return { description: data.description ?? null, alternateTitle: data.alternateTitle ?? null };
 		} catch {
-			return null;
+			return { description: null, alternateTitle: null };
 		}
 	}
 
@@ -176,14 +179,16 @@
 		selectedBook = book;
 		descriptionExpanded = false;
 		selectedDescription = null;
+		selectedAlternateTitle = null;
 		selectedTagIds = [];
 		tagsToCreate = [];
 		duplicateMatch = null;
 		loadingDescription = true;
 		mode = 'confirm';
 		await Promise.all([
-			fetchDescription(book.id).then((d) => {
-				selectedDescription = d;
+			fetchDetail(book.id).then(({ description, alternateTitle }) => {
+				selectedDescription = description;
+				selectedAlternateTitle = alternateTitle;
 				loadingDescription = false;
 			}),
 			fetchUserTags(),
@@ -496,6 +501,9 @@
 				/>
 				{#if selectedBook.isbn}
 					<p class="mt-3 text-xs text-ink-faint">ISBN {selectedBook.isbn}</p>
+				{/if}
+				{#if selectedAlternateTitle}
+					<p class="mt-1 text-xs text-ink-faint">Also known as: {selectedAlternateTitle}</p>
 				{/if}
 			</div>
 
