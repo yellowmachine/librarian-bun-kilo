@@ -30,7 +30,10 @@ export async function getOpenRouterApiKey(userId: string): Promise<string | null
 		`);
 
 		const row = rows[0];
-		if (!row) return null;
+		if (!row) {
+			console.error(`getOpenRouterApiKey: no enabled key found for user ${userId}`);
+			return null;
+		}
 
 		try {
 			return await decryptSecret({
@@ -38,9 +41,10 @@ export async function getOpenRouterApiKey(userId: string): Promise<string | null
 				iv: row.iv,
 				authTag: row.auth_tag
 			});
-		} catch {
+		} catch (err) {
 			// Clave corrupta o KMS_MASTER_KEY desincronizada con Scholio — no
 			// bloquear al usuario, simplemente tratar como "sin clave".
+			console.error('getOpenRouterApiKey: decryptSecret failed (KMS_MASTER_KEY mismatch?)', err);
 			return null;
 		}
 	});
