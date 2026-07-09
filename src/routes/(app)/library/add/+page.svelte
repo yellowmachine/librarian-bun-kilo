@@ -251,15 +251,15 @@
 	}
 
 	function handleAddClick() {
-		if (duplicateMatch && duplicateMatch.type !== 'exact') {
-			pendingConfirmedAdd = () => addBook();
+		if (duplicateMatch) {
+			pendingConfirmedAdd = () => addBook(true);
 			showDuplicateDialog = true;
 			return;
 		}
-		addBook();
+		addBook(false);
 	}
 
-	async function addBook() {
+	async function addBook(allowDuplicate: boolean) {
 		if (!selectedBook) return;
 		mode = 'adding';
 		errorMsg = '';
@@ -272,6 +272,7 @@
 					isbn: selectedBook.isbn ?? undefined,
 					notes: notes || undefined,
 					libraryId: selectedLibraryId || undefined,
+					allowDuplicate: allowDuplicate || undefined,
 					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
 					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 				})
@@ -294,12 +295,12 @@
 	function onManualSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		if (!formTitle.trim()) return;
-		if (duplicateMatch && duplicateMatch.type !== 'exact') {
-			pendingConfirmedAdd = () => addManualBook();
+		if (duplicateMatch) {
+			pendingConfirmedAdd = () => addManualBook(true);
 			showDuplicateDialog = true;
 			return;
 		}
-		addManualBook();
+		addManualBook(false);
 	}
 
 	function confirmDuplicateAdd() {
@@ -314,7 +315,7 @@
 		pendingConfirmedAdd = null;
 	}
 
-	async function addManualBook() {
+	async function addManualBook(allowDuplicate: boolean) {
 		mode = 'adding';
 		errorMsg = '';
 		const authors = formAuthors.map((a) => a.trim()).filter(Boolean);
@@ -331,6 +332,7 @@
 					description: formDescription.trim() || undefined,
 					notes: notes.trim() || undefined,
 					libraryId: selectedLibraryId || undefined,
+					allowDuplicate: allowDuplicate || undefined,
 					tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
 					tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 				})
@@ -787,7 +789,7 @@
 	{/if}
 </div>
 
-{#if showDuplicateDialog && duplicateMatch && duplicateMatch.type !== 'exact'}
+{#if showDuplicateDialog && duplicateMatch}
 	<DuplicateBookDialog
 		book={{
 			title: duplicateMatch.title,

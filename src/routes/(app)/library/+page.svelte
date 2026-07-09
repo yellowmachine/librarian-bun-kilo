@@ -64,6 +64,29 @@
 
 	const activeLetters = $derived(by === 'title' ? titleLetters : authorLetters);
 
+	// "Copy 2 of 3" — agrupa por bookId (catálogo) o por título+autores normalizados
+	// (entrada manual), y solo etiqueta los grupos con más de una copia.
+	const copyLabelByUserBookId = $derived.by(() => {
+		const groups = new SvelteMap<string, UserBookWithDetails[]>();
+		for (const b of userBooks as UserBookWithDetails[]) {
+			const key =
+				b.bookId ?? `manual:${normalize(b.title)}:${b.authors.map(normalize).sort().join('|')}`;
+			const group = groups.get(key) ?? [];
+			group.push(b);
+			groups.set(key, group);
+		}
+
+		const labels = new SvelteMap<string, string>();
+		for (const group of groups.values()) {
+			if (group.length < 2) continue;
+			const sorted = [...group].sort(
+				(a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime()
+			);
+			sorted.forEach((b, i) => labels.set(b.userBookId, `Copy ${i + 1} of ${sorted.length}`));
+		}
+		return labels;
+	});
+
 	const mineTags = $derived(() => {
 		const map = new SvelteMap<string, { id: string; name: string; color: string | null }>();
 		for (const book of userBooks as UserBookWithDetails[]) {
@@ -514,6 +537,7 @@
 						coverUrl: b.coverUrl,
 						publishYear: b.publishYear,
 						isAvailable: b.isAvailable,
+						copyLabel: copyLabelByUserBookId.get(b.userBookId),
 						href: `/library/${b.userBookId}`
 					}))}
 					selectable={selectionMode}

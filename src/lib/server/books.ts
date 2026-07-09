@@ -64,11 +64,13 @@ export async function addBookToLibrary(
 	userId: string,
 	source: BookSource,
 	notes?: string,
-	libraryId?: string
+	libraryId?: string,
+	allowDuplicate = false
 ): Promise<string> {
 	return withRLS(userId, async (tx) => {
-		if (source.bookId !== null) {
-			// OpenLibrary book — check for duplicates
+		if (source.bookId !== null && !allowDuplicate) {
+			// OpenLibrary book — reuse the existing copy unless the caller has
+			// explicitly confirmed they want a separate physical copy.
 			const dup = await tx
 				.select({ id: userBooks.id })
 				.from(userBooks)

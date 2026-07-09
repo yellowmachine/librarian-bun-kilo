@@ -3,7 +3,7 @@
 
 	type Props = {
 		book: { title: string; authors: string[]; coverUrl: string | null };
-		matchType: 'isbn' | 'title-author';
+		matchType: 'exact' | 'isbn' | 'title-author';
 		libraryName: string;
 		onconfirm: () => void;
 		oncancel: () => void;
@@ -12,7 +12,11 @@
 	let { book, matchType, libraryName, onconfirm, oncancel }: Props = $props();
 
 	const reason = $derived(
-		matchType === 'isbn' ? 'a book with the same ISBN' : 'a book with the same title and author'
+		matchType === 'exact'
+			? 'this exact book'
+			: matchType === 'isbn'
+				? 'a book with the same ISBN'
+				: 'a book with the same title and author'
 	);
 </script>
 
