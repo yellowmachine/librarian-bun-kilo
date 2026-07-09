@@ -5,6 +5,7 @@ import { books, userBooks, tags, userBookTags, libraries } from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
+import { translateBookTitle } from './wikidata';
 
 export const LIBRARY_RECENT_LIMIT = 50;
 
@@ -22,6 +23,9 @@ const effectiveDescription = sql<
 	string | null
 >`COALESCE(${userBooks.description}, ${books.description})`;
 const effectiveIsbn = sql<string | null>`COALESCE(${userBooks.isbn}, ${books.isbn})`;
+const effectiveAlternateTitle = sql<
+	string | null
+>`COALESCE(${userBooks.alternateTitle}, ${books.alternateTitle})`;
 
 // ─── Upsert libro en catálogo global ─────────────────────────────────────────
 // Si el libro ya existe por workId lo devuelve sin tocar; si no, lo inserta.
@@ -30,6 +34,10 @@ const effectiveIsbn = sql<string | null>`COALESCE(${userBooks.isbn}, ${books.isb
 export async function upsertBook(data: OpenLibraryBook): Promise<string> {
 	const existing = await db.select({ id: books.id }).from(books).where(eq(books.id, data.id));
 	if (existing.length > 0) return existing[0].id;
+
+	// Best-effort: título en castellano vía Wikidata, para que buscarlo en tu
+	// biblioteca por ese título también lo encuentre. Nunca bloquea el alta.
+	const translated = await translateBookTitle(data.title, 'en', 'es');
 
 	await db.insert(books).values({
 		id: data.id,
@@ -41,6 +49,7 @@ export async function upsertBook(data: OpenLibraryBook): Promise<string> {
 		publisher: data.publisher,
 		language: data.language,
 		description: data.description,
+		alternateTitle: translated?.label ?? null,
 		openlibraryData: data.openlibraryData
 	});
 
@@ -58,6 +67,7 @@ type BookSource =
 			isbn?: string;
 			description?: string;
 			publishYear?: number;
+			alternateTitle?: string;
 	  };
 
 export async function addBookToLibrary(
@@ -104,6 +114,7 @@ export async function addBookToLibrary(
 			isbn: source.bookId === null ? (source.isbn ?? null) : null,
 			description: source.bookId === null ? (source.description ?? null) : null,
 			publishYear: source.bookId === null ? (source.publishYear ?? null) : null,
+			alternateTitle: source.bookId === null ? (source.alternateTitle ?? null) : null,
 			notes: notes ?? null,
 			isAvailable: true
 		});
@@ -124,6 +135,7 @@ export type UserBookWithDetails = {
 	isbn: string | null;
 	publishYear: number | null;
 	description: string | null;
+	alternateTitle: string | null;
 	isAvailable: boolean;
 	notes: string | null;
 	addedAt: Date;
@@ -153,6 +165,7 @@ export async function getUserBooks(
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
+				alternateTitle: effectiveAlternateTitle,
 				isAvailable: userBooks.isAvailable,
 				notes: userBooks.notes,
 				addedAt: userBooks.addedAt
@@ -317,6 +330,7 @@ export async function getContactBooks(
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
+				alternateTitle: effectiveAlternateTitle,
 				isAvailable: userBooks.isAvailable,
 				notes: userBooks.notes,
 				addedAt: userBooks.addedAt
@@ -396,6 +410,7 @@ export async function getUserBook(
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
+				alternateTitle: effectiveAlternateTitle,
 				isAvailable: userBooks.isAvailable,
 				notes: userBooks.notes,
 				addedAt: userBooks.addedAt
