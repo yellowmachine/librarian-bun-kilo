@@ -49,32 +49,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-fly:
-    needs: build-and-push
-    if: needs.build-and-push.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
-      - name: Deploy librarian
-        run: |
-          flyctl deploy --app ${{ vars.FLY_APP_LIBRARIAN }} \
-            --image ${{ env.REGISTRY }}/${{ github.repository }}:sha-${{ github.sha }} \
-            --strategy rolling \
-            --yes
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
-      - name: Notify Slack on successful deploy
-        run: |
-          curl --silent --show-error -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"text\":\"✅ *Deployed to production* · \`${{ github.ref_name }}\` @ \`${{ github.sha }}\`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Ver en GitHub Actions>\"}"
-
   notify-failure:
-    needs: [build-and-push, deploy-fly]
+    needs: [build-and-push]
     if: failure()
     runs-on: ubuntu-latest
     steps:
