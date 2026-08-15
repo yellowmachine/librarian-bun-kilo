@@ -84,7 +84,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           status=$(curl -sS -o /tmp/dokploy-response.txt -w '%{http_code}' \
-            -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }}" \
+            -X POST "${{ secrets.DOKPLOY_DEPLOY_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -H "x-github-event: push" \
             -d "{\"ref\": \"refs/heads/${{ github.ref_name }}\", \"commits\": []}")
