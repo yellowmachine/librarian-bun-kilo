@@ -277,10 +277,10 @@ Pushes to `main` trigger `.github/workflows/build-ghcr.yml`:
 
 ### Required GitHub secrets
 
-| Secret                | Description                                                              |
-| --------------------- | ------------------------------------------------------------------------ |
-| `DOKPLOY_WEBHOOK_URL` | Dashboard Dokploy → app → **General** → **Deployments** → "Copy Webhook" |
-| `SLACK_WEBHOOK_URL`   | Slack incoming webhook, used for build/deploy notifications              |
+| Secret                       | Description                                                              |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| `DOKPLOY_DEPLOY_WEBHOOK_URL` | Dashboard Dokploy → app → **General** → **Deployments** → "Copy Webhook" |
+| `SLACK_WEBHOOK_URL`          | Slack incoming webhook, used for build/deploy notifications              |
 
 ### Dokploy environment variables
 
