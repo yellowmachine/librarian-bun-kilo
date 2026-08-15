@@ -56,7 +56,7 @@ This approach follows the same security model used by platforms like Supabase an
 | PWA                  | [@vite-pwa/sveltekit](https://vite-pwa-org.netlify.app/frameworks/sveltekit)        |
 | Barcode scanning     | [Quagga2](https://github.com/ericblade/quagga2)                                     |
 | QR codes             | [@paulmillr/qr](https://github.com/paulmillr/qr)                                    |
-| Deployment           | [Coolify](https://coolify.io) via Docker                                            |
+| Deployment           | [Dokploy](https://dokploy.com) via Docker                                           |
 
 ---
 
@@ -135,7 +135,7 @@ The `group_members` RLS policy needs to check whether the current user belongs t
 │   ├── migrate.mjs                      # runs at container startup
 │   └── entrypoint.sh                    # Docker entrypoint
 ├── compose.yaml                         # local dev (Postgres only)
-├── compose.prod.yaml                    # production (app + Postgres)
+├── docker-compose.yml                   # production (Dokploy deploys this one)
 └── Dockerfile                           # 3-stage: deps → build → prod (Node 22)
 ```
 
@@ -267,31 +267,38 @@ Stories live in `src/stories/`. The `storybook` Vitest project runs them headles
 
 ## Deployment
 
-Pushes to `main` trigger a GitHub Actions workflow:
+Pushes to `main` trigger `.github/workflows/build-ghcr.yml`:
 
-1. **CI** — `bun run check` (typecheck) + `bun run build`
-2. **Deploy** — Coolify deploy webhook is called; Coolify builds the Docker image and starts `compose.prod.yaml`
-3. **Container startup** — `entrypoint.sh` runs `migrate.mjs` (applies pending migrations) then starts the Node server
+1. **Build & push** — builds the Docker image and pushes `ghcr.io/yellowmachine/librarian-bun-kilo:latest` to GHCR
+2. **Deploy** — waits for `:latest` on GHCR to resolve to the digest just pushed, then calls the Dokploy webhook to redeploy `docker-compose.yml` (`librarian` pulls the new image via `pull_policy: always`)
+3. **Container startup** — `entrypoint.sh` runs `migrate.ts` (applies pending migrations) then starts the Node server
+
+⚠️ **The Dokploy webhook is the same endpoint Dokploy's native "deploy on GitHub push" trigger calls** (`/api/deploy/compose/<refreshToken>`, see [source](https://github.com/Dokploy/dokploy/blob/main/apps/dokploy/pages/api/deploy/compose/%5BrefreshToken%5D.ts)). It only counts as a real deploy if the request carries an `x-github-event` header and a matching `ref` in the body — otherwise it responds `301 "Branch Not Match"` without deploying (not caught by a plain `curl --fail`, since 301 isn't ≥400). The workflow's `curl` sends `-H "x-github-event: push" -d '{"ref": "refs/heads/main", "commits": []}'` and checks for `HTTP 200` explicitly. It also needs the **Auto Deploy** toggle on in Dokploy's General tab — turning it off returns `400` and blocks this webhook too (same flag as the native trigger, can't be split). Because the native trigger also fires the instant it sees the push, expect two deploys per push to `main`; the workflow's one always runs last (after the image is confirmed ready) and wins thanks to `pull_policy: always`.
 
 ### Required GitHub secrets
 
-| Secret                  | Description                     |
-| ----------------------- | ------------------------------- |
-| `COOLIFY_WEBHOOK_URL`   | Coolify deploy webhook endpoint |
-| `COOLIFY_WEBHOOK_TOKEN` | Coolify deploy webhook token    |
+| Secret                | Description                                                              |
+| --------------------- | ------------------------------------------------------------------------ |
+| `DOKPLOY_WEBHOOK_URL` | Dashboard Dokploy → app → **General** → **Deployments** → "Copy Webhook" |
+| `SLACK_WEBHOOK_URL`   | Slack incoming webhook, used for build/deploy notifications              |
 
-### Coolify environment variables
+### Dokploy environment variables
 
-| Variable               | Required | Description                               |
-| ---------------------- | -------- | ----------------------------------------- |
-| `DATABASE_URL`         | ✅       | Postgres connection string                |
-| `POSTGRES_USER`        | ✅       | Postgres superuser                        |
-| `POSTGRES_PASSWORD`    | ✅       | Postgres password                         |
-| `POSTGRES_DB`          | ✅       | Postgres database name                    |
-| `ORIGIN`               | ✅       | Public app URL, no trailing slash         |
-| `BETTER_AUTH_SECRET`   | ✅       | Random secret (`openssl rand -base64 32`) |
-| `GITHUB_CLIENT_ID`     | optional | GitHub OAuth                              |
-| `GITHUB_CLIENT_SECRET` | optional | GitHub OAuth                              |
+`docker-compose.yml` is the compose file Dokploy actually deploys — it has no `db` service of its own; Postgres is shared with `scholio` via `scholio-network` (separate stack, own schema).
+
+| Variable                                                                             | Required | Description                                                                |
+| ------------------------------------------------------------------------------------ | -------- | -------------------------------------------------------------------------- |
+| `ORIGIN`                                                                             | ✅       | Public app URL, no trailing slash                                          |
+| `BETTER_AUTH_SECRET`                                                                 | ✅       | Random secret (`openssl rand -base64 32`)                                  |
+| `TRUSTED_ORIGINS`                                                                    | ✅       | Scholio + Librarian origins, for the shared cross-subdomain auth cookie    |
+| `DATABASE_URL`                                                                       | ✅       | Shared Postgres connection string (same DB as scholio, `librarian` schema) |
+| `MIGRATION_DATABASE_URL`                                                             | ✅       | Superuser connection string, used only for running migrations              |
+| `KMS_MASTER_KEY`                                                                     | ✅       | Must match scholio's value exactly                                         |
+| `GITHUB_CLIENT_ID`                                                                   | optional | GitHub OAuth                                                               |
+| `GITHUB_CLIENT_SECRET`                                                               | optional | GitHub OAuth                                                               |
+| `SCHOLIO_REDIRECT`                                                                   | optional | Where to send logged-out/unauthorized users (defaults to scholio.review)   |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `EMAIL_FROM` | optional | SMTP config                                                                |
+| `SENTRY_DSN` / `PUBLIC_SENTRY_DSN`                                                   | optional | Error tracking                                                             |
 
 ---
 
