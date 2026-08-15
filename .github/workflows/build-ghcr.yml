@@ -39,6 +39,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -48,6 +49,59 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Dokploy's `pull_policy: always` only helps if `:latest` on GHCR already
+      # points at the image we just pushed. Firing the webhook immediately can
+      # race GHCR's tag propagation and pull the previous image instead — wait
+      # here until `:latest` resolves to our digest before triggering deploy.
+      - name: Wait for GHCR latest tag to reflect pushed digest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          image="${{ env.REGISTRY }}/${{ github.repository }}"
+          target="${{ steps.build.outputs.digest }}"
+          echo "Waiting for $image:latest to resolve to $target"
+          for i in $(seq 1 30); do
+            current=$(docker buildx imagetools inspect "$image:latest" 2>/dev/null \
+              | awk '/^Digest:/ { print $2; exit }')
+            if [ "$current" = "$target" ]; then
+              echo "Matched after $i attempt(s): $current"
+              exit 0
+            fi
+            echo "Attempt $i/30: latest is '$current', want '$target' — retrying in 5s"
+            sleep 5
+          done
+          echo "::error::Timed out waiting for $image:latest to reflect $target"
+          exit 1
+
+      # Dokploy's webhook endpoint is the same one its native GitHub
+      # integration calls on every push — it only recognizes the request as
+      # a real deploy trigger (vs "Branch Not Match") if it carries GitHub's
+      # own event header + a ref in the body. Without these it silently
+      # returns 301 and deploys nothing, which curl -f doesn't treat as a
+      # failure (only >=400 does). Also requires the "Auto Deploy" toggle
+      # (General tab) to be on in Dokploy — it gates this same endpoint.
+      - name: Trigger Dokploy deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          status=$(curl -sS -o /tmp/dokploy-response.txt -w '%{http_code}' \
+            -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -H "x-github-event: push" \
+            -d "{\"ref\": \"refs/heads/${{ github.ref_name }}\", \"commits\": []}")
+          echo "HTTP status: $status"
+          echo "Response body:"
+          cat /tmp/dokploy-response.txt
+          if [ "$status" != "200" ]; then
+            echo "::error::Dokploy webhook returned HTTP $status"
+            exit 1
+          fi
+
+      - name: Notify Slack on successful deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          curl --silent --show-error -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"✅ *Deployed to production* · \`${{ github.ref_name }}\` @ \`${{ github.sha }}\`\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Ver en GitHub Actions>\"}"
 
   notify-failure:
     needs: [build-and-push]
