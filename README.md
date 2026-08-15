@@ -136,7 +136,6 @@ The `group_members` RLS policy needs to check whether the current user belongs t
 │   └── entrypoint.sh                    # Docker entrypoint
 ├── compose.yaml                         # local dev (Postgres only)
 ├── docker-compose.yml                   # production (Dokploy deploys this one)
-├── compose.prod.yaml                    # unused — leftover from an earlier Coolify plan
 └── Dockerfile                           # 3-stage: deps → build → prod (Node 22)
 ```
 
@@ -285,7 +284,7 @@ Pushes to `main` trigger `.github/workflows/build-ghcr.yml`:
 
 ### Dokploy environment variables
 
-`docker-compose.yml` is the compose file Dokploy actually deploys — it has no `db` service of its own; Postgres is shared with `scholio` via `scholio-network` (separate stack, own schema). `compose.prod.yaml` (self-contained, own local Postgres) is a leftover from an earlier, unused Coolify-based plan — not what's deployed.
+`docker-compose.yml` is the compose file Dokploy actually deploys — it has no `db` service of its own; Postgres is shared with `scholio` via `scholio-network` (separate stack, own schema).
 
 | Variable                                                                             | Required | Description                                                                |
 | ------------------------------------------------------------------------------------ | -------- | -------------------------------------------------------------------------- |
