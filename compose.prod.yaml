@@ -1,5 +1,5 @@
-# compose.prod.yaml — usado por Dokploy (o para pruebas locales de producción)
-# Dokploy inyecta las variables de entorno desde su panel; aquí solo
+# compose.prod.yaml — usado por Coolify (o para pruebas locales de producción)
+# Coolify inyecta las variables de entorno desde su panel; aquí solo
 # se definen los servicios y su relación.
 #
 # Para pruebas locales:
@@ -7,8 +7,9 @@
 
 services:
   app:
-    image: ghcr.io/yellowmachine/librarian-bun-kilo:${APP_IMAGE_TAG:-latest}
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - '${PORT:-3000}:3000'
