@@ -1,7 +1,7 @@
 // Servicio de integración con OpenLibrary API
 // Docs: https://openlibrary.org/developers/api
 import { error } from '@sveltejs/kit';
-import type { BookSearchResult } from '$lib/types';
+import type { AuthorSearchResult, BookSearchResult } from '$lib/types';
 
 // ─── OpenLibrary API response shapes ─────────────────────────────────────────
 
@@ -12,6 +12,15 @@ interface OLSearchDoc {
 	cover_i?: number;
 	first_publish_year?: number;
 	isbn?: string[];
+}
+
+interface OLAuthorSearchDoc {
+	key: string;
+	name: string;
+	birth_date?: string;
+	death_date?: string;
+	top_work?: string;
+	work_count?: number;
 }
 
 interface OLAuthorEntry {
@@ -146,6 +155,40 @@ export async function searchBooks(query: string, limit = 10): Promise<BookSearch
 		coverUrl: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : null,
 		publishYear: doc.first_publish_year ?? null
 	}));
+}
+
+// ─── Buscar autores ───────────────────────────────────────────────────────────
+
+/**
+ * Sugerencias de autor para el alta manual. OpenLibrary tiene muchos autores
+ * duplicados con una o dos obras, así que se ordena por nº de obras para que
+ * el autor "canónico" salga primero.
+ */
+export async function searchAuthors(query: string, limit = 8): Promise<AuthorSearchResult[]> {
+	const params = new URLSearchParams({
+		q: query,
+		// Se piden más de los que se muestran para que el reordenado tenga margen
+		limit: String(limit * 2),
+		fields: 'key,name,birth_date,death_date,top_work,work_count'
+	});
+	const res = await fetchOL(`https://openlibrary.org/search/authors.json?${params}`);
+	if (!res.ok) return [];
+
+	const data = await res.json();
+	const docs: OLAuthorSearchDoc[] = data.docs ?? [];
+
+	return docs
+		.filter((doc) => doc.name)
+		.map((doc) => ({
+			id: doc.key.replace('/authors/', ''),
+			name: doc.name,
+			birthDate: doc.birth_date ?? null,
+			deathDate: doc.death_date ?? null,
+			topWork: doc.top_work ?? null,
+			workCount: doc.work_count ?? 0
+		}))
+		.sort((a, b) => b.workCount - a.workCount)
+		.slice(0, limit);
 }
 
 // ─── Obtener detalle completo de una obra ─────────────────────────────────────
