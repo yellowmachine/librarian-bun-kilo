@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { trackDropdownPlacement, type DropdownPlacement } from '$lib/dropdownPlacement';
 
 	interface Tag {
 		id: string;
@@ -20,6 +21,14 @@
 	let newTagColor = $state('#0a0a0a');
 	let inputEl = $state<HTMLInputElement | null>(null);
 	let containerEl = $state<HTMLDivElement | null>(null);
+
+	let placement = $state<DropdownPlacement>({ direction: 'down', maxHeight: 256 });
+
+	// Ajusta la lista al espacio visible (barra inferior y teclado en mobile)
+	$effect(() => {
+		if (!open || !inputEl) return;
+		return trackDropdownPlacement(inputEl, (p) => (placement = p));
+	});
 
 	// Etiquetas que coinciden con lo escrito (sin distinguir mayúsculas)
 	let filtered = $derived(
@@ -141,7 +150,11 @@
 		<!-- Dropdown -->
 		{#if open && (filtered.length > 0 || showCreate)}
 			<ul
-				class="absolute top-full right-0 left-0 z-10 mt-0.5 border border-paper-border bg-paper shadow-sm"
+				class="absolute right-0 left-0 z-10 overflow-y-auto border border-paper-border bg-paper shadow-sm {placement.direction ===
+				'up'
+					? 'bottom-full mb-0.5'
+					: 'top-full mt-0.5'}"
+				style="max-height: {placement.maxHeight}px"
 				role="listbox"
 			>
 				{#each filtered as tag (tag.id)}
