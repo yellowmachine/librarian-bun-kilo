@@ -28,7 +28,7 @@
 
 <div class="flex min-h-screen flex-col bg-paper">
 	<!-- ── Cabecera ──────────────────────────────────────────────────────── -->
-	<header class="sticky top-0 z-30 border-b border-paper-border bg-paper">
+	<header data-top-bar class="sticky top-0 z-30 border-b border-paper-border bg-paper">
 		<div class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
 			<!-- Logotipo -->
 			<a
@@ -113,6 +113,7 @@
 
 	<!-- ── Barra de navegación inferior — solo mobile ────────────────────── -->
 	<nav
+		data-bottom-bar
 		class="fixed right-0 bottom-0 left-0 z-30 border-t border-paper-border bg-paper
 		pb-[env(safe-area-inset-bottom)] sm:hidden"
 	>
