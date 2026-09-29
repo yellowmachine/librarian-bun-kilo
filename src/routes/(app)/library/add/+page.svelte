@@ -16,6 +16,7 @@
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import DuplicateBookDialog from '$lib/components/DuplicateBookDialog.svelte';
+	import AuthorCombobox from '$lib/components/AuthorCombobox.svelte';
 	import type { BookSearchResult } from '$lib/types';
 
 	interface Library {
@@ -901,12 +902,7 @@
 				<div class="mt-1.5 space-y-2">
 					{#each formAuthors as _, i (i)}
 						<div class="flex gap-2">
-							<input
-								type="text"
-								bind:value={formAuthors[i]}
-								placeholder="Author name"
-								class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
-							/>
+							<AuthorCombobox bind:value={formAuthors[i]} class="flex-1" />
 							{#if formAuthors.length > 1}
 								<button
 									type="button"
