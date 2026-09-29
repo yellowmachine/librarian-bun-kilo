@@ -8,3 +8,12 @@ export interface BookSearchResult {
 	coverUrl: string | null;
 	publishYear: number | null;
 }
+
+export interface AuthorSearchResult {
+	id: string; // OpenLibrary author ID, e.g. "OL23919A"
+	name: string;
+	birthDate: string | null;
+	deathDate: string | null;
+	topWork: string | null;
+	workCount: number;
+}
