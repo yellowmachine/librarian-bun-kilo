@@ -347,6 +347,13 @@
 	// ── Tags sugeridos por IA (libro encontrado en OpenLibrary) ──────────────
 	let suggestingTags = $state(false);
 	let tagsSuggested = $state(false);
+	// Tags nuevos propuestos por la IA: no se crean solos, el usuario los pulsa.
+	let proposedNewTags = $state<string[]>([]);
+	let pendingProposedTags = $derived(
+		proposedNewTags.filter(
+			(name) => !tagsToCreate.some((t) => t.name.toLowerCase() === name.toLowerCase())
+		)
+	);
 
 	async function suggestTags(
 		book: BookSearchResult,
@@ -361,15 +368,12 @@
 				body: JSON.stringify({ title: book.title, authors: book.authors, description, subjects })
 			});
 			if (!res.ok) return;
-			const data: { tagIds: string[] } = await res.json();
-			// Solo si sigue siendo el mismo libro y el usuario no ha tocado ya los
-			// tags — la sugerencia nunca pisa una elección manual.
-			if (
-				selectedBook?.id === book.id &&
-				selectedTagIds.length === 0 &&
-				tagsToCreate.length === 0 &&
-				data.tagIds.length > 0
-			) {
+			const data: { tagIds: string[]; newTags?: string[] } = await res.json();
+			if (selectedBook?.id !== book.id) return;
+			proposedNewTags = data.newTags ?? [];
+			// Solo si el usuario no ha tocado ya los tags — la sugerencia nunca
+			// pisa una elección manual.
+			if (selectedTagIds.length === 0 && tagsToCreate.length === 0 && data.tagIds.length > 0) {
 				selectedTagIds = data.tagIds;
 				tagsSuggested = true;
 			}
@@ -443,6 +447,7 @@
 		selectedTagIds = [];
 		tagsToCreate = [];
 		tagsSuggested = false;
+		proposedNewTags = [];
 		confirmCoverUrl = '';
 		duplicateMatch = null;
 		loadingDescription = true;
@@ -919,6 +924,22 @@
 				<div class="mt-1.5">
 					<TagSelectorLocal {availableTags} bind:selectedTagIds bind:tagsToCreate />
 				</div>
+				{#if pendingProposedTags.length > 0}
+					<div class="mt-2 flex flex-wrap items-center gap-2">
+						<span class="flex items-center gap-1 text-xs text-ink-faint">
+							<Sparkle size={12} /> New tag ideas:
+						</span>
+						{#each pendingProposedTags as name (name)}
+							<button
+								type="button"
+								onclick={() => (tagsToCreate = [...tagsToCreate, { name, color: null }])}
+								class="border border-dashed border-ink-faint px-2.5 py-0.5 text-xs text-ink-muted transition-colors hover:border-ink hover:text-ink"
+							>
+								+ {name}
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 
 			<div class="flex gap-3">

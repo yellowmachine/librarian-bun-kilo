@@ -104,6 +104,52 @@ export const actions = {
 		return { success: true };
 	},
 
+	// Aplicar tags sugeridos por IA: asigna los existentes (tagId) y crea y
+	// asigna los nuevos (newTag). Un nuevo cuyo nombre ya exista se reutiliza.
+	applyTags: async ({ locals, params, request }: RequestEvent) => {
+		const book = await getUserBook(locals.user!.id, params.id!);
+		if (!book || book.ownerId !== locals.user!.id) return fail(404, { error: 'Book not found.' });
+
+		const data = await request.formData();
+		const tagIds = data.getAll('tagId').map(String).filter(Boolean);
+		const newNames = data
+			.getAll('newTag')
+			.map((n) => String(n).trim())
+			.filter((n) => n && n.length <= 100);
+		if (tagIds.length === 0 && newNames.length === 0)
+			return fail(400, { error: 'No tags to apply.' });
+
+		await withRLS(locals.user!.id, async (tx) => {
+			const userTags = await tx
+				.select({ id: tags.id, name: tags.name })
+				.from(tags)
+				.where(eq(tags.userId, locals.user!.id));
+			const ownIds = new Set(userTags.map((t) => t.id));
+			const toAssign = tagIds.filter((id) => ownIds.has(id));
+
+			for (const name of newNames) {
+				const existing = userTags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+				if (existing) {
+					toAssign.push(existing.id);
+					continue;
+				}
+				const tagId = nanoid();
+				await tx.insert(tags).values({ id: tagId, userId: locals.user!.id, name, color: null });
+				userTags.push({ id: tagId, name });
+				toAssign.push(tagId);
+			}
+
+			if (toAssign.length > 0) {
+				await tx
+					.insert(userBookTags)
+					.values(toAssign.map((tagId) => ({ userBookId: params.id!, tagId })))
+					.onConflictDoNothing();
+			}
+		});
+
+		return { tagsApplied: true };
+	},
+
 	// Quitar etiqueta del libro
 	removeTag: async ({ locals, params, request }: RequestEvent) => {
 		const data = await request.formData();
