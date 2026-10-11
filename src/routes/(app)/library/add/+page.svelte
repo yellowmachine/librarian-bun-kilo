@@ -7,7 +7,8 @@
 		Trash,
 		Info,
 		Camera,
-		Check
+		Check,
+		Sparkle
 	} from 'phosphor-svelte';
 	import { page } from '$app/state';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -17,6 +18,7 @@
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import DuplicateBookDialog from '$lib/components/DuplicateBookDialog.svelte';
 	import AuthorCombobox from '$lib/components/AuthorCombobox.svelte';
+	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import type { BookSearchResult } from '$lib/types';
 
 	interface Library {
@@ -272,6 +274,7 @@
 	let formPublishYear = $state('');
 	let formDescription = $state('');
 	let formAlternateTitle = $state('');
+	let formCoverUrl = $state('');
 
 	function addAuthorField() {
 		formAuthors = [...formAuthors, ''];
@@ -289,6 +292,7 @@
 		formPublishYear = '';
 		formDescription = '';
 		formAlternateTitle = '';
+		formCoverUrl = '';
 		notes = '';
 		selectedTagIds = [];
 		tagsToCreate = [];
@@ -317,16 +321,62 @@
 			: null
 	);
 
-	async function fetchDetail(
-		workId: string
-	): Promise<{ description: string | null; alternateTitle: string | null }> {
+	async function fetchDetail(workId: string): Promise<{
+		description: string | null;
+		alternateTitle: string | null;
+		subjects: string[];
+	}> {
+		const empty = { description: null, alternateTitle: null, subjects: [] };
 		try {
 			const res = await fetch(`/api/books/detail?workId=${encodeURIComponent(workId)}`);
-			if (!res.ok) return { description: null, alternateTitle: null };
+			if (!res.ok) return empty;
 			const data = await res.json();
-			return { description: data.description ?? null, alternateTitle: data.alternateTitle ?? null };
+			return {
+				description: data.description ?? null,
+				alternateTitle: data.alternateTitle ?? null,
+				subjects: data.subjects ?? []
+			};
 		} catch {
-			return { description: null, alternateTitle: null };
+			return empty;
+		}
+	}
+
+	// Portada propia para un libro de OpenLibrary que no tiene ninguna.
+	let confirmCoverUrl = $state('');
+
+	// ── Tags sugeridos por IA (libro encontrado en OpenLibrary) ──────────────
+	let suggestingTags = $state(false);
+	let tagsSuggested = $state(false);
+
+	async function suggestTags(
+		book: BookSearchResult,
+		description: string | null,
+		subjects: string[]
+	): Promise<void> {
+		suggestingTags = true;
+		try {
+			const res = await fetch('/api/books/suggest-tags', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ title: book.title, authors: book.authors, description, subjects })
+			});
+			if (!res.ok) return;
+			const data: { tagIds: string[] } = await res.json();
+			// Solo si sigue siendo el mismo libro y el usuario no ha tocado ya los
+			// tags — la sugerencia nunca pisa una elección manual.
+			if (
+				selectedBook?.id === book.id &&
+				selectedTagIds.length === 0 &&
+				tagsToCreate.length === 0 &&
+				data.tagIds.length > 0
+			) {
+				selectedTagIds = data.tagIds;
+				tagsSuggested = true;
+			}
+		} catch {
+			// Best-effort: sin sugerencia el usuario elige a mano.
+		} finally {
+			if (selectedBook?.id === book.id) suggestingTags = false;
 		}
 	}
 
@@ -392,14 +442,17 @@
 		selectedAlternateTitle = null;
 		selectedTagIds = [];
 		tagsToCreate = [];
+		tagsSuggested = false;
+		confirmCoverUrl = '';
 		duplicateMatch = null;
 		loadingDescription = true;
 		mode = 'confirm';
 		await Promise.all([
-			fetchDetail(book.id).then(({ description, alternateTitle }) => {
+			fetchDetail(book.id).then(({ description, alternateTitle, subjects }) => {
 				selectedDescription = description;
 				selectedAlternateTitle = alternateTitle;
 				loadingDescription = false;
+				return suggestTags(book, description, subjects);
 			}),
 			fetchUserTags(),
 			fetchUserLibraries(),
@@ -492,6 +545,7 @@
 				body: JSON.stringify({
 					workId: selectedBook.id,
 					isbn: selectedBook.isbn ?? undefined,
+					coverUrl: (!selectedBook.coverUrl && confirmCoverUrl.trim()) || undefined,
 					notes: notes || undefined,
 					libraryId: selectedLibraryId || undefined,
 					allowDuplicate: allowDuplicate || undefined,
@@ -553,6 +607,7 @@
 					publishYear: year && !isNaN(year) ? year : undefined,
 					description: formDescription.trim() || undefined,
 					alternateTitle: formAlternateTitle.trim() || undefined,
+					coverUrl: formCoverUrl.trim() || undefined,
 					notes: notes.trim() || undefined,
 					libraryId: selectedLibraryId || undefined,
 					allowDuplicate: allowDuplicate || undefined,
@@ -793,6 +848,23 @@
 				</div>
 			{/if}
 
+			{#if !selectedBook.coverUrl}
+				<div>
+					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+						Cover <span class="tracking-normal normal-case">(not on OpenLibrary)</span>
+					</span>
+					<div class="mt-1.5">
+						<CoverPicker
+							bind:value={confirmCoverUrl}
+							title={selectedBook.title}
+							authors={selectedBook.authors}
+							isbn={selectedBook.isbn ?? ''}
+							publishYear={selectedBook.publishYear}
+						/>
+					</div>
+				</div>
+			{/if}
+
 			<div>
 				<label
 					for="notes"
@@ -830,8 +902,19 @@
 			{/if}
 
 			<div>
-				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+				<span
+					class="flex items-center gap-2 text-xs font-medium tracking-widest text-ink-muted uppercase"
+				>
 					Tags <span class="tracking-normal normal-case">(optional)</span>
+					{#if suggestingTags}
+						<span class="flex items-center gap-1 tracking-normal text-ink-faint normal-case">
+							<Spinner size="sm" /> Suggesting…
+						</span>
+					{:else if tagsSuggested}
+						<span class="flex items-center gap-1 tracking-normal text-ink-faint normal-case">
+							<Sparkle size={12} /> Suggested by AI
+						</span>
+					{/if}
 				</span>
 				<div class="mt-1.5">
 					<TagSelectorLocal {availableTags} bind:selectedTagIds bind:tagsToCreate />
@@ -971,6 +1054,21 @@
 						min="0"
 						max="9999"
 						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					/>
+				</div>
+			</div>
+
+			<div>
+				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Cover <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
+				</span>
+				<div class="mt-1.5">
+					<CoverPicker
+						bind:value={formCoverUrl}
+						title={formTitle}
+						authors={formAuthors}
+						isbn={formIsbn}
+						publishYear={formPublishYear ? parseInt(formPublishYear, 10) || null : null}
 					/>
 				</div>
 			</div>

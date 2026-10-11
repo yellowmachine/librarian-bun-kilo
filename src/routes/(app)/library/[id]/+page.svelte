@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Tag, Trash, Star, PencilSimple } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
+	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
 	import StarRating from '$lib/components/StarRating.svelte';
@@ -62,6 +63,15 @@
 	let editIsbn = $state(book.isbn ?? '');
 	let editPublishYear = $state(book.publishYear?.toString() ?? '');
 	let editDescription = $state(book.description ?? '');
+
+	// Portada propia (cualquier libro; en los de catálogo tapa la del catálogo)
+	let coverOpen = $state(false);
+	let coverValue = $state('');
+
+	function toggleCover() {
+		coverOpen = !coverOpen;
+		if (coverOpen) coverValue = book.coverUrl ?? '';
+	}
 
 	// Corrección local de título/autor (libros de catálogo, bookId presente)
 	let correctOpen = $state(false);
@@ -195,9 +205,26 @@
 						↻ Fetch cover from OpenLibrary
 					</button>
 				</form>
-				{#if form?.coverError}
+				{#if form?.coverError && !coverOpen}
 					<p class="mt-1 text-xs text-red-600">{form.coverError}</p>
 				{/if}
+			{/if}
+			{#if isOwner}
+				<button
+					type="button"
+					onclick={toggleCover}
+					class="mt-2 text-xs text-ink-faint hover:text-ink-muted"
+				>
+					{coverOpen ? 'Cancel' : book.coverUrl ? 'Change cover' : '✦ Find cover'}
+				</button>
+			{/if}
+			{#if isOwner && book.bookId && book.coverOverridden && !coverOpen}
+				<form method="POST" action="?/setCover" use:enhance class="mt-2">
+					<input type="hidden" name="coverUrl" value="" />
+					<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
+						↻ Reset to catalog cover
+					</button>
+				</form>
 			{/if}
 			{#if isOwner && book.bookId && book.titleOverridden}
 				<form method="POST" action="?/resetTitleAuthor" use:enhance class="mt-2">
@@ -239,6 +266,39 @@
 			</div>
 		{/if}
 	</div>
+
+	<!-- Portada propia de la copia (manual o de catálogo) -->
+	{#if isOwner && coverOpen}
+		<form
+			method="POST"
+			action="?/setCover"
+			use:enhance={() =>
+				async ({ result, update }) => {
+					await update();
+					if (result.type === 'success') coverOpen = false;
+				}}
+			class="space-y-4 border border-paper-border p-4"
+		>
+			{#if form?.coverError}
+				<p class="text-xs text-red-600">{form.coverError}</p>
+			{/if}
+			<CoverPicker
+				bind:value={coverValue}
+				title={book.title}
+				authors={book.authors}
+				isbn={book.isbn ?? ''}
+				publishYear={book.publishYear}
+			/>
+			<input type="hidden" name="coverUrl" value={coverValue} />
+			<button
+				type="submit"
+				disabled={coverValue === (book.coverUrl ?? '')}
+				class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90 disabled:opacity-40"
+			>
+				Save cover
+			</button>
+		</form>
+	{/if}
 
 	<!-- Corregir título/autor de un libro de catálogo (corrección local) -->
 	{#if isOwner && correctOpen && book.bookId}

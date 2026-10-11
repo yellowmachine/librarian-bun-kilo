@@ -59,7 +59,7 @@ export async function upsertBook(data: OpenLibraryBook): Promise<string> {
 // ─── Añadir libro a la biblioteca del usuario ─────────────────────────────────
 
 type BookSource =
-	| { bookId: string; title?: undefined }
+	| { bookId: string; title?: undefined; coverUrl?: string }
 	| {
 			bookId: null;
 			title: string;
@@ -68,6 +68,7 @@ type BookSource =
 			description?: string;
 			publishYear?: number;
 			alternateTitle?: string;
+			coverUrl?: string;
 	  };
 
 export async function addBookToLibrary(
@@ -115,6 +116,9 @@ export async function addBookToLibrary(
 			description: source.bookId === null ? (source.description ?? null) : null,
 			publishYear: source.bookId === null ? (source.publishYear ?? null) : null,
 			alternateTitle: source.bookId === null ? (source.alternateTitle ?? null) : null,
+			// A diferencia del resto de campos, la portada propia también vale para
+			// libros de catálogo: se guarda por copia, nunca en el catálogo global.
+			coverUrl: source.coverUrl ?? null,
 			notes: notes ?? null,
 			isAvailable: true
 		});
@@ -161,7 +165,7 @@ export async function getUserBooks(
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
@@ -326,7 +330,7 @@ export async function getContactBooks(
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
@@ -396,7 +400,7 @@ export async function getLibraryLetters(userId: string, by: 'title' | 'author'):
 export async function getUserBook(
 	userId: string,
 	userBookId: string
-): Promise<(UserBookWithDetails & { titleOverridden: boolean }) | null> {
+): Promise<(UserBookWithDetails & { titleOverridden: boolean; coverOverridden: boolean }) | null> {
 	return withRLS(userId, async (tx) => {
 		const rows = await tx
 			.select({
@@ -406,7 +410,7 @@ export async function getUserBook(
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
@@ -417,7 +421,10 @@ export async function getUserBook(
 				// Solo es relevante para libros de catálogo: indica si el título/autor
 				// llevan una corrección local (userBooks.title no nulo) en vez de venir
 				// del catálogo — el detalle del libro lo usa para mostrar "Reset".
-				titleOverridden: sql<boolean>`(${userBooks.title} IS NOT NULL)`
+				titleOverridden: sql<boolean>`(${userBooks.title} IS NOT NULL)`,
+				// Igual para la portada: la copia lleva una portada propia que tapa
+				// la del catálogo — el detalle lo usa para "Reset to catalog cover".
+				coverOverridden: sql<boolean>`(${userBooks.coverUrl} IS NOT NULL)`
 			})
 			.from(userBooks)
 			.leftJoin(books, eq(userBooks.bookId, books.id))

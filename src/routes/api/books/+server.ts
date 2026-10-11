@@ -18,6 +18,9 @@ const AddBookSchema = v.pipe(
 		description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(5000))),
 		alternateTitle: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(500))),
 		publishYear: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(9999))),
+		coverUrl: v.optional(
+			v.pipe(v.string(), v.trim(), v.maxLength(2000), v.url(), v.startsWith('https://'))
+		),
 		// Common
 		notes: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
 		libraryId: v.optional(v.pipe(v.string(), v.trim())),
@@ -71,6 +74,7 @@ export async function POST({ locals, request }: RequestEvent) {
 			description,
 			alternateTitle,
 			publishYear,
+			coverUrl,
 			notes,
 			libraryId,
 			allowDuplicate,
@@ -93,7 +97,8 @@ export async function POST({ locals, request }: RequestEvent) {
 					isbn: manualIsbn,
 					description,
 					publishYear,
-					alternateTitle
+					alternateTitle,
+					coverUrl
 				},
 				notes,
 				libraryId,
@@ -109,7 +114,8 @@ export async function POST({ locals, request }: RequestEvent) {
 			const bookId = await upsertBook(bookData);
 			userBookId = await addBookToLibrary(
 				locals.user.id,
-				{ bookId },
+				// Portada propia solo si el catálogo no tiene ninguna.
+				{ bookId, coverUrl: bookData.coverUrl ? undefined : coverUrl },
 				notes,
 				libraryId,
 				allowDuplicate

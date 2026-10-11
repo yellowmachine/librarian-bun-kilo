@@ -185,6 +185,11 @@ export const userBooks = librarianSchema.table(
 		// Título alternativo anotado a mano (entrada manual); mismo patrón de
 		// override que el resto de estos campos.
 		alternateTitle: text('alternate_title'),
+		// URL pública de portada elegida a mano, normalmente sugerida por la
+		// búsqueda de portadas (src/lib/server/coverSearch.ts). Excepción al
+		// patrón de arriba: también aplica a libros de catálogo sin portada (o
+		// con una que el usuario prefiere cambiar), y tapa books.cover_url.
+		coverUrl: text('cover_url'),
 		notes: text('notes'),
 		isAvailable: boolean('is_available').default(true).notNull(),
 		addedAt: timestamp('added_at').defaultNow().notNull(),

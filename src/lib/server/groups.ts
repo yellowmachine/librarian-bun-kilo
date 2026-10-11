@@ -457,7 +457,7 @@ export async function searchBooksFromOthers(
 				bookId: userBooks.bookId,
 				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
 				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
 				alternateTitle: sql<
 					string | null
@@ -541,7 +541,7 @@ export async function getGroupRecentBooks(
 				bookId: userBooks.bookId,
 				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
 				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
 				isAvailable: userBooks.isAvailable,
 				addedAt: userBooks.addedAt,

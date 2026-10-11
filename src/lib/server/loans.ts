@@ -145,7 +145,7 @@ export async function getUserLoans(userId: string): Promise<{
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				borrowerId: loans.borrowerId,
 				ownerId: loans.ownerId
 			})
@@ -170,7 +170,7 @@ export async function getUserLoans(userId: string): Promise<{
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				borrowerId: loans.borrowerId,
 				ownerId: loans.ownerId
 			})
@@ -247,7 +247,7 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				borrowerId: loans.borrowerId,
 				ownerId: loans.ownerId
 			})
@@ -409,7 +409,7 @@ export async function getBookForBorrow(
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
 				isAvailable: userBooks.isAvailable,
 				ownerId: userBooks.userId
