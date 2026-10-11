@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, Tag, Trash, Star, PencilSimple } from 'phosphor-svelte';
+	import { ArrowLeft, Tag, Trash, Star, PencilSimple, Sparkle } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
@@ -39,6 +39,67 @@
 
 	let assignedTagIds = $derived(new Set(book.tags.map((t: { id: string }) => t.id)));
 	let availableTags = $derived(userTags.filter((t: { id: string }) => !assignedTagIds.has(t.id)));
+
+	// Sugerencia de tags con IA (re-tagear un libro ya dado de alta): los que
+	// encajan de entre los existentes y unos pocos nuevos a crear. Nada se
+	// aplica sin que el usuario lo pulse.
+	let suggestingTags = $state(false);
+	let tagSuggestion = $state<{ tagIds: string[]; newTags: string[] } | null>(null);
+	let suggestedExisting = $derived(
+		tagSuggestion
+			? userTags.filter(
+					(t: { id: string }) => tagSuggestion!.tagIds.includes(t.id) && !assignedTagIds.has(t.id)
+				)
+			: []
+	);
+	// Los nuevos que ya existan (p. ej. recién creados al aplicarlos) desaparecen.
+	let suggestedNew = $derived(
+		tagSuggestion
+			? tagSuggestion.newTags.filter(
+					(name) =>
+						!userTags.some((t: { name: string }) => t.name.toLowerCase() === name.toLowerCase())
+				)
+			: []
+	);
+	// Asignados que la IA no elegiría: se marcan para que el usuario decida si quitarlos.
+	let unsuggestedAssigned = $derived(
+		new Set(
+			tagSuggestion
+				? book.tags
+						.filter((t: { id: string }) => !tagSuggestion!.tagIds.includes(t.id))
+						.map((t: { id: string }) => t.id)
+				: []
+		)
+	);
+
+	async function suggestTags() {
+		suggestingTags = true;
+		try {
+			const res = await fetch('/api/books/suggest-tags', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ userBookId: book.userBookId })
+			});
+			tagSuggestion = res.ok ? await res.json() : { tagIds: [], newTags: [] };
+		} catch {
+			tagSuggestion = { tagIds: [], newTags: [] };
+		} finally {
+			suggestingTags = false;
+		}
+	}
+
+	async function applySuggestedTags(tagIds: string[], newTags: string[]) {
+		const body = new FormData();
+		for (const id of tagIds) body.append('tagId', id);
+		for (const name of newTags) body.append('newTag', name);
+		const response = await fetch('?/applyTags', {
+			method: 'POST',
+			body,
+			headers: { 'x-sveltekit-action': 'true' }
+		});
+		await applyAction(deserialize(await response.text()));
+		invalidateAll();
+	}
 
 	let isAvailable = $state(book.isAvailable);
 	let notes = $state(book.notes ?? '');
@@ -646,7 +707,80 @@
 			<div class="flex items-center gap-2">
 				<Tag size={16} class="text-ink-faint" />
 				<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Tags</span>
+				<button
+					type="button"
+					onclick={suggestTags}
+					disabled={suggestingTags}
+					class="ml-auto flex items-center gap-1 text-xs text-ink-faint hover:text-ink disabled:opacity-60"
+				>
+					{#if suggestingTags}
+						<Spinner size="sm" /> Suggesting…
+					{:else}
+						<Sparkle size={12} /> Suggest with AI
+					{/if}
+				</button>
 			</div>
+
+			{#if tagSuggestion && !suggestingTags}
+				<div class="space-y-3 border border-dashed border-paper-border p-3">
+					{#if suggestedExisting.length === 0 && suggestedNew.length === 0}
+						<p class="text-xs text-ink-faint">No more tags to suggest for this book.</p>
+					{:else}
+						<p class="text-xs text-ink-faint">Suggested by AI — tap to add</p>
+						<div class="flex flex-wrap gap-2">
+							{#each suggestedExisting as tag (tag.id)}
+								<button
+									type="button"
+									onclick={() => applySuggestedTags([tag.id], [])}
+									class="border px-3 py-1 text-xs transition-colors hover:border-ink-faint"
+									style={tag.color
+										? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
+										: 'border-color: #e8e2da; color: #3d3d3d'}
+								>
+									+ {tag.name}
+								</button>
+							{/each}
+							{#each suggestedNew as name (name)}
+								<button
+									type="button"
+									onclick={() => applySuggestedTags([], [name])}
+									class="flex items-center gap-1.5 border border-dashed border-ink-faint px-3 py-1 text-xs text-ink-muted transition-colors hover:border-ink hover:text-ink"
+								>
+									+ {name}
+									<span class="text-[10px] tracking-widest text-ink-faint uppercase">new</span>
+								</button>
+							{/each}
+						</div>
+					{/if}
+					{#if unsuggestedAssigned.size > 0}
+						<p class="text-xs text-ink-faint">
+							Tags with a dashed border wouldn’t be picked by the AI — tap one to remove it.
+						</p>
+					{/if}
+					<div class="flex gap-4">
+						{#if suggestedExisting.length + suggestedNew.length > 1}
+							<button
+								type="button"
+								onclick={() =>
+									applySuggestedTags(
+										suggestedExisting.map((t: { id: string }) => t.id),
+										suggestedNew
+									)}
+								class="text-xs text-ink hover:underline"
+							>
+								Add all
+							</button>
+						{/if}
+						<button
+							type="button"
+							onclick={() => (tagSuggestion = null)}
+							class="text-xs text-ink-faint hover:text-ink"
+						>
+							Dismiss
+						</button>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Asignadas -->
 			{#if book.tags.length > 0}
@@ -656,7 +790,11 @@
 							<input type="hidden" name="tagId" value={tag.id} />
 							<button
 								type="submit"
-								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-500"
+								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-500 {unsuggestedAssigned.has(
+									tag.id
+								)
+									? 'border-dashed'
+									: ''}"
 								style={tag.color
 									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
 									: 'border-color: #e8e2da; color: #3d3d3d'}
