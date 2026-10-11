@@ -17,6 +17,7 @@
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import DuplicateBookDialog from '$lib/components/DuplicateBookDialog.svelte';
 	import AuthorCombobox from '$lib/components/AuthorCombobox.svelte';
+	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import type { BookSearchResult } from '$lib/types';
 
 	interface Library {
@@ -272,6 +273,7 @@
 	let formPublishYear = $state('');
 	let formDescription = $state('');
 	let formAlternateTitle = $state('');
+	let formCoverUrl = $state('');
 
 	function addAuthorField() {
 		formAuthors = [...formAuthors, ''];
@@ -289,6 +291,7 @@
 		formPublishYear = '';
 		formDescription = '';
 		formAlternateTitle = '';
+		formCoverUrl = '';
 		notes = '';
 		selectedTagIds = [];
 		tagsToCreate = [];
@@ -553,6 +556,7 @@
 					publishYear: year && !isNaN(year) ? year : undefined,
 					description: formDescription.trim() || undefined,
 					alternateTitle: formAlternateTitle.trim() || undefined,
+					coverUrl: formCoverUrl.trim() || undefined,
 					notes: notes.trim() || undefined,
 					libraryId: selectedLibraryId || undefined,
 					allowDuplicate: allowDuplicate || undefined,
@@ -971,6 +975,21 @@
 						min="0"
 						max="9999"
 						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					/>
+				</div>
+			</div>
+
+			<div>
+				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Cover <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
+				</span>
+				<div class="mt-1.5">
+					<CoverPicker
+						bind:value={formCoverUrl}
+						title={formTitle}
+						authors={formAuthors}
+						isbn={formIsbn}
+						publishYear={formPublishYear ? parseInt(formPublishYear, 10) || null : null}
 					/>
 				</div>
 			</div>

@@ -68,6 +68,7 @@ type BookSource =
 			description?: string;
 			publishYear?: number;
 			alternateTitle?: string;
+			coverUrl?: string;
 	  };
 
 export async function addBookToLibrary(
@@ -115,6 +116,7 @@ export async function addBookToLibrary(
 			description: source.bookId === null ? (source.description ?? null) : null,
 			publishYear: source.bookId === null ? (source.publishYear ?? null) : null,
 			alternateTitle: source.bookId === null ? (source.alternateTitle ?? null) : null,
+			coverUrl: source.bookId === null ? (source.coverUrl ?? null) : null,
 			notes: notes ?? null,
 			isAvailable: true
 		});
@@ -161,7 +163,7 @@ export async function getUserBooks(
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
@@ -326,7 +328,7 @@ export async function getContactBooks(
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,
@@ -406,7 +408,7 @@ export async function getUserBook(
 				bookId: userBooks.bookId,
 				title: effectiveTitle,
 				authors: effectiveAuthors,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				isbn: effectiveIsbn,
 				publishYear: effectivePublishYear,
 				description: effectiveDescription,

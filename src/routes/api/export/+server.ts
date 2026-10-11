@@ -21,7 +21,7 @@ export async function GET({ locals, url }: RequestEvent) {
 				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
 				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
 				isbn: sql<string | null>`COALESCE(${userBooks.isbn}, ${books.isbn})`,
-				coverUrl: books.coverUrl,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
 				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
 				notes: userBooks.notes
 			})

@@ -19,6 +19,8 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       # Encryption — debe ser EXACTAMENTE el mismo valor que en Scholio
       KMS_MASTER_KEY: ${KMS_MASTER_KEY}
+      # Opcional: cuota propia para la búsqueda de portadas en Google Books
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
       # Redirect a Scholio cuando el usuario no tiene acceso / hace logout
       SCHOLIO_REDIRECT: ${SCHOLIO_REDIRECT:-https://scholio.review}
       # Email (SMTP)
