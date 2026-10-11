@@ -280,9 +280,9 @@ export const actions = {
 					description: null,
 					publishYear: null,
 					alternateTitle: null,
-					// También la portada manual: si no, el COALESCE la seguiría
-					// anteponiendo a la del catálogo.
-					coverUrl: null,
+					// La portada propia solo se conserva si el catálogo no trae
+					// ninguna; si no, el COALESCE la seguiría anteponiendo.
+					coverUrl: bookData.coverUrl ? null : book.coverUrl,
 					updatedAt: new Date()
 				})
 				.where(eq(userBooks.id, params.id!));
@@ -294,13 +294,12 @@ export const actions = {
 	// Volver a pedir la portada a OpenLibrary (solo libros con bookId que no
 	// tienen portada guardada todavía). Nunca acepta una URL del usuario —
 	// siempre viene de la propia respuesta de OpenLibrary.
-	// Portada de un libro manual (elegida con CoverPicker o pegada a mano);
-	// vacío = quitarla.
+	// Portada propia de la copia (elegida con CoverPicker o pegada a mano);
+	// vacío = quitarla (en libros de catálogo, vuelve la del catálogo). Nunca
+	// toca books.cover_url, que es compartido entre usuarios.
 	setCover: async ({ locals, params, request }: RequestEvent) => {
 		const book = await getUserBook(locals.user!.id, params.id!);
 		if (!book) return fail(404, { coverError: 'Book not found.' });
-		if (book.bookId !== null)
-			return fail(400, { coverError: 'Only manually added books can change their cover.' });
 
 		const data = await request.formData();
 		const coverUrl = (data.get('coverUrl') as string | null)?.trim() || null;

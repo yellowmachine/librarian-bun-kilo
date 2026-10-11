@@ -64,7 +64,7 @@
 	let editPublishYear = $state(book.publishYear?.toString() ?? '');
 	let editDescription = $state(book.description ?? '');
 
-	// Portada (libros manuales)
+	// Portada propia (cualquier libro; en los de catálogo tapa la del catálogo)
 	let coverOpen = $state(false);
 	let coverValue = $state('');
 
@@ -205,11 +205,11 @@
 						↻ Fetch cover from OpenLibrary
 					</button>
 				</form>
-				{#if form?.coverError}
+				{#if form?.coverError && !coverOpen}
 					<p class="mt-1 text-xs text-red-600">{form.coverError}</p>
 				{/if}
 			{/if}
-			{#if isOwner && !book.bookId}
+			{#if isOwner}
 				<button
 					type="button"
 					onclick={toggleCover}
@@ -217,6 +217,14 @@
 				>
 					{coverOpen ? 'Cancel' : book.coverUrl ? 'Change cover' : '✦ Find cover'}
 				</button>
+			{/if}
+			{#if isOwner && book.bookId && book.coverOverridden && !coverOpen}
+				<form method="POST" action="?/setCover" use:enhance class="mt-2">
+					<input type="hidden" name="coverUrl" value="" />
+					<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
+						↻ Reset to catalog cover
+					</button>
+				</form>
 			{/if}
 			{#if isOwner && book.bookId && book.titleOverridden}
 				<form method="POST" action="?/resetTitleAuthor" use:enhance class="mt-2">
@@ -259,8 +267,8 @@
 		{/if}
 	</div>
 
-	<!-- Portada de un libro manual -->
-	{#if isOwner && coverOpen && !book.bookId}
+	<!-- Portada propia de la copia (manual o de catálogo) -->
+	{#if isOwner && coverOpen}
 		<form
 			method="POST"
 			action="?/setCover"

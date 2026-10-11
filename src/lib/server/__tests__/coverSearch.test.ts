@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
 	askAiForCoverHints,
+	buildSearchQuery,
+	isbn13To10,
+	isbnCoverUrls,
 	extractOgImage,
 	isPrivateAddress,
 	isUsableImage,
@@ -109,5 +112,36 @@ describe('askAiForCoverHints', () => {
 			pageUrls: [],
 			imageUrls: []
 		});
+	});
+});
+
+describe('isbn13To10', () => {
+	it('convierte ISBN-13 978 a ISBN-10, incluido el dígito de control X', () => {
+		expect(isbn13To10('9780945466376')).toBe('0945466374');
+		expect(isbn13To10('9781005485320')).toBe('1005485321');
+		expect(isbn13To10('9780804429573')).toBe('080442957X');
+	});
+
+	it('deja un ISBN-10 tal cual y no convierte prefijos 979', () => {
+		expect(isbn13To10('0945466374')).toBe('0945466374');
+		expect(isbn13To10('9791234567896')).toBeNull();
+	});
+});
+
+describe('isbnCoverUrls', () => {
+	it('construye OpenLibrary, Casa del Libro y Amazon para un ISBN-13', () => {
+		expect(isbnCoverUrls('9781005485320')).toEqual([
+			'https://covers.openlibrary.org/b/isbn/9781005485320-M.jpg?default=false',
+			'https://imagessl0.casadellibro.com/a/l/t1/20/9781005485320.jpg',
+			'https://images-na.ssl-images-amazon.com/images/P/1005485321.01.LZZZZZZZ.jpg'
+		]);
+	});
+});
+
+describe('buildSearchQuery', () => {
+	it('es una consulta corta: título entre comillas, autores y ISBN', () => {
+		expect(
+			buildSearchQuery({ title: 'El mito de la defensa nacional', authors: ['Hans-Hermann Hoppe'] })
+		).toBe('"El mito de la defensa nacional" Hans-Hermann Hoppe ISBN');
 	});
 });

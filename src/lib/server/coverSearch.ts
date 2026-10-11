@@ -29,7 +29,7 @@ const MAX_HTML_BYTES = 1024 * 1024;
 // Por debajo de esto son placeholders (el 1x1 de OpenLibrary, iconos, etc.).
 const MIN_IMAGE_BYTES = 2_000;
 const MAX_CANDIDATES = 6;
-const MAX_PAGES_TO_SCRAPE = 5;
+const MAX_PAGES_TO_SCRAPE = 8;
 const USER_AGENT = 'Librarian/1.0 (+https://librarian.scholio.review)';
 
 export interface CoverQuery {
@@ -186,9 +186,37 @@ function normalizeIsbn(isbn: string): string | null {
 	return /^(?:\d{9}[\dX]|\d{13})$/.test(clean) ? clean : null;
 }
 
-function openLibraryIsbnCover(isbn: string): string {
-	// default=false → 404 en vez del placeholder transparente si no hay portada.
-	return `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`;
+/** ISBN-10 equivalente (solo existe para ISBN-13 con prefijo 978). */
+export function isbn13To10(isbn: string): string | null {
+	if (isbn.length === 10) return isbn;
+	if (!isbn.startsWith('978')) return null;
+	const body = isbn.slice(3, 12);
+	let sum = 0;
+	for (let i = 0; i < 9; i++) sum += (10 - i) * Number(body[i]);
+	const check = (11 - (sum % 11)) % 11;
+	return body + (check === 10 ? 'X' : String(check));
+}
+
+/**
+ * URLs de portada que se pueden construir directamente a partir de un ISBN.
+ * Son patrones de CDN públicos (no APIs documentadas), así que pueden dejar
+ * de funcionar — da igual, todas pasan por isUsableImage antes de ofrecerse.
+ * Se complementan: Casa del Libro cubre bien ediciones en castellano y la de
+ * Amazon el resto.
+ */
+export function isbnCoverUrls(isbn: string): string[] {
+	const urls = [
+		// default=false → 404 en vez del placeholder transparente si no hay portada.
+		`https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`
+	];
+	if (isbn.length === 13) {
+		urls.push(`https://imagessl0.casadellibro.com/a/l/t1/${isbn.slice(-2)}/${isbn}.jpg`);
+	}
+	const isbn10 = isbn13To10(isbn);
+	// Sin portada devuelve un GIF de 1x1 (43 bytes) que MIN_IMAGE_BYTES descarta.
+	if (isbn10)
+		urls.push(`https://images-na.ssl-images-amazon.com/images/P/${isbn10}.01.LZZZZZZZ.jpg`);
+	return urls;
 }
 
 export function normalizeGoogleThumbnail(url: string): string {
@@ -266,7 +294,17 @@ interface AiCoverHints {
 	imageUrls: string[];
 }
 
-function buildPrompt(q: CoverQuery): string {
+// El plugin web de OpenRouter busca a partir del mensaje del usuario, así que
+// ese mensaje es solo una consulta corta (como la escribiría una persona en un
+// buscador) y todas las instrucciones van en el mensaje de sistema. Con el
+// prompt largo como mensaje de usuario, la búsqueda devolvía resultados
+// genéricos (p.ej. la edición original en inglés en vez de las librerías
+// que venden la traducción).
+export function buildSearchQuery(q: CoverQuery): string {
+	return [`"${q.title}"`, ...q.authors.slice(0, 2), q.isbn ?? 'ISBN'].join(' ');
+}
+
+function buildSystemPrompt(q: CoverQuery): string {
 	const lines = [
 		`Title: ${q.title}`,
 		q.authors.length > 0 ? `Author(s): ${q.authors.join(', ')}` : null,
@@ -274,13 +312,13 @@ function buildPrompt(q: CoverQuery): string {
 		q.isbn ? `ISBN given by the user: ${q.isbn}` : null
 	].filter(Boolean);
 
-	return `I need a picture of the front cover of this book, to show in a personal library catalogue:
+	return `You help find the front cover picture of a book for a personal library catalogue. The book is:
 
 ${lines.join('\n')}
 
-Using the web search results, find:
-- "isbns": ISBN-10 or ISBN-13 numbers of editions of THIS book (prefer the edition matching the year/language given).
-- "pageUrls": URLs of web pages dedicated to THIS specific book (publisher catalogue page, bookstore product page, Goodreads, library record...). Not search pages, not author pages.
+The user message is a web search for it. Using the web search results and your own knowledge, find:
+- "isbns": ISBN-13 (or ISBN-10) numbers of editions of THIS book. The title's language tells you which edition the user owns: a translated title means the translation, not the original — list that edition's ISBNs first.
+- "pageUrls": URLs of web pages dedicated to THIS specific edition (bookstore product page, publisher catalogue page, Goodreads, library record...). Not search pages, not author pages.
 - "imageUrls": direct URLs of the cover image file, only if you actually saw them in the results. Never guess or construct an image URL.
 
 Leave a list empty rather than including anything about a different book.
@@ -318,8 +356,12 @@ export async function askAiForCoverHints(apiKey: string, query: CoverQuery): Pro
 			body: JSON.stringify({
 				model: COVER_MODEL,
 				max_tokens: 1024,
-				plugins: [{ id: 'web', engine: 'exa', max_results: 5 }],
-				messages: [{ role: 'user', content: buildPrompt(query) }]
+				// Exa cobra lo mismo hasta 10 resultados.
+				plugins: [{ id: 'web', engine: 'exa', max_results: 10 }],
+				messages: [
+					{ role: 'system', content: buildSystemPrompt(query) },
+					{ role: 'user', content: buildSearchQuery(query) }
+				]
 			})
 		});
 
@@ -386,9 +428,9 @@ export async function findCoverCandidates(
 
 	// Orden = prioridad: lo que viene del ISBN del usuario es lo más fiable.
 	const raw = [
-		...(userIsbn ? [openLibraryIsbnCover(userIsbn)] : []),
+		...(userIsbn ? isbnCoverUrls(userIsbn) : []),
 		...googleUrls,
-		...aiIsbns.map(openLibraryIsbnCover),
+		...aiIsbns.flatMap(isbnCoverUrls),
 		...pageImages.filter((u): u is string => u !== null),
 		...(hints?.imageUrls ?? [])
 	];

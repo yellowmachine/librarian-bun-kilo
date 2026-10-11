@@ -114,7 +114,8 @@ export async function POST({ locals, request }: RequestEvent) {
 			const bookId = await upsertBook(bookData);
 			userBookId = await addBookToLibrary(
 				locals.user.id,
-				{ bookId },
+				// Portada propia solo si el catálogo no tiene ninguna.
+				{ bookId, coverUrl: bookData.coverUrl ? undefined : coverUrl },
 				notes,
 				libraryId,
 				allowDuplicate
