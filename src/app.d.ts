@@ -14,7 +14,12 @@ declare global {
 
 		// interface Error {}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			// Pantalla de /library/add guardada en el historial (shallow routing)
+			// y cuántos pasos hay desde la pantalla de elegir modo.
+			addBookMode?: string;
+			addBookDepth?: number;
+		}
 		// interface Platform {}
 	}
 }

@@ -11,6 +11,8 @@
 		Sparkle
 	} from 'phosphor-svelte';
 	import { page } from '$app/state';
+	import { pushState } from '$app/navigation';
+	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
@@ -68,6 +70,31 @@
 	}
 
 	let mode = $state<Mode>('choose');
+
+	// Cada pantalla es una entrada del historial (shallow routing), para que el
+	// botón atrás del navegador/móvil vuelva a la pantalla anterior en vez de
+	// salir de la página. Los estados de espera (adding, analyzing…) no se
+	// guardan: solo cambian `mode` localmente.
+	function goTo(next: Mode) {
+		mode = next;
+		pushState('', { addBookMode: next, addBookDepth: (page.state.addBookDepth ?? 0) + 1 });
+	}
+
+	// Vuelve a la pantalla de elegir modo deshaciendo las entradas apiladas, así
+	// después "atrás" sale de la página como se espera.
+	function backToChoose() {
+		const depth = page.state.addBookDepth ?? 0;
+		mode = 'choose';
+		if (depth > 0) history.go(-depth);
+	}
+
+	// Atrás/adelante del navegador: restaura la pantalla guardada.
+	$effect(() => {
+		const target = (page.state.addBookMode ?? 'choose') as Mode;
+		untrack(() => {
+			mode = target === 'confirm' && !selectedBook ? 'choose' : target;
+		});
+	});
 	let manualQuery = $state('');
 	let searchResults = $state<BookSearchResult[]>([]);
 	let translatedQuery = $state<string | null>(null);
@@ -175,7 +202,7 @@
 			);
 			shelfCandidateNewTags = shelfCandidates.map(() => []);
 			if (shelfCandidates.length === 0) errorMsg = 'No books were recognized in that photo.';
-			mode = 'shelf-review';
+			goTo('shelf-review');
 		} catch {
 			errorMsg = 'Could not analyze the photo. Check your connection.';
 			mode = 'choose';
@@ -264,7 +291,7 @@
 		shelfCandidateNewTags = [];
 		shelfImagePreview = null;
 		lastAddedTitle = null;
-		mode = 'choose';
+		backToChoose();
 	}
 
 	// ── Manual form state ─────────────────────────────────────────────────────
@@ -302,7 +329,7 @@
 	async function enterFormMode() {
 		resetFormFields();
 		await Promise.all([fetchUserTags(), fetchUserLibraries()]);
-		mode = 'form';
+		goTo('form');
 	}
 
 	// ── OpenLibrary confirm state ─────────────────────────────────────────────
@@ -451,7 +478,7 @@
 		confirmCoverUrl = '';
 		duplicateMatch = null;
 		loadingDescription = true;
-		mode = 'confirm';
+		goTo('confirm');
 		await Promise.all([
 			fetchDetail(book.id).then(({ description, alternateTitle, subjects }) => {
 				selectedDescription = description;
@@ -489,7 +516,7 @@
 	});
 
 	async function onIsbnDetected(isbn: string) {
-		mode = 'results';
+		goTo('results');
 		searching = true;
 		errorMsg = '';
 		searchResults = [];
@@ -512,7 +539,7 @@
 	async function onManualSearch(e: SubmitEvent) {
 		e.preventDefault();
 		if (!manualQuery.trim()) return;
-		mode = 'results';
+		goTo('results');
 		searching = true;
 		errorMsg = '';
 		searchResults = [];
@@ -566,7 +593,7 @@
 			}
 			const data = await res.json();
 			lastAddedTitle = data.title ?? selectedBook.title;
-			mode = 'choose';
+			backToChoose();
 		} catch {
 			errorMsg = 'Network error.';
 			mode = 'confirm';
@@ -629,7 +656,7 @@
 			const data = await res.json();
 			lastAddedTitle = data.title ?? formTitle;
 			resetFormFields();
-			mode = 'choose';
+			backToChoose();
 		} catch {
 			errorMsg = 'Network error.';
 			mode = 'form';
@@ -640,7 +667,16 @@
 <div class="mx-auto max-w-md space-y-8">
 	<!-- Cabecera -->
 	<div class="flex items-center gap-3">
-		<a href="/library" class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a>
+		<a
+			href="/library"
+			onclick={(e) => {
+				// Dentro de un modo, la flecha vuelve a elegir modo en vez de salir.
+				if (mode === 'choose') return;
+				e.preventDefault();
+				backToChoose();
+			}}
+			class="text-ink-faint hover:text-ink"><ArrowLeft size={20} /></a
+		>
 		<h1 class="font-serif text-2xl font-normal text-ink">Add book</h1>
 	</div>
 
@@ -678,7 +714,7 @@
 		{/if}
 		<div class="grid grid-cols-2 gap-3">
 			<button
-				onclick={() => (mode = 'scan')}
+				onclick={() => goTo('scan')}
 				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
 			>
 				<Barcode size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
@@ -687,7 +723,7 @@
 			<button
 				onclick={() => {
 					manualQuery = '';
-					mode = 'manual';
+					goTo('manual');
 				}}
 				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
 			>
@@ -728,7 +764,7 @@
 			onDetected={onIsbnDetected}
 			onError={(e) => {
 				errorMsg = e;
-				mode = 'choose';
+				backToChoose();
 			}}
 		/>
 
@@ -756,7 +792,7 @@
 			<div class="mb-4 flex items-center justify-between">
 				<span class="text-xs tracking-widest text-ink-faint uppercase">Results</span>
 				<button
-					onclick={() => (mode = 'manual')}
+					onclick={() => goTo('manual')}
 					class="text-xs text-ink underline underline-offset-2"
 				>
 					New search
@@ -944,7 +980,7 @@
 
 			<div class="flex gap-3">
 				<button
-					onclick={() => (mode = 'results')}
+					onclick={() => history.back()}
 					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
 				>
 					Cancel
@@ -1158,7 +1194,7 @@
 			<div class="flex gap-3 pt-1">
 				<button
 					type="button"
-					onclick={() => (mode = 'choose')}
+					onclick={backToChoose}
 					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
 				>
 					Cancel
@@ -1258,7 +1294,7 @@
 						shelfCandidates = [];
 						selectedShelfIndices.clear();
 						shelfImagePreview = null;
-						mode = 'choose';
+						backToChoose();
 					}}
 					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
 				>
