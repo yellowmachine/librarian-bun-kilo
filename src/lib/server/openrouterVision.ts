@@ -45,7 +45,7 @@ function toConfidence(value: unknown): ShelfBookCandidate['confidence'] {
 // Solo se aceptan nombres que coincidan (sin distinguir mayúsculas) con un
 // tag real del usuario — cualquier otra cosa que el modelo devuelva se
 // descarta, así nunca puede "inventar" un tag nuevo por esta vía.
-function filterKnownTags(value: unknown, availableTagNames: string[]): string[] {
+export function filterKnownTags(value: unknown, availableTagNames: string[]): string[] {
 	if (!Array.isArray(value)) return [];
 	const seen = new Set<string>();
 	const result: string[] = [];
@@ -61,7 +61,7 @@ function filterKnownTags(value: unknown, availableTagNames: string[]): string[] 
 	return result;
 }
 
-function extractJson(content: string): string {
+export function extractJson(content: string): string {
 	const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
 	return (fenced ? fenced[1] : content).trim();
 }
