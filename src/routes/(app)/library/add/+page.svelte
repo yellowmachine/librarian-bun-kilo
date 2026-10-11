@@ -341,6 +341,9 @@
 		}
 	}
 
+	// Portada propia para un libro de OpenLibrary que no tiene ninguna.
+	let confirmCoverUrl = $state('');
+
 	// ── Tags sugeridos por IA (libro encontrado en OpenLibrary) ──────────────
 	let suggestingTags = $state(false);
 	let tagsSuggested = $state(false);
@@ -440,6 +443,7 @@
 		selectedTagIds = [];
 		tagsToCreate = [];
 		tagsSuggested = false;
+		confirmCoverUrl = '';
 		duplicateMatch = null;
 		loadingDescription = true;
 		mode = 'confirm';
@@ -541,6 +545,7 @@
 				body: JSON.stringify({
 					workId: selectedBook.id,
 					isbn: selectedBook.isbn ?? undefined,
+					coverUrl: (!selectedBook.coverUrl && confirmCoverUrl.trim()) || undefined,
 					notes: notes || undefined,
 					libraryId: selectedLibraryId || undefined,
 					allowDuplicate: allowDuplicate || undefined,
@@ -840,6 +845,23 @@
 							{descriptionExpanded ? 'Less' : 'More'}
 						</button>
 					{/if}
+				</div>
+			{/if}
+
+			{#if !selectedBook.coverUrl}
+				<div>
+					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+						Cover <span class="tracking-normal normal-case">(not on OpenLibrary)</span>
+					</span>
+					<div class="mt-1.5">
+						<CoverPicker
+							bind:value={confirmCoverUrl}
+							title={selectedBook.title}
+							authors={selectedBook.authors}
+							isbn={selectedBook.isbn ?? ''}
+							publishYear={selectedBook.publishYear}
+						/>
+					</div>
 				</div>
 			{/if}
 
