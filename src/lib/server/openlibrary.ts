@@ -185,7 +185,8 @@ export async function searchAuthors(query: string, limit = 8): Promise<AuthorSea
 			birthDate: doc.birth_date ?? null,
 			deathDate: doc.death_date ?? null,
 			topWork: doc.top_work ?? null,
-			workCount: doc.work_count ?? 0
+			workCount: doc.work_count ?? 0,
+			source: 'openlibrary' as const
 		}))
 		.sort((a, b) => b.workCount - a.workCount)
 		.slice(0, limit);

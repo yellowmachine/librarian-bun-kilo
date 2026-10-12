@@ -6,6 +6,8 @@ import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
 import { translateBookTitle } from './wikidata';
+import { matchLocalAuthors } from './authorSearch';
+import type { AuthorSearchResult } from '$lib/types';
 
 export const LIBRARY_RECENT_LIMIT = 50;
 
@@ -313,6 +315,29 @@ export async function findDuplicateUserBook(
 	}
 
 	return null;
+}
+
+// ─── Autores de la biblioteca del usuario ─────────────────────────────────────
+// Sugerencias para el campo de autor de la entrada manual. Como el cotejo de
+// duplicados, se filtra en memoria (ver authorSearch.ts).
+
+export async function searchUserAuthors(
+	userId: string,
+	query: string,
+	limit?: number
+): Promise<AuthorSearchResult[]> {
+	const rows = await withRLS(userId, (tx) =>
+		tx
+			.select({ authors: effectiveAuthors })
+			.from(userBooks)
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(userBooks.userId, userId))
+	);
+	return matchLocalAuthors(
+		rows.map((r) => r.authors),
+		query,
+		limit
+	);
 }
 
 // ─── Libros de un contacto (RLS del viewer) ───────────────────────────────────
