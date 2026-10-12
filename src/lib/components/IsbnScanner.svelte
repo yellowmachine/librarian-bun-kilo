@@ -1,3 +1,10 @@
+<script module lang="ts">
+	// Quagga es un singleton y su stop() es asíncrono (libera la cámara). Si se
+	// vuelve a escanear antes de que termine, el nuevo init compite con esa
+	// liberación y falla. Se comparte entre instancias para esperarla.
+	let releasing: Promise<void> | null = null;
+</script>
+
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
@@ -5,21 +12,43 @@
 	interface Props {
 		onDetected: (isbn: string) => void;
 		onError?: (msg: string) => void;
+		onCancel?: () => void;
 	}
 
-	let { onDetected, onError }: Props = $props();
+	let { onDetected, onError, onCancel }: Props = $props();
 
 	let viewportEl: HTMLDivElement;
 	let running = $state(false);
 	let errorMsg = $state('');
-	let lastCode = $state('');
-	let detectionCount = $state(0);
+	let lastCode = '';
+	let detectionCount = 0;
+	// Una vez confirmado un código (o desmontado el componente) se ignora todo
+	// lo que siga llegando: Quagga aún puede emitir frames ya en vuelo.
+	let finished = false;
 
 	const CONFIRM_THRESHOLD = 3;
 
 	// Quagga se importa de forma dinámica para evitar que SSR lo evalúe.
 	// El módulo accede a `navigator` y `window` en el nivel de módulo.
 	let QuaggaInstance: typeof import('@ericblade/quagga2').default | null = null;
+
+	function handleDetected(result: { codeResult?: { code?: string | null } }) {
+		if (finished) return;
+		const code = result?.codeResult?.code ?? '';
+		if (!code) return;
+
+		if (code === lastCode) {
+			detectionCount++;
+		} else {
+			lastCode = code;
+			detectionCount = 1;
+		}
+
+		if (detectionCount >= CONFIRM_THRESHOLD) {
+			stop();
+			onDetected(code);
+		}
+	}
 
 	async function start() {
 		if (!browser) return;
@@ -28,7 +57,13 @@
 		try {
 			// Import dinámico — solo se ejecuta en el cliente
 			const mod = await import('@ericblade/quagga2');
+			if (releasing) await releasing;
+			if (finished) return;
 			QuaggaInstance = mod.default;
+
+			// Los handlers de Quagga son globales y stop() no los quita: se
+			// registra el de esta instancia y se elimina en stop().
+			QuaggaInstance.onDetected(handleDetected);
 
 			await QuaggaInstance.init(
 				{
@@ -50,9 +85,11 @@
 					frequency: 10
 				},
 				(err: unknown) => {
+					if (finished) return;
 					if (err) {
 						const msg = err instanceof Error ? err.message : String(err);
 						errorMsg = `Could not access the camera: ${msg}`;
+						stop();
 						onError?.(errorMsg);
 						return;
 					}
@@ -60,34 +97,29 @@
 					running = true;
 				}
 			);
-
-			QuaggaInstance.onDetected((result) => {
-				const code: string = result?.codeResult?.code ?? '';
-				if (!code) return;
-
-				if (code === lastCode) {
-					detectionCount++;
-				} else {
-					lastCode = code;
-					detectionCount = 1;
-				}
-
-				if (detectionCount >= CONFIRM_THRESHOLD) {
-					stop();
-					onDetected(code);
-				}
-			});
 		} catch (e) {
+			if (finished) return;
 			const msg = e instanceof Error ? e.message : String(e);
 			errorMsg = `Error starting scanner: ${msg}`;
+			stop();
 			onError?.(errorMsg);
 		}
 	}
 
 	function stop() {
-		if (running && QuaggaInstance) {
-			QuaggaInstance.stop();
-			running = false;
+		if (finished) return;
+		finished = true;
+		running = false;
+		if (QuaggaInstance) {
+			QuaggaInstance.offDetected(handleDetected);
+			// Se para aunque init no haya terminado: así no queda una cámara
+			// abierta en segundo plano tras salir de la pantalla.
+			const release: Promise<void> = Promise.resolve(QuaggaInstance.stop())
+				.catch(() => {})
+				.then(() => {
+					if (releasing === release) releasing = null;
+				});
+			releasing = release;
 		}
 	}
 
@@ -138,7 +170,10 @@
 		<p class="text-center text-xs text-ink-faint">Centra el código de barras en el marco</p>
 		<button
 			type="button"
-			onclick={stop}
+			onclick={() => {
+				stop();
+				onCancel?.();
+			}}
 			class="w-full border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
 		>
 			Cancel
