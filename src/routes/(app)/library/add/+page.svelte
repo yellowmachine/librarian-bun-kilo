@@ -348,6 +348,9 @@
 		notes = '';
 		selectedTagIds = [];
 		tagsToCreate = [];
+		tagsSuggested = false;
+		proposedNewTags = [];
+		formTagsNoSuggestions = false;
 		errorMsg = '';
 	}
 
@@ -421,7 +424,9 @@
 			});
 			if (!res.ok) return;
 			const data: { tagIds: string[]; newTags?: string[] } = await res.json();
-			if (selectedBook?.id !== book.id) return;
+			// Si el usuario ya dejó la confirmación (p.ej. pasó a la entrada
+			// manual), la respuesta llega tarde y no debe colarse en otro formulario.
+			if (selectedBook?.id !== book.id || mode !== 'confirm') return;
 			proposedNewTags = data.newTags ?? [];
 			// Solo si el usuario no ha tocado ya los tags — la sugerencia nunca
 			// pisa una elección manual.
@@ -433,6 +438,43 @@
 			// Best-effort: sin sugerencia el usuario elige a mano.
 		} finally {
 			if (selectedBook?.id === book.id) suggestingTags = false;
+		}
+	}
+
+	// ── Tags sugeridos por IA (entrada manual) ────────────────────────────────
+	// A diferencia del alta desde OpenLibrary no se lanza sola: el formulario
+	// empieza vacío, así que se ofrece un botón en cuanto hay título y autor.
+	let formTagsNoSuggestions = $state(false);
+	let canSuggestFormTags = $derived(
+		formTitle.trim().length > 0 && formAuthors.some((a) => a.trim().length > 0)
+	);
+
+	async function suggestFormTags(): Promise<void> {
+		suggestingTags = true;
+		formTagsNoSuggestions = false;
+		try {
+			const res = await fetch('/api/books/suggest-tags', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					title: formTitle.trim(),
+					authors: formAuthors.map((a) => a.trim()).filter(Boolean),
+					description: formDescription.trim() || null
+				})
+			});
+			const data: { tagIds: string[]; newTags?: string[] } = res.ok
+				? await res.json()
+				: { tagIds: [] };
+			// La ha pedido el usuario: se añade a lo ya elegido en vez de reemplazarlo.
+			const added = data.tagIds.filter((id) => !selectedTagIds.includes(id));
+			selectedTagIds = [...selectedTagIds, ...added];
+			proposedNewTags = data.newTags ?? [];
+			tagsSuggested = added.length > 0;
+			formTagsNoSuggestions = added.length === 0 && proposedNewTags.length === 0;
+		} catch {
+			formTagsNoSuggestions = true;
+		} finally {
+			suggestingTags = false;
 		}
 	}
 
@@ -698,6 +740,26 @@
 		}
 	}
 </script>
+
+<!-- Tags nuevos propuestos por la IA: no se crean solos, el usuario los pulsa. -->
+{#snippet proposedTagIdeas()}
+	{#if pendingProposedTags.length > 0}
+		<div class="mt-2 flex flex-wrap items-center gap-2">
+			<span class="flex items-center gap-1 text-xs text-ink-faint">
+				<Sparkle size={12} /> New tag ideas:
+			</span>
+			{#each pendingProposedTags as name (name)}
+				<button
+					type="button"
+					onclick={() => (tagsToCreate = [...tagsToCreate, { name, color: null }])}
+					class="border border-dashed border-ink-faint px-2.5 py-0.5 text-xs text-ink-muted transition-colors hover:border-ink hover:text-ink"
+				>
+					+ {name}
+				</button>
+			{/each}
+		</div>
+	{/if}
+{/snippet}
 
 <div class="mx-auto max-w-md space-y-8">
 	<!-- Cabecera -->
@@ -996,22 +1058,7 @@
 				<div class="mt-1.5">
 					<TagSelectorLocal {availableTags} bind:selectedTagIds bind:tagsToCreate />
 				</div>
-				{#if pendingProposedTags.length > 0}
-					<div class="mt-2 flex flex-wrap items-center gap-2">
-						<span class="flex items-center gap-1 text-xs text-ink-faint">
-							<Sparkle size={12} /> New tag ideas:
-						</span>
-						{#each pendingProposedTags as name (name)}
-							<button
-								type="button"
-								onclick={() => (tagsToCreate = [...tagsToCreate, { name, color: null }])}
-								class="border border-dashed border-ink-faint px-2.5 py-0.5 text-xs text-ink-muted transition-colors hover:border-ink hover:text-ink"
-							>
-								+ {name}
-							</button>
-						{/each}
-					</div>
-				{/if}
+				{@render proposedTagIdeas()}
 			</div>
 
 			<div class="flex gap-3">
@@ -1219,12 +1266,36 @@
 			{/if}
 
 			<div>
-				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-					Tags <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
-				</span>
+				<div class="flex items-center gap-2">
+					<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">
+						Tags <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
+					</span>
+					{#if canSuggestFormTags}
+						<button
+							type="button"
+							onclick={suggestFormTags}
+							disabled={suggestingTags}
+							class="ml-auto flex items-center gap-1 text-xs text-ink-faint hover:text-ink disabled:opacity-60"
+						>
+							{#if suggestingTags}
+								<Spinner size="sm" /> Suggesting…
+							{:else}
+								<Sparkle size={12} /> Suggest with AI
+							{/if}
+						</button>
+					{/if}
+				</div>
 				<div class="mt-1.5">
 					<TagSelectorLocal {availableTags} bind:selectedTagIds bind:tagsToCreate />
 				</div>
+				{#if tagsSuggested && !suggestingTags}
+					<p class="mt-2 flex items-center gap-1 text-xs text-ink-faint">
+						<Sparkle size={12} /> Suggested by AI
+					</p>
+				{:else if formTagsNoSuggestions && !suggestingTags}
+					<p class="mt-2 text-xs text-ink-faint">No tag suggestions for this book.</p>
+				{/if}
+				{@render proposedTagIdeas()}
 			</div>
 
 			<div class="flex gap-3 pt-1">
