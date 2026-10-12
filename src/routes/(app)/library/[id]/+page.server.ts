@@ -11,7 +11,7 @@ import {
 } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
 import { tags, userBookTags, loans, userBooks, books } from '$lib/server/db/schema';
-import { getWorkById } from '$lib/server/openlibrary';
+import { fetchWorkById } from '$lib/server/openlibrary';
 import { db } from '$lib/server/db/index';
 import {
 	getMyReview,
@@ -369,7 +369,7 @@ export const actions = {
 
 		let coverUrl: string | null = null;
 		try {
-			const workData = await getWorkById(book.bookId);
+			const workData = await fetchWorkById(book.bookId);
 			coverUrl = workData?.coverUrl ?? null;
 		} catch {
 			// OL unreachable
@@ -398,7 +398,7 @@ export const actions = {
 
 		// 1. Try fresh fetch from OL Works API
 		try {
-			const workData = await getWorkById(book.bookId);
+			const workData = await fetchWorkById(book.bookId);
 			description = workData?.description ?? null;
 		} catch {
 			// OL unreachable — fall through to catalog fallback

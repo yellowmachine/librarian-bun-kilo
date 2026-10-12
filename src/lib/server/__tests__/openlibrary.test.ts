@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { searchAuthors } from '../openlibrary';
+import { searchAuthors, getWorkById, fetchWorkById, clearLookupCache } from '../openlibrary';
 
 function jsonResponse(body: unknown, ok = true): Response {
 	return {
@@ -10,6 +10,7 @@ function jsonResponse(body: unknown, ok = true): Response {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+	clearLookupCache();
 });
 
 describe('searchAuthors', () => {
@@ -72,5 +73,60 @@ describe('searchAuthors', () => {
 		);
 		const result = await searchAuthors('abc', 3);
 		expect(result.map((a) => a.id)).toEqual(['OL9A', 'OL8A', 'OL7A']);
+	});
+});
+
+describe('getWorkById (caché)', () => {
+	function mockWorkFetch() {
+		return vi.spyOn(global, 'fetch').mockImplementation(async (input) => {
+			const url = String(input);
+			if (url.endsWith('/works/OL1W.json')) {
+				return jsonResponse({ title: 'Dune', authors: [{ author: { key: '/authors/OL1A' } }] });
+			}
+			if (url.includes('/editions.json')) return jsonResponse({ entries: [] });
+			if (url.endsWith('/authors/OL1A.json')) return jsonResponse({ name: 'Frank Herbert' });
+			return jsonResponse({}, false);
+		});
+	}
+
+	it('reutiliza el resultado en la segunda llamada', async () => {
+		const fetchMock = mockWorkFetch();
+
+		const first = await getWorkById('OL1W');
+		const callsAfterFirst = fetchMock.mock.calls.length;
+		const second = await getWorkById('OL1W');
+
+		expect(first?.title).toBe('Dune');
+		expect(first?.authors).toEqual(['Frank Herbert']);
+		expect(second).toEqual(first);
+		expect(fetchMock.mock.calls.length).toBe(callsAfterFirst);
+	});
+
+	it('comparte la petición entre llamadas simultáneas', async () => {
+		const fetchMock = mockWorkFetch();
+
+		await Promise.all([getWorkById('OL1W'), getWorkById('OL1W')]);
+
+		expect(fetchMock.mock.calls.length).toBe(3);
+	});
+
+	it('no cachea un work no encontrado', async () => {
+		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(jsonResponse({}, false));
+
+		expect(await getWorkById('OL404W')).toBeNull();
+		expect(await getWorkById('OL404W')).toBeNull();
+
+		// work + editions en cada llamada
+		expect(fetchMock.mock.calls.length).toBe(4);
+	});
+
+	it('fetchWorkById ignora la caché', async () => {
+		const fetchMock = mockWorkFetch();
+
+		await getWorkById('OL1W');
+		const callsAfterFirst = fetchMock.mock.calls.length;
+		await fetchWorkById('OL1W');
+
+		expect(fetchMock.mock.calls.length).toBe(callsAfterFirst * 2);
 	});
 });
