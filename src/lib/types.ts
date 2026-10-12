@@ -10,10 +10,11 @@ export interface BookSearchResult {
 }
 
 export interface AuthorSearchResult {
-	id: string; // OpenLibrary author ID, e.g. "OL23919A"
+	id: string; // OpenLibrary author ID, e.g. "OL23919A" (o "local:<nombre>")
 	name: string;
 	birthDate: string | null;
 	deathDate: string | null;
 	topWork: string | null;
-	workCount: number;
+	workCount: number; // en resultados locales: nº de libros del usuario con ese autor
+	source: 'local' | 'openlibrary';
 }

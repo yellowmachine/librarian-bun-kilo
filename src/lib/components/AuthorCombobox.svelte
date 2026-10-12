@@ -1,9 +1,10 @@
 <script lang="ts">
 	import type { AuthorSearchResult } from '$lib/types';
 
-	// Campo de autor con sugerencias de OpenLibrary. Sigue siendo texto libre:
-	// las sugerencias solo ayudan a escribir el nombre tal y como aparece en OL
-	// (lo que mejora la detección de duplicados), no obligan a elegir una.
+	// Campo de autor con sugerencias: primero los autores que ya están en la
+	// biblioteca del usuario y después los de OpenLibrary. Sigue siendo texto
+	// libre: las sugerencias solo ayudan a escribir el nombre de forma
+	// consistente (lo que mejora la detección de duplicados), no obligan a elegir una.
 
 	const MIN_CHARS = 3;
 	const DEBOUNCE_MS = 300;
@@ -80,6 +81,13 @@
 		return death ? `${birth ?? '?'}–${death}` : `${birth}`;
 	}
 
+	function subtitle(a: AuthorSearchResult): string | null {
+		if (a.source === 'local') {
+			return `In your library · ${a.workCount} ${a.workCount === 1 ? 'book' : 'books'}`;
+		}
+		return [lifespan(a), a.topWork].filter(Boolean).join(' · ') || null;
+	}
+
 	function handleInput() {
 		userTyped = true;
 		lastPicked = null;
@@ -144,7 +152,7 @@
 			class="absolute top-full right-0 left-0 z-20 mt-0.5 max-h-72 overflow-y-auto border border-paper-border bg-paper shadow-sm"
 		>
 			{#each results as author, i (author.id)}
-				{@const years = lifespan(author)}
+				{@const detail = subtitle(author)}
 				<li
 					id="{listboxId}-{i}"
 					role="option"
@@ -159,10 +167,8 @@
 					}}
 				>
 					<span class="block text-ink">{author.name}</span>
-					{#if years || author.topWork}
-						<span class="block truncate text-xs text-ink-faint">
-							{[years, author.topWork].filter(Boolean).join(' · ')}
-						</span>
+					{#if detail}
+						<span class="block truncate text-xs text-ink-faint">{detail}</span>
 					{/if}
 				</li>
 			{/each}

@@ -39,7 +39,8 @@ describe('searchAuthors', () => {
 				birthDate: '6 March 1927',
 				deathDate: '17 April 2014',
 				topWork: 'Cien años de soledad',
-				workCount: 350
+				workCount: 350,
+				source: 'openlibrary'
 			},
 			{
 				id: 'OL999A',
@@ -47,7 +48,8 @@ describe('searchAuthors', () => {
 				birthDate: null,
 				deathDate: null,
 				topWork: null,
-				workCount: 2
+				workCount: 2,
+				source: 'openlibrary'
 			}
 		]);
 		expect(String(fetchMock.mock.calls[0][0])).toContain('/search/authors.json?q=garcia+marq');
