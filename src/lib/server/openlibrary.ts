@@ -96,10 +96,60 @@ export interface OpenLibraryBook {
 	openlibraryData: string; // JSON raw
 }
 
-// ─── Buscar por ISBN ──────────────────────────────────────────────────────────
-export async function searchByIsbn(isbn: string): Promise<OpenLibraryBook | null> {
-	const clean = isbn.replace(/[^0-9X]/gi, '');
+// ─── Caché de lookups ─────────────────────────────────────────────────────────
+// El alta de un libro (POST /api/books) vuelve a resolver en el servidor el
+// ISBN/workId que el cliente acaba de consultar en /api/books/search o
+// /api/books/detail. Se cachean esos resultados un rato para no repetir las
+// peticiones a OpenLibrary. Se guarda la promesa para que dos consultas
+// simultáneas compartan la misma petición.
 
+const LOOKUP_TTL_MS = 15 * 60_000;
+const LOOKUP_MAX_ENTRIES = 500;
+
+const lookupCache = new Map<string, { expires: number; value: Promise<OpenLibraryBook | null> }>();
+
+function cachedLookup(
+	key: string,
+	load: () => Promise<OpenLibraryBook | null>
+): Promise<OpenLibraryBook | null> {
+	const now = Date.now();
+	const hit = lookupCache.get(key);
+	if (hit && hit.expires > now) return hit.value;
+	lookupCache.delete(key);
+
+	const value = load().then(
+		(book) => {
+			// No cachear "no encontrado": puede ser un fallo puntual de OpenLibrary.
+			if (!book && lookupCache.get(key)?.value === value) lookupCache.delete(key);
+			return book;
+		},
+		(e) => {
+			if (lookupCache.get(key)?.value === value) lookupCache.delete(key);
+			throw e;
+		}
+	);
+
+	if (lookupCache.size >= LOOKUP_MAX_ENTRIES) {
+		// Map conserva el orden de inserción: la primera es la más antigua.
+		const oldest = lookupCache.keys().next().value;
+		if (oldest !== undefined) lookupCache.delete(oldest);
+	}
+	lookupCache.set(key, { expires: now + LOOKUP_TTL_MS, value });
+	return value;
+}
+
+/** Solo para tests. */
+export function clearLookupCache(): void {
+	lookupCache.clear();
+}
+
+// ─── Buscar por ISBN ──────────────────────────────────────────────────────────
+export function searchByIsbn(isbn: string): Promise<OpenLibraryBook | null> {
+	const clean = isbn.replace(/[^0-9X]/gi, '').toUpperCase();
+	return cachedLookup(`isbn:${clean}`, () => fetchByIsbn(clean));
+}
+
+async function fetchByIsbn(clean: string): Promise<OpenLibraryBook | null> {
 	try {
 		// 1. search.json returns a reliable work ID (OL…W) — preferred path
 		const searchRes = await fetchOL(
@@ -194,7 +244,12 @@ export async function searchAuthors(query: string, limit = 8): Promise<AuthorSea
 
 // ─── Obtener detalle completo de una obra ─────────────────────────────────────
 
-export async function getWorkById(workId: string): Promise<OpenLibraryBook | null> {
+export function getWorkById(workId: string): Promise<OpenLibraryBook | null> {
+	return cachedLookup(`work:${workId}`, () => fetchWorkById(workId));
+}
+
+// Sin caché: para acciones que piden explícitamente datos frescos.
+export async function fetchWorkById(workId: string): Promise<OpenLibraryBook | null> {
 	// Work y ediciones en paralelo
 	const [workRes, editionRes] = await Promise.all([
 		fetchOL(`https://openlibrary.org/works/${workId}.json`),
