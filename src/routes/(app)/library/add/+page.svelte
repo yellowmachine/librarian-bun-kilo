@@ -76,22 +76,47 @@
 	// salir de la página. Los estados de espera (adding, analyzing…) no se
 	// guardan: solo cambian `mode` localmente.
 	function goTo(next: Mode) {
+		// history.go() es asíncrono: si se navega antes de que termine el
+		// rebobinado, el pushState se mezcla con él y al llegar el popstate se
+		// restaura una pantalla vieja (o se vuelve a "choose"). Se aplaza hasta
+		// que el rebobinado acabe.
+		if (rewinding) {
+			queuedMode = next;
+			mode = next;
+			return;
+		}
 		mode = next;
 		pushState('', { addBookMode: next, addBookDepth: (page.state.addBookDepth ?? 0) + 1 });
 	}
+
+	let rewinding = false;
+	let queuedMode: Mode | null = null;
 
 	// Vuelve a la pantalla de elegir modo deshaciendo las entradas apiladas, así
 	// después "atrás" sale de la página como se espera.
 	function backToChoose() {
 		const depth = page.state.addBookDepth ?? 0;
 		mode = 'choose';
-		if (depth > 0) history.go(-depth);
+		queuedMode = null;
+		if (depth > 0) {
+			rewinding = true;
+			history.go(-depth);
+		}
 	}
 
 	// Atrás/adelante del navegador: restaura la pantalla guardada.
 	$effect(() => {
-		const target = (page.state.addBookMode ?? 'choose') as Mode;
+		const state = page.state;
 		untrack(() => {
+			if (rewinding) {
+				rewinding = false;
+				const next = queuedMode;
+				queuedMode = null;
+				if (next) goTo(next);
+				else mode = 'choose';
+				return;
+			}
+			const target = (state.addBookMode ?? 'choose') as Mode;
 			mode = target === 'confirm' && !selectedBook ? 'choose' : target;
 		});
 	});
@@ -515,7 +540,13 @@
 		return () => clearTimeout(timer);
 	});
 
+	// Cada búsqueda invalida las anteriores: una respuesta tardía de una
+	// búsqueda vieja no debe pisar (ni seleccionar) el libro de la nueva.
+	let searchSeq = 0;
+
 	async function onIsbnDetected(isbn: string) {
+		const seq = ++searchSeq;
+		selectedBook = null;
 		goTo('results');
 		searching = true;
 		errorMsg = '';
@@ -524,21 +555,23 @@
 		try {
 			const res = await fetch(`/api/books/search?isbn=${encodeURIComponent(isbn)}`);
 			const data = await res.json();
+			if (seq !== searchSeq) return;
 			searchResults = data;
 			if (searchResults.length === 0) errorMsg = `Without results with ISBN ${isbn}`;
 			else if (searchResults.length === 1) {
 				await selectBook(searchResults[0]);
 			}
 		} catch {
-			errorMsg = 'Search error. Check your connection.';
+			if (seq === searchSeq) errorMsg = 'Search error. Check your connection.';
 		} finally {
-			searching = false;
+			if (seq === searchSeq) searching = false;
 		}
 	}
 
 	async function onManualSearch(e: SubmitEvent) {
 		e.preventDefault();
 		if (!manualQuery.trim()) return;
+		const seq = ++searchSeq;
 		goTo('results');
 		searching = true;
 		errorMsg = '';
@@ -546,14 +579,16 @@
 		translatedQuery = null;
 		try {
 			const res = await fetch(`/api/books/search?q=${encodeURIComponent(manualQuery)}`);
-			searchResults = await res.json();
+			const data = await res.json();
+			if (seq !== searchSeq) return;
+			searchResults = data;
 			const translatedHeader = res.headers.get('X-Translated-Query');
 			translatedQuery = translatedHeader ? decodeURIComponent(translatedHeader) : null;
 			if (searchResults.length === 0) errorMsg = 'Without results.';
 		} catch {
-			errorMsg = 'Search error.';
+			if (seq === searchSeq) errorMsg = 'Search error.';
 		} finally {
-			searching = false;
+			if (seq === searchSeq) searching = false;
 		}
 	}
 
@@ -762,6 +797,7 @@
 	{:else if mode === 'scan'}
 		<IsbnScanner
 			onDetected={onIsbnDetected}
+			onCancel={backToChoose}
 			onError={(e) => {
 				errorMsg = e;
 				backToChoose();
