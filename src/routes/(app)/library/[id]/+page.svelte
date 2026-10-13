@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Tag, Trash, Star, PencilSimple, Sparkle } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
+	import AuthorListInput from '$lib/components/AuthorListInput.svelte';
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
@@ -120,7 +121,9 @@
 	// Edit form state (manual books only)
 	let editOpen = $state(false);
 	let editTitle = $state(book.title);
-	let editAuthors = $state((book.authors as string[]).join('\n'));
+	let editAuthors = $state<string[]>(
+		(book.authors as string[]).length ? [...(book.authors as string[])] : ['']
+	);
 	let editIsbn = $state(book.isbn ?? '');
 	let editPublishYear = $state(book.publishYear?.toString() ?? '');
 	let editDescription = $state(book.description ?? '');
@@ -137,7 +140,9 @@
 	// Corrección local de título/autor (libros de catálogo, bookId presente)
 	let correctOpen = $state(false);
 	let correctTitle = $state(book.title);
-	let correctAuthors = $state((book.authors as string[]).join('\n'));
+	let correctAuthors = $state<string[]>(
+		(book.authors as string[]).length ? [...(book.authors as string[])] : ['']
+	);
 
 	// Search & link (upgrade a manual entry to a real catalog book)
 	let linkSearchOpen = $state(false);
@@ -387,19 +392,10 @@
 				/>
 			</div>
 			<div>
-				<label
-					for="correct-authors"
-					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
-				>
-					Authors <span class="tracking-normal text-ink-faint normal-case">(one per line)</span>
-				</label>
-				<textarea
-					id="correct-authors"
-					name="authors"
-					rows="2"
-					bind:value={correctAuthors}
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
-				></textarea>
+				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Authors
+				</span>
+				<AuthorListInput bind:authors={correctAuthors} name="authors" />
 			</div>
 			<button
 				type="submit"
@@ -479,19 +475,10 @@
 				/>
 			</div>
 			<div>
-				<label
-					for="edit-authors"
-					class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
-				>
-					Authors <span class="tracking-normal text-ink-faint normal-case">(one per line)</span>
-				</label>
-				<textarea
-					id="edit-authors"
-					name="authors"
-					rows="2"
-					bind:value={editAuthors}
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
-				></textarea>
+				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+					Authors
+				</span>
+				<AuthorListInput bind:authors={editAuthors} name="authors" />
 			</div>
 			<div class="grid grid-cols-2 gap-3">
 				<div>

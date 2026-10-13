@@ -210,19 +210,16 @@ export const actions = {
 
 		const data = await request.formData();
 		const title = (data.get('title') as string)?.trim();
-		const authorsRaw = (data.get('authors') as string)?.trim();
 		const isbn = (data.get('isbn') as string)?.trim() || null;
 		const publishYearRaw = (data.get('publishYear') as string)?.trim();
 		const description = (data.get('description') as string)?.trim() || null;
 
 		if (!title) return fail(400, { editError: 'Title is required.' });
 
-		const authors = authorsRaw
-			? authorsRaw
-					.split('\n')
-					.map((a) => a.trim())
-					.filter(Boolean)
-			: [];
+		const authors = data
+			.getAll('authors')
+			.map((a) => (a as string).trim())
+			.filter(Boolean);
 		const publishYear = publishYearRaw ? parseInt(publishYearRaw, 10) : null;
 
 		await withRLS(locals.user!.id, async (tx) => {
@@ -253,16 +250,13 @@ export const actions = {
 
 		const data = await request.formData();
 		const title = (data.get('title') as string)?.trim();
-		const authorsRaw = (data.get('authors') as string)?.trim();
 
 		if (!title) return fail(400, { correctError: 'Title is required.' });
 
-		const authors = authorsRaw
-			? authorsRaw
-					.split('\n')
-					.map((a) => a.trim())
-					.filter(Boolean)
-			: [];
+		const authors = data
+			.getAll('authors')
+			.map((a) => (a as string).trim())
+			.filter(Boolean);
 
 		await withRLS(locals.user!.id, async (tx) => {
 			await tx

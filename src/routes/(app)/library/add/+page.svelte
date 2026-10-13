@@ -4,7 +4,6 @@
 		MagnifyingGlass,
 		ArrowLeft,
 		Plus,
-		Trash,
 		Info,
 		Camera,
 		Check,
@@ -19,7 +18,7 @@
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import DuplicateBookDialog from '$lib/components/DuplicateBookDialog.svelte';
-	import AuthorCombobox from '$lib/components/AuthorCombobox.svelte';
+	import AuthorListInput from '$lib/components/AuthorListInput.svelte';
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import type { BookSearchResult } from '$lib/types';
 
@@ -327,15 +326,6 @@
 	let formDescription = $state('');
 	let formAlternateTitle = $state('');
 	let formCoverUrl = $state('');
-
-	function addAuthorField() {
-		formAuthors = [...formAuthors, ''];
-	}
-
-	function removeAuthorField(i: number) {
-		formAuthors = formAuthors.filter((_, idx) => idx !== i);
-		if (formAuthors.length === 0) formAuthors = [''];
-	}
 
 	function resetFormFields() {
 		formTitle = '';
@@ -1122,29 +1112,7 @@
 				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
 					Authors <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
 				</span>
-				<div class="mt-1.5 space-y-2">
-					{#each formAuthors as _, i (i)}
-						<div class="flex gap-2">
-							<AuthorCombobox bind:value={formAuthors[i]} class="flex-1" />
-							{#if formAuthors.length > 1}
-								<button
-									type="button"
-									onclick={() => removeAuthorField(i)}
-									class="flex items-center justify-center border border-paper-border px-2.5 text-ink-faint hover:border-ink-faint hover:text-ink"
-								>
-									<Trash size={14} />
-								</button>
-							{/if}
-						</div>
-					{/each}
-					<button
-						type="button"
-						onclick={addAuthorField}
-						class="flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink-muted"
-					>
-						<Plus size={12} /> Add author
-					</button>
-				</div>
+				<AuthorListInput bind:authors={formAuthors} />
 			</div>
 
 			<div>
