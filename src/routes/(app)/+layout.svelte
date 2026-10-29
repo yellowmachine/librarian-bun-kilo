@@ -6,7 +6,8 @@
 		ArrowsLeftRight,
 		SignOut,
 		ClockCounterClockwise,
-		Plus
+		Plus,
+		UserCircle
 	} from 'phosphor-svelte';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 
@@ -75,7 +76,15 @@
 					<Plus size={15} weight="bold" />
 					<span class="hidden sm:inline">Add</span>
 				</a>
-				<span class="hidden text-sm text-ink-faint sm:block">{user.name}</span>
+				<a
+					href="/account"
+					title="Tu cuenta"
+					class="flex items-center gap-1.5 rounded-md p-2 text-sm text-ink-faint transition-colors hover:bg-paper-ui hover:text-ink sm:px-3
+					{isActive('/account') ? 'text-ink' : ''}"
+				>
+					<UserCircle size={18} weight={isActive('/account') ? 'fill' : 'regular'} />
+					<span class="hidden sm:inline">{user.name}</span>
+				</a>
 				<form method="POST" action="/logout">
 					<button
 						type="submit"

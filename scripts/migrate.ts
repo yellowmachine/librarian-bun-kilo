@@ -27,9 +27,7 @@ console.log('[migrate] Aplicando migraciones desde', migrationsFolder);
 
 try {
 	await migrate(db, {
-		migrationsFolder,
-		migrationsSchema: 'librarian',
-		migrationsTable: '__drizzle_migrations'
+		migrationsFolder
 	});
 	console.log('[migrate] OK');
 } catch (e) {

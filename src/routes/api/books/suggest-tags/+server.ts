@@ -31,7 +31,7 @@ const SuggestTagsSchema = v.union([UserBookSchema, BookDataSchema]);
 // encajan de entre los que el usuario ya tiene (tagIds) y unos pocos nuevos
 // que merecería crear (newTags). Acepta los datos de un libro encontrado en
 // OpenLibrary (alta) o el userBookId de uno ya dado de alta (re-tagear). Sin
-// clave de OpenRouter en Scholio, simplemente no sugiere nada.
+// clave de OpenRouter, simplemente no sugiere nada.
 export async function POST({ locals, request }: RequestEvent) {
 	if (!locals.user) error(401, 'Not authenticated');
 	const userId = locals.user.id;

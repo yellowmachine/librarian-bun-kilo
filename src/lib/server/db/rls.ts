@@ -14,8 +14,7 @@ export async function withRLS<T>(
 ): Promise<T> {
 	return db.transaction(async (tx) => {
 		await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
-		await tx.execute(sql`SET LOCAL ROLE scholio_app`);
-		await tx.execute(sql`SET LOCAL search_path = librarian, public`);
+		await tx.execute(sql`SET LOCAL ROLE app_user`);
 		return callback(tx as unknown as typeof db);
 	});
 }

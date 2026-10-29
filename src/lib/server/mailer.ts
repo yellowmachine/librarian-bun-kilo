@@ -7,7 +7,7 @@
  *   SMTP_SECURE — 'true' for port 465 (SSL), 'false' for STARTTLS
  *   SMTP_USER   — SMTP login (e.g. no-reply@scholio.review)
  *   SMTP_PASS   — SMTP password / token
- *   EMAIL_FROM  — display sender, e.g. "Scholio Librarian <no-reply@scholio.review>"
+ *   EMAIL_FROM  — display sender, e.g. "Librarian <no-reply@scholio.review>"
  *
  * If SMTP_HOST is not set the mailer is disabled and calls are no-ops.
  */
@@ -50,6 +50,6 @@ export async function sendMail({
 		return;
 	}
 
-	const from = env.EMAIL_FROM ?? 'Scholio Librarian <no-reply@scholio.review>';
+	const from = env.EMAIL_FROM ?? 'Librarian <no-reply@scholio.review>';
 	await transporter.sendMail({ from, to, subject, html });
 }

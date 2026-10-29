@@ -183,15 +183,15 @@ export async function getGroup(userId: string, groupId: string): Promise<GroupWi
 
 export async function getGroupMembers(userId: string, groupId: string): Promise<GroupMember[]> {
 	return withRLS(userId, async (tx) => {
-		// Uses SECURITY DEFINER function in Scholio — bypasses RLS self-referential recursion
-		// on group_members while still validating that userId is a member of the group.
+		// SECURITY DEFINER (drizzle/0000_rls_functions.sql): se salta la recursión de RLS
+		// en group_members y aun así comprueba que userId es miembro del grupo.
 		const rows = await tx.execute<{
 			user_id: string;
 			role: string;
 			joined_at: Date;
 			name: string;
 			email: string;
-		}>(sql`SELECT * FROM librarian.get_group_members(${groupId})`);
+		}>(sql`SELECT * FROM get_group_members(${groupId})`);
 
 		if (rows.length === 0) return [];
 
@@ -211,12 +211,15 @@ export async function joinGroupByCode(
 	userId: string,
 	inviteCode: string
 ): Promise<{ success: boolean; groupId?: string; error?: string }> {
+	const code = inviteCode.toUpperCase().trim();
 	return withRLS(userId, async (tx) => {
-		// group_invite_codes tiene USING(true) — cualquier usuario autenticado puede leer
+		// Las políticas de group_invite_codes y group_members dejan ver el código y
+		// entrar como member a quien lo trae en app.invite_code.
+		await tx.execute(sql`SELECT set_config('app.invite_code', ${code}, true)`);
 		const codeRows = await tx
 			.select({ groupId: groupInviteCodes.groupId })
 			.from(groupInviteCodes)
-			.where(eq(groupInviteCodes.code, inviteCode.toUpperCase().trim()));
+			.where(eq(groupInviteCodes.code, code));
 
 		if (codeRows.length === 0) {
 			return { success: false, error: 'Invitation code not valid' };
@@ -234,7 +237,7 @@ export async function joinGroupByCode(
 			return { success: false, groupId, error: 'You are already member of this group.' };
 		}
 
-		// group_members_insert_self: user_id = current_user_id — válido para unirse
+		// group_members_insert: él mismo, como member, con el código del grupo
 		await tx.insert(groupMembers).values({ groupId, userId, role: 'member' });
 
 		return { success: true, groupId };

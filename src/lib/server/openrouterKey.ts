@@ -1,51 +1,56 @@
-// Lee (nunca escribe) la clave de OpenRouter que el usuario ya conectó en
-// Scholio — Scholio y Librarian comparten Postgres y el mismo rol de app
-// (scholio_app, ver withRLS()), así que esto es una simple lectura
-// cross-schema con RLS, no una integración nueva de credenciales.
-//
-// scholio.user_api_key no es una tabla de Librarian (no se migra ni se posee
-// aquí), así que se consulta con SQL crudo en vez de una tabla Drizzle propia.
-import { sql } from 'drizzle-orm';
+// La clave de OpenRouter de cada usuario (tabla user_api_keys), cifrada con
+// KMS_MASTER_KEY. La conecta él mismo en /account; sin ella, escanear
+// estanterías, sugerir etiquetas y buscar portadas con IA no están disponibles.
+import { eq } from 'drizzle-orm';
 import { withRLS } from './db/rls';
-import { decryptSecret } from './kms';
-
-interface UserApiKeyRow extends Record<string, unknown> {
-	encrypted_api_key: string;
-	iv: string;
-	auth_tag: string;
-}
+import { userApiKeys } from './db/schema';
+import { decryptSecret, encryptSecret } from './kms';
 
 /**
  * Devuelve la clave de OpenRouter (ya descifrada) del usuario, o null si no
- * tiene ninguna clave habilitada conectada en Scholio.
+ * tiene ninguna conectada.
  */
 export async function getOpenRouterApiKey(userId: string): Promise<string | null> {
-	return withRLS(userId, async (tx) => {
-		const rows = await tx.execute<UserApiKeyRow>(sql`
-			select encrypted_api_key, iv, auth_tag
-			from scholio.user_api_key
-			where user_id = ${userId} and enabled = true
-			order by created_at desc
-			limit 1
-		`);
+	const [row] = await withRLS(userId, (tx) =>
+		tx.select().from(userApiKeys).where(eq(userApiKeys.userId, userId))
+	);
+	if (!row) return null;
 
-		const row = rows[0];
-		if (!row) {
-			console.error(`getOpenRouterApiKey: no enabled key found for user ${userId}`);
-			return null;
-		}
+	try {
+		return await decryptSecret(row);
+	} catch (err) {
+		// Clave corrupta o KMS_MASTER_KEY cambiada — no bloquear al usuario,
+		// simplemente tratar como "sin clave".
+		console.error('getOpenRouterApiKey: decryptSecret failed (KMS_MASTER_KEY changed?)', err);
+		return null;
+	}
+}
 
-		try {
-			return await decryptSecret({
-				encryptedApiKey: row.encrypted_api_key,
-				iv: row.iv,
-				authTag: row.auth_tag
-			});
-		} catch (err) {
-			// Clave corrupta o KMS_MASTER_KEY desincronizada con Scholio — no
-			// bloquear al usuario, simplemente tratar como "sin clave".
-			console.error('getOpenRouterApiKey: decryptSecret failed (KMS_MASTER_KEY mismatch?)', err);
-			return null;
-		}
-	});
+/** Si el usuario tiene clave conectada, sin descifrarla. */
+export async function hasOpenRouterApiKey(userId: string): Promise<boolean> {
+	const rows = await withRLS(userId, (tx) =>
+		tx
+			.select({ userId: userApiKeys.userId })
+			.from(userApiKeys)
+			.where(eq(userApiKeys.userId, userId))
+	);
+	return rows.length > 0;
+}
+
+/** Guarda (o sustituye) la clave del usuario, cifrada. */
+export async function setOpenRouterApiKey(userId: string, apiKey: string): Promise<void> {
+	const secret = await encryptSecret(apiKey);
+	await withRLS(userId, (tx) =>
+		tx
+			.insert(userApiKeys)
+			.values({ userId, ...secret })
+			.onConflictDoUpdate({
+				target: userApiKeys.userId,
+				set: { ...secret, updatedAt: new Date() }
+			})
+	);
+}
+
+export async function removeOpenRouterApiKey(userId: string): Promise<void> {
+	await withRLS(userId, (tx) => tx.delete(userApiKeys).where(eq(userApiKeys.userId, userId)));
 }

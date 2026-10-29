@@ -1,9 +1,9 @@
 import { auth } from '$lib/server/auth';
-import { db } from '$lib/server/db';
-import { sql } from 'drizzle-orm';
+import { withRLS } from '$lib/server/db/rls';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building } from '$app/environment';
-import { error, type Handle } from '@sveltejs/kit';
+import { error, type Handle, type ServerInit } from '@sveltejs/kit';
+import { inviteFirstAccount } from '$lib/server/invitations';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const session = await auth.api.getSession({ headers: event.request.headers });
@@ -19,20 +19,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// para el usuario autenticado. SET LOCAL — solo aplica en esta transacción.
 	event.locals.withRLS = (fn) => {
 		if (!userId) error(401, 'Unauthorized');
-		return db.transaction(async (tx) => {
-			await tx.execute(sql`SELECT set_config('app.current_user_id', ${userId}, true)`);
-			await tx.execute(sql`SET LOCAL ROLE scholio_app`);
-			await tx.execute(sql`SET LOCAL search_path = librarian, public`);
-			return fn(tx as unknown as typeof db);
-		});
+		return withRLS(userId, fn);
 	};
 
-	// Cualquier usuario autenticado tiene acceso a Librarian.
-	// Ambas apps comparten public.user — el gate es la sesión, no un perfil adicional.
-	// El modelo de user_profile se revisará cuando haya requisitos concretos de acceso.
-	if (userId) {
-		event.locals.hasLibrarianProfile = true;
-	}
-
 	return svelteKitHandler({ event, resolve, auth, building });
+};
+
+// Al arrancar sin cuentas, la primera invitación (ADMIN_EMAIL). No en el build.
+export const init: ServerInit = async () => {
+	if (building) return;
+	await inviteFirstAccount().catch((err) =>
+		console.error('[invitations] No se pudo crear la primera invitación:', err)
+	);
 };

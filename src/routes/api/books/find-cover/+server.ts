@@ -12,7 +12,7 @@ const FindCoverSchema = v.object({
 });
 
 // POST /api/books/find-cover — sugiere portadas para un libro dado de alta a
-// mano. Sin clave de OpenRouter (Scholio) solo se usan las fuentes gratuitas;
+// mano. Sin clave de OpenRouter solo se usan las fuentes gratuitas;
 // con clave, además se pide a la IA (con búsqueda web) pistas que se verifican
 // en el servidor — ver src/lib/server/coverSearch.ts.
 export async function POST({ locals, request }: RequestEvent) {

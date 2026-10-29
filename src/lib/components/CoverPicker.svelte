@@ -3,7 +3,7 @@
 	import Spinner from '$lib/components/Spinner.svelte';
 
 	// Selector de portada para libros dados de alta a mano: sugiere portadas
-	// (fuentes gratuitas + IA con la clave de OpenRouter de Scholio, ver
+	// (fuentes gratuitas + IA con la clave de OpenRouter del usuario, ver
 	// src/lib/server/coverSearch.ts) o deja pegar una URL directamente.
 
 	let {
@@ -109,7 +109,8 @@
 	{:else if searched}
 		<p class="mt-2 text-xs text-ink-faint">
 			No cover found.{#if !usedAi}
-				Connect an OpenRouter key in Scholio settings to also search the web with AI.{/if}
+				Connect an OpenRouter key in <a href="/account" class="underline">your account</a> to also search
+				the web with AI.{/if}
 		</p>
 	{/if}
 </div>

@@ -1,7 +1,8 @@
 // Identifica libros por el lomo en una foto de estantería, vía OpenRouter
-// (mismo endpoint/formato que ya usa Scholio para sus llamadas de IA:
-// https://openrouter.ai/api/v1/chat/completions, OpenAI-compatible).
+// con la clave del usuario (https://openrouter.ai/api/v1/chat/completions,
+// OpenAI-compatible).
 
+import { env } from '$env/dynamic/private';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Confirmado contra https://openrouter.ai/api/v1/models (sin auth) que este
 // id existe hoy y soporta input de imagen — los ids de modelo de OpenRouter
@@ -83,7 +84,7 @@ export async function identifyBooksFromImage(
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				'Content-Type': 'application/json',
-				'HTTP-Referer': 'https://librarian.scholio.review',
+				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.scholio.review',
 				'X-Title': 'Librarian'
 			},
 			body: JSON.stringify({

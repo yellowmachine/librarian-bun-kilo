@@ -58,9 +58,10 @@ export default defineConfig({
 		}),
 		devtoolsJson()
 	],
-	server: {
-		allowedHosts: ['modern-abnormally-crab.ngrok-free.app']
-	},
+	// El túnel de cloudflared al que Seilide devuelve los logins de desarrollo
+	// (`bun run tunnel`, ver README → Seilide).
+	server: { allowedHosts: ['librarian-dev.scholio.review'] },
+	preview: { allowedHosts: ['librarian-dev.scholio.review'] },
 	test: {
 		expect: {
 			requireAssertions: true

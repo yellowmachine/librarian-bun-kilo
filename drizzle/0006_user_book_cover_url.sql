@@ -1,1 +1,0 @@
-ALTER TABLE "librarian"."user_books" ADD COLUMN "cover_url" text;

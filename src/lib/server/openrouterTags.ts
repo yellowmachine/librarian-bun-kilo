@@ -1,7 +1,8 @@
 // Sugiere tags para un libro — de entre los que el usuario YA tiene, y además
-// unos pocos nuevos que merecería crear — vía OpenRouter con la clave de
-// Scholio, mismo endpoint/modelo que el escaneo de estanterías
+// unos pocos nuevos que merecería crear — vía OpenRouter con la clave del
+// usuario, mismo endpoint/modelo que el escaneo de estanterías
 // (openrouterVision.ts).
+import { env } from '$env/dynamic/private';
 import { extractJson, filterKnownTags } from './openrouterVision';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -111,7 +112,7 @@ export async function suggestTagsForBook(
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				'Content-Type': 'application/json',
-				'HTTP-Referer': 'https://librarian.scholio.review',
+				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.scholio.review',
 				'X-Title': 'Librarian'
 			},
 			body: JSON.stringify({

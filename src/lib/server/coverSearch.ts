@@ -11,7 +11,7 @@
 // Fuentes, en paralelo:
 //   1. OpenLibrary por ISBN (si el usuario lo escribió) — gratis, sin IA.
 //   2. Google Books por ISBN o título+autor — gratis, sin IA.
-//   3. OpenRouter con búsqueda web (si el usuario tiene clave en Scholio):
+//   3. OpenRouter con búsqueda web (si el usuario tiene clave conectada):
 //      ISBNs → OpenLibrary, páginas → og:image, URLs directas.
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
@@ -30,7 +30,7 @@ const MAX_HTML_BYTES = 1024 * 1024;
 const MIN_IMAGE_BYTES = 2_000;
 const MAX_CANDIDATES = 6;
 const MAX_PAGES_TO_SCRAPE = 8;
-const USER_AGENT = 'Librarian/1.0 (+https://librarian.scholio.review)';
+const USER_AGENT = `Librarian/1.0 (+${env.ORIGIN ?? 'https://librarian.scholio.review'})`;
 
 export interface CoverQuery {
 	title: string;
@@ -350,7 +350,7 @@ export async function askAiForCoverHints(apiKey: string, query: CoverQuery): Pro
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				'Content-Type': 'application/json',
-				'HTTP-Referer': 'https://librarian.scholio.review',
+				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.scholio.review',
 				'X-Title': 'Librarian'
 			},
 			body: JSON.stringify({

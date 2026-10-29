@@ -3,26 +3,29 @@ services:
     image: ghcr.io/yellowmachine/librarian-bun-kilo:latest
     pull_policy: always
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - '${PORT:-3001}:3000'
     environment:
       NODE_ENV: production
       ORIGIN: ${ORIGIN}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      # Orígenes de confianza (Scholio + Librarian) y cookie compartida entre subdominios
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS}
-      # Database (externa, compartida con Scholio vía scholio-network — mismo rol/DB, schema "librarian")
-      DATABASE_URL: ${DATABASE_URL}
-      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL}
-      # Auth providers
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-      # Encryption — debe ser EXACTAMENTE el mismo valor que en Scholio
+      # Su propia base de datos (servicio db): la app como app_user (RLS), las
+      # migraciones como el dueño.
+      DATABASE_URL: postgres://app_user:${APP_DB_PASSWORD}@db:5432/librarian
+      MIGRATION_DATABASE_URL: postgres://librarian:${POSTGRES_PASSWORD}@db:5432/librarian
+      # Invitada al arrancar mientras no haya ninguna cuenta
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      # «Entrar con Seilide» (opcional): las tres líneas del cliente de /admin/apps
+      SEILIDE_URL: ${SEILIDE_URL:-}
+      SEILIDE_CLIENT_ID: ${SEILIDE_CLIENT_ID:-}
+      SEILIDE_CLIENT_SECRET: ${SEILIDE_CLIENT_SECRET:-}
+      # Cifra las claves de OpenRouter de los usuarios: cambiarla las pierde
       KMS_MASTER_KEY: ${KMS_MASTER_KEY}
       # Opcional: cuota propia para la búsqueda de portadas en Google Books
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
-      # Redirect a Scholio cuando el usuario no tiene acceso / hace logout
-      SCHOLIO_REDIRECT: ${SCHOLIO_REDIRECT:-https://scholio.review}
       # Email (SMTP)
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
@@ -33,11 +36,33 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       PUBLIC_SENTRY_DSN: ${PUBLIC_SENTRY_DSN:-}
     networks:
-      - scholio-network
+      - default
       - dokploy-network
 
+  # Postgres de Librarian, solo en la red interna. scripts/init.sh crea app_user
+  # la primera vez que arranca con el volumen vacío. Haz copia de pgdata.
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: librarian
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: librarian
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U librarian -d librarian']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - default
+
+volumes:
+  pgdata:
+
 networks:
-  scholio-network:
-    external: true
   dokploy-network:
     external: true
