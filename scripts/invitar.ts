@@ -15,7 +15,7 @@ if (!email || !url || !origin) {
 	process.exit(1);
 }
 
-const client = postgres(url, { max: 1 });
+const client = postgres(url, { max: 1, connection: { search_path: 'public' } });
 try {
 	const made = await invitationStore(drizzle(client)).invite(email, null);
 	if (!made.ok) {

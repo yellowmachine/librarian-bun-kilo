@@ -20,7 +20,9 @@ if (!migrationUrl) {
 	process.exit(1);
 }
 
-const client = postgres(migrationUrl, { max: 1 });
+// search_path fijo: con el por defecto ("$user", public), si existe un esquema con
+// el nombre del rol (el dueño se llama librarian), las tablas sin esquema irían ahí.
+const client = postgres(migrationUrl, { max: 1, connection: { search_path: 'public' } });
 const db = drizzle(client);
 
 console.log('[migrate] Aplicando migraciones desde', migrationsFolder);
