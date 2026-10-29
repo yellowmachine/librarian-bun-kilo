@@ -48,6 +48,11 @@ COPY --from=build /app/package.json ./
 COPY --from=build /app/drizzle ./drizzle
 COPY scripts/entrypoint.sh ./entrypoint.sh
 COPY scripts/migrate.ts ./scripts/migrate.ts
+# scripts/invitar.ts y lo que importa, para invitar a mano desde el contenedor
+COPY scripts/invitar.ts ./scripts/invitar.ts
+COPY src/lib/invitation.ts ./src/lib/invitation.ts
+COPY src/lib/server/invitation-store.ts ./src/lib/server/invitation-store.ts
+COPY src/lib/server/db/schema.ts src/lib/server/db/auth.schema.ts ./src/lib/server/db/
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 

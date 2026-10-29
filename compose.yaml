@@ -1,15 +1,18 @@
+# Postgres de desarrollo: `bun run db:start`. El volumen se inicializa una vez con
+# scripts/init.sh (rol app_user); las tablas las crean las migraciones.
 services:
   db:
-    image: postgres
-    restart: always
+    image: postgres:17
+    restart: unless-stopped
     ports:
-      - 5432:5432
+      - 5436:5432
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: mysecretpassword
-      POSTGRES_DB: local
+      POSTGRES_USER: ${POSTGRES_USER:-librarian}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-librarian}
+      POSTGRES_DB: ${POSTGRES_DB:-librarian}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-app_user}
     volumes:
-      - pgdata:/var/lib/postgresql
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
 volumes:
   pgdata:

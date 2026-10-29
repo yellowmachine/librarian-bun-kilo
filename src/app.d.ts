@@ -8,7 +8,6 @@ declare global {
 		interface Locals {
 			user?: User;
 			session?: Session;
-			hasLibrarianProfile?: boolean;
 			withRLS: <T>(fn: (tx: typeof db) => Promise<T>) => Promise<T>;
 		}
 

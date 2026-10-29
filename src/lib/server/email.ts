@@ -1,14 +1,13 @@
+import { env } from '$env/dynamic/private';
 import { sendMail } from './mailer';
 
-const APP_URL = 'https://librarian.scholio.review';
+const APP_URL = env.ORIGIN ?? 'http://localhost:5173';
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export async function sendVerificationEmail(to: string, url: string): Promise<void> {
-	await sendMail({
-		to,
-		subject: 'Confirma tu cuenta en Scholio Librarian',
-		html: `
+/** El marco de los correos de cuenta: cabecera, un texto, un botón y una nota al pie. */
+function accountEmail(p: { text: string; button: string; url: string; note: string }): string {
+	return `
 <!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -17,33 +16,84 @@ export async function sendVerificationEmail(to: string, url: string): Promise<vo
     <tr><td align="center">
       <table width="100%" style="max-width:520px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden">
         <tr><td style="background:#0a0a0a;padding:28px 40px">
-          <p style="margin:0;font-family:Georgia,serif;font-size:20px;color:#fff">Scholio Librarian</p>
+          <p style="margin:0;font-family:Georgia,serif;font-size:20px;color:#fff">Librarian</p>
         </td></tr>
         <tr><td style="padding:36px 40px 28px">
           <p style="margin:0 0 16px;font-size:16px;color:#404040;line-height:1.6">
-            Gracias por registrarte. Confirma tu dirección de email para activar tu cuenta.
+            ${p.text}
           </p>
           <table cellpadding="0" cellspacing="0" style="margin:28px 0">
             <tr><td style="background:#0a0a0a;border-radius:6px">
-              <a href="${url}" style="display:inline-block;padding:12px 28px;font-family:sans-serif;font-size:14px;font-weight:600;color:#fff;text-decoration:none">
-                Confirmar email
+              <a href="${p.url}" style="display:inline-block;padding:12px 28px;font-family:sans-serif;font-size:14px;font-weight:600;color:#fff;text-decoration:none">
+                ${p.button}
               </a>
             </td></tr>
           </table>
+          <p style="margin:0 0 12px;font-size:13px;color:#a3a3a3;line-height:1.5">
+            Si el botón no funciona, copia este enlace: <a href="${p.url}" style="color:#737373">${p.url}</a>
+          </p>
           <p style="margin:0;font-size:13px;color:#a3a3a3;line-height:1.5">
-            Si no creaste esta cuenta, puedes ignorar este mensaje. El enlace expira en 24 horas.
+            ${p.note}
           </p>
         </td></tr>
         <tr><td style="padding:20px 40px;border-top:1px solid #e5e5e5">
           <p style="margin:0;font-size:12px;color:#a3a3a3">
-            Scholio Librarian · <a href="${APP_URL}" style="color:#a3a3a3">${APP_URL}</a>
+            Librarian · <a href="${APP_URL}" style="color:#a3a3a3">${APP_URL}</a>
           </p>
         </td></tr>
       </table>
     </td></tr>
   </table>
 </body>
-</html>`
+</html>`;
+}
+
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+export async function sendVerificationEmail(to: string, url: string): Promise<void> {
+	await sendMail({
+		to,
+		subject: 'Confirma tu email en Librarian',
+		html: accountEmail({
+			text: 'Confirma tu dirección de email para seguir usando tu cuenta.',
+			button: 'Confirmar email',
+			url,
+			note: 'Si no fuiste tú, puedes ignorar este mensaje. El enlace caduca en 24 horas.'
+		})
+	});
+}
+
+export async function sendResetPasswordEmail(to: string, url: string): Promise<void> {
+	await sendMail({
+		to,
+		subject: 'Cambia tu contraseña de Librarian',
+		html: accountEmail({
+			text: 'Alguien (seguramente tú) ha pedido cambiar la contraseña de tu cuenta.',
+			button: 'Elegir una contraseña nueva',
+			url,
+			note: 'Si no lo pediste, ignora este mensaje: tu contraseña sigue igual. El enlace caduca en 1 hora.'
+		})
+	});
+}
+
+/** Sin quien invita: la primera invitación, la de ADMIN_EMAIL. */
+export async function sendInvitationEmail(p: {
+	to: string;
+	url: string;
+	inviterName: string | null;
+}): Promise<void> {
+	const who = p.inviterName
+		? `<strong>${escapeHtml(p.inviterName)}</strong> te invita`
+		: 'Te invitan';
+	await sendMail({
+		to: p.to,
+		subject: p.inviterName ? `${p.inviterName} te invita a Librarian` : 'Tu invitación a Librarian',
+		html: accountEmail({
+			text: `${who} a Librarian, para organizar tus libros y prestarlos a la gente en la que confías.`,
+			button: 'Crear mi cuenta',
+			url: p.url,
+			note: 'Si no conoces a quien te invita, ignora este mensaje. La invitación caduca en 7 días.'
+		})
 	});
 }
 
@@ -86,7 +136,7 @@ export async function sendLoanRequestEmail({
     <tr><td align="center">
       <table width="100%" style="max-width:520px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden">
         <tr><td style="background:#0a0a0a;padding:28px 40px">
-          <p style="margin:0;font-family:Georgia,serif;font-size:20px;color:#fff">Scholio Librarian</p>
+          <p style="margin:0;font-family:Georgia,serif;font-size:20px;color:#fff">Librarian</p>
         </td></tr>
         <tr><td style="padding:36px 40px 28px">
           <p style="margin:0 0 20px;font-size:16px;color:#404040;line-height:1.6">
@@ -109,7 +159,7 @@ export async function sendLoanRequestEmail({
         </td></tr>
         <tr><td style="padding:20px 40px;border-top:1px solid #e5e5e5">
           <p style="margin:0;font-size:12px;color:#a3a3a3">
-            Scholio Librarian · <a href="${APP_URL}" style="color:#a3a3a3">${APP_URL}</a>
+            Librarian · <a href="${APP_URL}" style="color:#a3a3a3">${APP_URL}</a>
           </p>
         </td></tr>
       </table>
@@ -157,7 +207,7 @@ export async function sendLoanAcceptedEmail({
     <tr><td align="center">
       <table width="100%" style="max-width:520px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden">
         <tr><td style="background:#0a0a0a;padding:28px 40px">
-          <p style="margin:0;font-family:Georgia,serif;font-size:20px;color:#fff">Scholio Librarian</p>
+          <p style="margin:0;font-family:Georgia,serif;font-size:20px;color:#fff">Librarian</p>
         </td></tr>
         <tr><td style="padding:36px 40px 28px">
           <p style="margin:0 0 20px;font-size:16px;color:#404040;line-height:1.6">
@@ -178,7 +228,7 @@ export async function sendLoanAcceptedEmail({
         </td></tr>
         <tr><td style="padding:20px 40px;border-top:1px solid #e5e5e5">
           <p style="margin:0;font-size:12px;color:#a3a3a3">
-            Scholio Librarian · <a href="${APP_URL}" style="color:#a3a3a3">${APP_URL}</a>
+            Librarian · <a href="${APP_URL}" style="color:#a3a3a3">${APP_URL}</a>
           </p>
         </td></tr>
       </table>

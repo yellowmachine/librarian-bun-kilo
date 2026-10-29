@@ -7,7 +7,7 @@
 
 const WD_API = 'https://www.wikidata.org/w/api.php';
 const WD_TIMEOUT_MS = 5_000;
-const WD_USER_AGENT = 'Scholio/1.0 (miguel@scholio.review)';
+const WD_USER_AGENT = 'Librarian/1.0 (miguel@scholio.review)';
 
 // Tipos "obra escrita" — sesgamos a precisión: si el candidato no es
 // claramente un libro/obra literaria, se descarta antes que arriesgar una

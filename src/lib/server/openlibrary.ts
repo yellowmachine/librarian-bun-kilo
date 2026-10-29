@@ -67,7 +67,7 @@ const OL_TIMEOUT_MS = 10_000;
  * fetch con timeout automático hacia OpenLibrary.
  * Lanza AbortError si la respuesta tarda más de OL_TIMEOUT_MS.
  */
-const OL_USER_AGENT = 'Scholio/1.0 (miguel@scholio.review)';
+const OL_USER_AGENT = 'Librarian/1.0 (miguel@scholio.review)';
 
 async function fetchOL(url: string): Promise<Response> {
 	try {

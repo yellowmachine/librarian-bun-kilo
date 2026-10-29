@@ -12,8 +12,7 @@ const ScanShelfSchema = v.object({
 });
 
 // POST /api/books/scan-shelf — identifica libros por el lomo en una foto de
-// estantería, usando la clave de OpenRouter que el usuario ya conectó en
-// Scholio (no hay ajustes propios de Librarian para esto).
+// estantería, usando la clave de OpenRouter que el usuario conectó en /account.
 export async function POST({ locals, request }: RequestEvent) {
 	if (!locals.user) error(401, 'Not authenticated');
 
@@ -25,7 +24,7 @@ export async function POST({ locals, request }: RequestEvent) {
 
 	const apiKey = await getOpenRouterApiKey(locals.user.id);
 	if (!apiKey) {
-		error(400, 'No OpenRouter key connected. Connect one in Scholio settings, then try again.');
+		error(400, 'No OpenRouter key connected. Connect one in your account, then try again.');
 	}
 
 	const userTags = await withRLS(locals.user.id, (tx) =>
