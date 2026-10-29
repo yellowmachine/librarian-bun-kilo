@@ -34,11 +34,12 @@
 			<!-- Logotipo -->
 			<a
 				href="/library"
-				class="flex items-baseline gap-2 font-serif text-xl font-normal tracking-tight text-ink"
+				class="flex items-center gap-2 font-serif text-xl font-normal tracking-tight text-ink"
 			>
-				The Svelte Librarian
-				<span class="font-sans text-[10px] font-semibold tracking-widest text-ink-faint uppercase"
-					>Beta</span
+				<img src="/icons/icon.svg" alt="" class="h-7 w-7 shrink-0" />
+				<!-- En móvil no cabe entero junto al icono: «Librarian», como el short_name del manifest -->
+				<span class="whitespace-nowrap"
+					><span class="hidden sm:inline">The Svelte </span>Librarian</span
 				>
 			</a>
 
