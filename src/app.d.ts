@@ -1,3 +1,5 @@
+/// <reference types="vite-plugin-pwa/info" />
+/// <reference types="vite-plugin-pwa/client" />
 import type { User, Session } from 'better-auth/minimal';
 import type { db } from '$lib/server/db';
 

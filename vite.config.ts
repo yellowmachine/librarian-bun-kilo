@@ -19,13 +19,17 @@ export default defineConfig({
 			// El service worker se registra solo en producción por defecto.
 			// En dev podemos activarlo con: devOptions: { enabled: true }
 			registerType: 'autoUpdate',
+			// El HTML lo renderiza el servidor: el registro del SW y el <link> al
+			// manifest los pone src/routes/+layout.svelte, no el plugin.
+			injectRegister: false,
 			// La cámara requiere HTTPS — el SW solo intercepta requests,
 			// no bloquea el acceso a la cámara nativa.
 			workbox: {
 				// Cachear assets estáticos y páginas de la app
-				globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
-				// No cachear las API routes ni las páginas de auth
-				navigateFallbackDenylist: [/^\/api\//, /^\/login/, /^\/register/, /^\/logout/],
+				globPatterns: ['**/*.{js,css,ico,png,svg,webp,woff2}'],
+				// Las páginas se renderizan en el servidor con la sesión del usuario:
+				// no hay un HTML precacheado al que redirigir las navegaciones.
+				navigateFallback: null,
 				// Cachear respuestas de navegación (páginas de la app)
 				runtimeCaching: [
 					{
