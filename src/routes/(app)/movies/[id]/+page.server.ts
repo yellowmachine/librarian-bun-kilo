@@ -13,6 +13,7 @@ import {
 import { withRLS } from '$lib/server/db/rls';
 import { hasOpenRouterApiKey } from '$lib/server/openrouterKey';
 import { getMovieForBorrow, requestLoan } from '$lib/server/loans';
+import { getMovieReviews, upsertMovieReview, deleteMovieReview } from '$lib/server/movieReviews';
 import { tags } from '$lib/server/db/schema';
 import { getUserLibraries } from '$lib/server/libraries';
 import { isMediaFormat } from '$lib/mediaFormat';
@@ -38,6 +39,8 @@ export const load = async ({ locals, params }: RequestEvent) => {
 	return {
 		// Para «Pedir prestada»: disponibilidad y petición propia abierta
 		borrowInfo: isOwner ? null : await getMovieForBorrow(userId, movie.userMovieId),
+		// Reseñas: solo de películas del catálogo (TMDB), como los libros
+		reviews: movie.movieId ? await getMovieReviews(userId, movie.movieId) : null,
 		movie: forViewer(movie, userId),
 		isOwner,
 		userLibraries: isOwner ? userLibraries : [],
@@ -130,6 +133,29 @@ export const actions = {
 		return tagAction(() => removeMovieTag(locals.user!.id, params.id!, tagId));
 	},
 
+	// ── Reseñas (de la película del catálogo, no de esta copia) ────────────
+	saveReview: async ({ locals, params, request }: RequestEvent) => {
+		const movieId = await reviewableMovieId(locals.user!.id, params.id!);
+		if (!movieId) return fail(404, { reviewError: 'Reviews are only for movies from TMDB.' });
+
+		const data = await request.formData();
+		const rating = Number(data.get('rating'));
+		const body = (data.get('body') as string | null) ?? undefined;
+		try {
+			await upsertMovieReview(locals.user!.id, movieId, { rating, body });
+		} catch (e) {
+			return fail(400, { reviewError: e instanceof Error ? e.message : 'Saving error.' });
+		}
+		return { reviewSaved: true };
+	},
+
+	deleteReview: async ({ locals, params }: RequestEvent) => {
+		const movieId = await reviewableMovieId(locals.user!.id, params.id!);
+		if (!movieId) return fail(404, { reviewError: 'Movie not found.' });
+		await deleteMovieReview(locals.user!.id, movieId);
+		return { reviewDeleted: true };
+	},
+
 	// Pedirla prestada (solo quien no es el dueño)
 	request: async ({ locals, params, request }: RequestEvent) => {
 		const notes = ((await request.formData()).get('notes') as string | null)?.trim() || undefined;
@@ -169,4 +195,10 @@ async function tagAction(run: () => Promise<unknown>) {
 		throw e;
 	}
 	return { tagsUpdated: true };
+}
+
+// Reseña quien puede ver la copia (suya, por grupo o prestada) y solo si es de TMDB.
+async function reviewableMovieId(userId: string, userMovieId: string): Promise<string | null> {
+	const movie = await getUserMovie(userId, userMovieId);
+	return movie?.movieId ?? null;
 }

@@ -9,10 +9,11 @@
 	import BookCard from '$lib/components/BookCard.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
+	import ReviewsSection from '$lib/components/ReviewsSection.svelte';
 	import { MEDIA_FORMATS, MEDIA_FORMAT_LABELS, formatLine } from '$lib/mediaFormat';
 
 	let { data, form } = $props();
-	const { movie, isOwner, borrowInfo, userLibraries, userTags, hasAiKey } = $derived(data);
+	const { movie, isOwner, borrowInfo, reviews, userLibraries, userTags, hasAiKey } = $derived(data);
 
 	// ── Etiquetas ─────────────────────────────────────────────────────────────
 	const assignedTagIds = $derived(new Set(movie.tags.map((t) => t.id)));
@@ -436,6 +437,19 @@
 				<Trash size={15} /> Remove from my movies
 			</button>
 		</form>
+	{/if}
+
+	{#if reviews}
+		<!-- La reseña es de la película, así que se comparte entre todas sus copias -->
+		{#key movie.userMovieId}
+			<ReviewsSection
+				myReview={reviews.myReview}
+				reviews={reviews.reviews}
+				stats={reviews.stats}
+				{form}
+				emptyText="No one has reviewed this movie yet."
+			/>
+		{/key}
 	{/if}
 
 	{#if movie.movieId}

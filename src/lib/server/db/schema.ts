@@ -861,6 +861,49 @@ export const bookReviews = pgTable(
 	]
 );
 
+// ─── Movie Reviews ────────────────────────────────────────────────────────────
+// Como book_reviews: una reseña por usuario y película del catálogo (TMDB),
+// visible para todos. Las películas dadas de alta a mano no tienen.
+
+export const movieReviews = pgTable(
+	'movie_reviews',
+	{
+		id: text('id').primaryKey(),
+		movieId: text('movie_id')
+			.notNull()
+			.references(() => movies.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		rating: integer('rating').notNull(), // 1–5 estrellas
+		body: text('body'),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	(table) => [
+		uniqueIndex('movie_reviews_movie_user_idx').on(table.movieId, table.userId),
+		index('movie_reviews_movie_idx').on(table.movieId),
+		index('movie_reviews_user_idx').on(table.userId),
+		check('movie_reviews_rating_range', sql`${table.rating} between 1 and 5`),
+		pgPolicy('movie_reviews_select', { for: 'select', to: appUser, using: sql`true` }),
+		pgPolicy('movie_reviews_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_reviews_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_reviews_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
 // ─── Invitations ──────────────────────────────────────────────────────────────
 // Librarian es una red por invitación: cualquiera invita por email y el enlace
 // (/invitacion/<token>) caduca a los 7 días. Solo se crea cuenta con contraseña
@@ -945,7 +988,13 @@ export const librariesRelations = relations(libraries, ({ one, many }) => ({
 }));
 
 export const moviesRelations = relations(movies, ({ many }) => ({
-	userMovies: many(userMovies)
+	userMovies: many(userMovies),
+	reviews: many(movieReviews)
+}));
+
+export const movieReviewsRelations = relations(movieReviews, ({ one }) => ({
+	movie: one(movies, { fields: [movieReviews.movieId], references: [movies.id] }),
+	user: one(user, { fields: [movieReviews.userId], references: [user.id] })
 }));
 
 export const userMoviesRelations = relations(userMovies, ({ one, many }) => ({
