@@ -3,6 +3,7 @@
 	import { ArrowLeft, Camera, Info, Sparkle } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
+	import Espera from '$lib/components/Espera.svelte';
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import MoviePhotoScan, { type ScanSummary } from '$lib/components/MoviePhotoScan.svelte';
@@ -77,17 +78,21 @@
 		}
 	}
 
+	// La pedida con el botón (película escrita a mano) bloquea la pantalla con Espera; la que sale
+	// sola al elegir una película de la búsqueda no, para no cortar al usuario mientras rellena.
+	let suggestingManually = $state(false);
 	function suggestManualTags() {
 		const title = manualTitle.trim();
 		if (!title) return;
-		suggestTags(`manual:${title}`, {
+		suggestingManually = true;
+		void suggestTags(`manual:${title}`, {
 			title,
 			directors: manualDirectors
 				.split(',')
 				.map((d) => d.trim())
 				.filter(Boolean),
 			overview: manualOverview.trim() || null
-		});
+		}).finally(() => (suggestingManually = false));
 	}
 
 	// ── Datos de la copia (comunes a las dos rutas) ───────────────────────────
@@ -340,6 +345,7 @@
 		</div>
 	{/if}
 
+	{#if suggestingManually}<Espera>Suggesting tags…</Espera>{/if}
 	<div>
 		<span
 			class="flex items-center gap-2 text-xs font-medium tracking-widest text-ink-muted uppercase"

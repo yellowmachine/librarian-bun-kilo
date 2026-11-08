@@ -7,6 +7,7 @@
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
+	import Espera from '$lib/components/Espera.svelte';
 	import ReviewsSection from '$lib/components/ReviewsSection.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { readableTagTextColor } from '$lib/tagColor';
@@ -677,12 +678,9 @@
 					disabled={suggestingTags}
 					class="ml-auto flex items-center gap-1 text-xs text-ink-faint hover:text-ink disabled:opacity-60"
 				>
-					{#if suggestingTags}
-						<Spinner size="sm" /> Suggesting…
-					{:else}
-						<Sparkle size={12} /> Suggest with AI
-					{/if}
+					<Sparkle size={12} /> Suggest with AI
 				</button>
+				{#if suggestingTags}<Espera>Suggesting tags…</Espera>{/if}
 			</div>
 
 			{#if tagSuggestion && !suggestingTags}

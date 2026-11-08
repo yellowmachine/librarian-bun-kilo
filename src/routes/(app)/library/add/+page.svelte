@@ -15,6 +15,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
+	import Espera from '$lib/components/Espera.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import DuplicateBookDialog from '$lib/components/DuplicateBookDialog.svelte';
@@ -1245,12 +1246,9 @@
 							disabled={suggestingTags}
 							class="ml-auto flex items-center gap-1 text-xs text-ink-faint hover:text-ink disabled:opacity-60"
 						>
-							{#if suggestingTags}
-								<Spinner size="sm" /> Suggesting…
-							{:else}
-								<Sparkle size={12} /> Suggest with AI
-							{/if}
+							<Sparkle size={12} /> Suggest with AI
 						</button>
+						{#if suggestingTags}<Espera>Suggesting tags…</Espera>{/if}
 					{/if}
 				</div>
 				<div class="mt-1.5">
@@ -1286,9 +1284,7 @@
 
 		<!-- Añadiendo -->
 	{:else if mode === 'adding'}
-		<div class="flex justify-center py-16">
-			<Spinner size="lg" class="text-ink-faint" />
-		</div>
+		<Espera>Adding to your library…</Espera>
 
 		<!-- Analizando la foto de la estantería -->
 	{:else if mode === 'shelf-analyzing'}
@@ -1300,10 +1296,7 @@
 					class="max-h-48 border border-paper-border object-contain"
 				/>
 			{/if}
-			<div class="flex items-center gap-2 text-sm text-ink-muted">
-				<Spinner size="sm" />
-				Analyzing photo…
-			</div>
+			<Espera>Analyzing photo…</Espera>
 		</div>
 
 		<!-- Revisar libros detectados -->
@@ -1388,10 +1381,7 @@
 
 		<!-- Añadiendo los libros seleccionados -->
 	{:else if mode === 'shelf-adding'}
-		<div class="flex flex-col items-center gap-2 py-16">
-			<Spinner size="lg" class="text-ink-faint" />
-			<p class="text-sm text-ink-faint">Adding books…</p>
-		</div>
+		<Espera>Adding books…</Espera>
 	{/if}
 </div>
 
