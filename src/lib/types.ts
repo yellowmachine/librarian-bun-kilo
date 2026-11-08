@@ -9,6 +9,14 @@ export interface BookSearchResult {
 	publishYear: number | null;
 }
 
+export interface MovieSearchResult {
+	id: string; // "tmdb-<id>", el mismo id que movies.id
+	title: string; // en castellano si TMDB lo tiene
+	originalTitle: string | null;
+	releaseYear: number | null;
+	posterUrl: string | null; // miniatura (w185)
+}
+
 export interface AuthorSearchResult {
 	id: string; // OpenLibrary author ID, e.g. "OL23919A" (o "local:<nombre>")
 	name: string;
