@@ -67,7 +67,7 @@ describe('autenticación', () => {
 	});
 
 	it('un token v4 va en la cabecera Authorization', async () => {
-		mockEnv.TMDB_API_KEY = 'eyJhbGciOiJIUzI1NiJ9.token';
+		mockEnv.TMDB_API_KEY = 'eyJ-fake-v4-read-token-for-tests';
 		const fetchMock = vi
 			.spyOn(global, 'fetch')
 			.mockResolvedValueOnce(jsonResponse({ results: [] }));
@@ -75,7 +75,7 @@ describe('autenticación', () => {
 		const [url, init] = fetchMock.mock.calls[0];
 		expect(String(url)).not.toContain('api_key');
 		expect((init?.headers as Record<string, string>).Authorization).toBe(
-			'Bearer eyJhbGciOiJIUzI1NiJ9.token'
+			'Bearer eyJ-fake-v4-read-token-for-tests'
 		);
 	});
 

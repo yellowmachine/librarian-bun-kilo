@@ -6,7 +6,10 @@
 // que OpenRouter informa en la respuesta: coste real, tokens y modelo. Así
 // ninguna función de IA puede olvidarse de apuntar su consumo.
 import { env } from '$env/dynamic/private';
-import { recordAiCall, type AiLogContext } from './aiUsage';
+// Solo el tipo: aiUsage.ts arrastra la conexión a la base de datos, que exige
+// DATABASE_URL al cargarse. Se importa al registrar (ver finish) para que estas
+// funciones no dependan de la base solo por importarlas (tests, CI).
+import type { AiLogContext } from './aiUsage';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -82,6 +85,7 @@ export async function openRouterChat<T>(
 
 	const finish = async (outcome: { resultCount?: number; error?: string }) => {
 		if (!log) return;
+		const { recordAiCall } = await import('./aiUsage');
 		await recordAiCall(log, {
 			...usage,
 			success: !outcome.error,
