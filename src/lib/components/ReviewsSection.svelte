@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Reseñas de una obra (de momento, películas): media, la propia (escribir,
+	// Reseñas de una obra (libro o película): media, la propia (escribir,
 	// editar, borrar) y las de los demás. Manda los formularios a las acciones
 	// ?/saveReview y ?/deleteReview de la página que lo usa.
 	import { enhance } from '$app/forms';
@@ -23,9 +23,18 @@
 		/** El `form` de la página: reviewError / reviewSaved */
 		form?: { reviewError?: string; reviewSaved?: boolean } | null;
 		emptyText?: string;
+		/** Enlace «See all →» a una página con todas las reseñas */
+		allHref?: string;
 	}
 
-	let { myReview, reviews, stats, form = null, emptyText = 'No reviews yet.' }: Props = $props();
+	let {
+		myReview,
+		reviews,
+		stats,
+		form = null,
+		emptyText = 'No reviews yet.',
+		allHref
+	}: Props = $props();
 
 	// svelte-ignore state_referenced_locally
 	let rating = $state(myReview?.rating ?? 0);
@@ -52,15 +61,22 @@
 			<Star size={16} class="text-ink-faint" />
 			<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Reviews</span>
 		</div>
-		{#if stats.totalReviews > 0}
-			<div class="flex items-center gap-2">
-				<StarRating value={Math.round(stats.averageRating ?? 0)} readonly size={16} />
-				<span class="text-xs text-ink-muted">
-					{stats.averageRating?.toFixed(1)} · {stats.totalReviews}
-					{stats.totalReviews === 1 ? 'review' : 'reviews'}
-				</span>
-			</div>
-		{/if}
+		<div class="flex items-center gap-3">
+			{#if stats.totalReviews > 0}
+				<div class="flex items-center gap-2">
+					<StarRating value={Math.round(stats.averageRating ?? 0)} readonly size={16} />
+					<span class="text-xs text-ink-muted">
+						{stats.averageRating?.toFixed(1)} · {stats.totalReviews}
+						{stats.totalReviews === 1 ? 'review' : 'reviews'}
+					</span>
+				</div>
+			{/if}
+			{#if allHref}
+				<a href={allHref} class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
+					>See all →</a
+				>
+			{/if}
+		</div>
 	</div>
 
 	{#if !writing && !myReview}
