@@ -83,11 +83,13 @@ export async function addBookToLibrary(
 	return withRLS(userId, async (tx) => {
 		if (source.bookId !== null && !allowDuplicate) {
 			// OpenLibrary book — reuse the existing copy unless the caller has
-			// explicitly confirmed they want a separate physical copy.
+			// explicitly confirmed they want a separate physical copy. Solo entre
+			// las copias PROPIAS: la RLS también deja ver las de otros por grupo o
+			// préstamo, y sin este filtro se devolvía la copia de otro usuario.
 			const dup = await tx
 				.select({ id: userBooks.id })
 				.from(userBooks)
-				.where(eq(userBooks.bookId, source.bookId));
+				.where(and(eq(userBooks.bookId, source.bookId), eq(userBooks.userId, userId)));
 
 			if (dup.length > 0) return dup[0].id;
 		}

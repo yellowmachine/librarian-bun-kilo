@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, type TestDb } from '../test-db';
-import { books, userBooks, tags, libraries } from '../schema';
+import {
+	books,
+	userBooks,
+	tags,
+	libraries,
+	userBookTags,
+	groups,
+	groupMembers,
+	sharedTags
+} from '../schema';
 import { eq } from 'drizzle-orm';
 
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
@@ -207,5 +216,80 @@ describe('RLS · tags', () => {
 			tx.select().from(tags).where(eq(tags.id, 'tag-bob'))
 		);
 		expect(rows).toHaveLength(1);
+	});
+});
+
+// ─── user_book_tags: solo tus etiquetas en tus libros ─────────────────────────
+// Bob comparte «Club» con el grupo de Alice y Bob. Alice tiene su propia
+// etiqueta «Mía», compartida con otro grupo suyo donde Bob no está.
+
+describe('RLS · user_book_tags', () => {
+	// 42501: "new row violates row-level security policy". Se comprueba el código
+	// para no dar por bueno otro error (p.ej. 42P17, recursión en las políticas).
+	const RLS_VIOLATION = '42501';
+	let tdb: TestDb;
+
+	beforeEach(async () => {
+		tdb = await createTestDb();
+		await seedUsers(tdb);
+		await seedBook(tdb, 'OL1');
+		await seedLibrary(tdb, 'lib-alice', ALICE);
+		await seedLibrary(tdb, 'lib-bob', BOB);
+		await tdb.asSuperuser(async (tx) => {
+			await tx.insert(userBooks).values([
+				{ id: 'ub-bob', userId: BOB, libraryId: 'lib-bob', bookId: 'OL1' },
+				{ id: 'ub-alice', userId: ALICE, libraryId: 'lib-alice', bookId: 'OL1' }
+			]);
+			await tx.insert(tags).values([
+				{ id: 'tag-bob', userId: BOB, name: 'Club' },
+				{ id: 'tag-alice', userId: ALICE, name: 'Mía' }
+			]);
+			await tx.insert(userBookTags).values({ userBookId: 'ub-bob', tagId: 'tag-bob' });
+			await tx.insert(groups).values([
+				{ id: 'grp-club', name: 'Club', createdBy: BOB },
+				{ id: 'grp-alice', name: 'Otro', createdBy: ALICE }
+			]);
+			await tx.insert(groupMembers).values([
+				{ groupId: 'grp-club', userId: BOB, role: 'owner' },
+				{ groupId: 'grp-club', userId: ALICE, role: 'member' },
+				{ groupId: 'grp-alice', userId: ALICE, role: 'owner' }
+			]);
+			await tx.insert(sharedTags).values([
+				{ id: 'st-club', tagId: 'tag-bob', groupId: 'grp-club', sharedBy: BOB },
+				{ id: 'st-alice', tagId: 'tag-alice', groupId: 'grp-alice', sharedBy: ALICE }
+			]);
+		});
+	});
+	afterEach(() => tdb.cleanup());
+
+	it('alice ve el libro de bob por el grupo, pero no puede ponerle su etiqueta', async () => {
+		const visible = await tdb.withRLS(ALICE, (tx) =>
+			tx.select({ id: userBooks.id }).from(userBooks).where(eq(userBooks.id, 'ub-bob'))
+		);
+		expect(visible).toHaveLength(1);
+
+		await expect(
+			tdb.withRLS(ALICE, (tx) =>
+				tx.insert(userBookTags).values({ userBookId: 'ub-bob', tagId: 'tag-alice' })
+			)
+		).rejects.toMatchObject({ cause: { code: RLS_VIOLATION } });
+	});
+
+	it('ni poner una etiqueta ajena en un libro propio', async () => {
+		await expect(
+			tdb.withRLS(ALICE, (tx) =>
+				tx.insert(userBookTags).values({ userBookId: 'ub-alice', tagId: 'tag-bob' })
+			)
+		).rejects.toMatchObject({ cause: { code: RLS_VIOLATION } });
+	});
+
+	it('el dueño sí etiqueta su libro con su etiqueta', async () => {
+		await tdb.withRLS(ALICE, (tx) =>
+			tx.insert(userBookTags).values({ userBookId: 'ub-alice', tagId: 'tag-alice' })
+		);
+		const rows = await tdb.withRLS(ALICE, (tx) =>
+			tx.select().from(userBookTags).where(eq(userBookTags.userBookId, 'ub-alice'))
+		);
+		expect(rows).toEqual([{ userBookId: 'ub-alice', tagId: 'tag-alice' }]);
 	});
 });

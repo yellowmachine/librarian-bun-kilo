@@ -68,6 +68,9 @@ const isGroupCreator = (groupId: unknown, userId: unknown) =>
 // user_movie_tags no puede leer user_movies sin entrar en recursión (42P17).
 const ownsUserMovie = (userMovieId: unknown, userId: unknown) =>
 	sql`owns_user_movie(${userMovieId}, ${userId})`;
+// Lo mismo para libros (user_books_select_in_group lee user_book_tags).
+const ownsUserBook = (userBookId: unknown, userId: unknown) =>
+	sql`owns_user_book(${userBookId}, ${userId})`;
 
 // ─── Books ────────────────────────────────────────────────────────────────────
 
@@ -478,6 +481,9 @@ export const userBookTags = pgTable(
 				  and gm.user_id = ${currentUserId}
 			)`
 		}),
+		// Etiqueta Y libro propios: si bastara con la etiqueta, se podría poner
+		// una propia, compartida con otro grupo, a un libro ajeno visible por
+		// grupo, y exponerlo a gente que su dueño no eligió.
 		pgPolicy('user_book_tags_insert', {
 			for: 'insert',
 			to: appUser,
@@ -485,7 +491,7 @@ export const userBookTags = pgTable(
 				select 1 from tags t
 				where t.id = ${table.tagId}
 				  and t.user_id = ${currentUserId}
-			)`
+			) and ${ownsUserBook(table.userBookId, currentUserId)}`
 		}),
 		pgPolicy('user_book_tags_delete', {
 			for: 'delete',

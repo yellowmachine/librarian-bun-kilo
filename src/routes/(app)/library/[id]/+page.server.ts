@@ -82,6 +82,8 @@ export const actions = {
 		const color = (data.get('color') as string)?.trim() || null;
 
 		if (!name) return fail(400, { error: 'Name is required' });
+		if (!(await ownsBook(locals.user!.id, params.id!)))
+			return fail(404, { error: 'Book not found.' });
 
 		const tagId = nanoid();
 		await withRLS(locals.user!.id, async (tx) => {
@@ -97,6 +99,8 @@ export const actions = {
 		const data = await request.formData();
 		const tagId = data.get('tagId') as string;
 		if (!tagId) return fail(400, { error: 'tagId is required' });
+		if (!(await ownsBook(locals.user!.id, params.id!)))
+			return fail(404, { error: 'Book not found.' });
 
 		await withRLS(locals.user!.id, (tx) =>
 			tx.insert(userBookTags).values({ userBookId: params.id!, tagId }).onConflictDoNothing()
@@ -462,3 +466,10 @@ export const actions = {
 		redirect(303, '/library');
 	}
 };
+
+// Solo el dueño etiqueta un libro. La RLS ya lo exige (user_book_tags_insert),
+// pero así quien lo intente con un libro ajeno recibe un 404 y no un 500.
+async function ownsBook(userId: string, userBookId: string): Promise<boolean> {
+	const book = await getUserBook(userId, userBookId);
+	return book?.ownerId === userId;
+}

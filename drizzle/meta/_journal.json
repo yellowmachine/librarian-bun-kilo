@@ -36,6 +36,13 @@
       "when": 1794159486885,
       "tag": "0004_movie_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794160066848,
+      "tag": "0005_book_tags_owner",
+      "breakpoints": true
     }
   ]
 }
