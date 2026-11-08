@@ -41,6 +41,9 @@ export const loanStatusEnum = pgEnum('loan_status', [
 	'cancelled'
 ]);
 
+// Soporte físico de una copia de la videoteca (user_movies.format).
+export const mediaFormatEnum = pgEnum('media_format', ['dvd', 'bluray', 'uhd_bluray']);
+
 // ─── Helper SQL ───────────────────────────────────────────────────────────────
 // current_setting('app.current_user_id', true) devuelve '' si no está seteado,
 // en lugar de lanzar un error.
@@ -217,6 +220,103 @@ export const userBooks = pgTable(
 			using: sql`${table.userId} = ${currentUserId}`
 		}),
 		pgPolicy('user_books_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
+// ─── Movies ───────────────────────────────────────────────────────────────────
+// Catálogo global de películas, rellenado desde TMDB (src/lib/server/tmdb.ts).
+// Mismo papel que `books` para la videoteca.
+
+export const movies = pgTable(
+	'movies',
+	{
+		id: text('id').primaryKey(), // "tmdb-<id>", ej: "tmdb-78"
+		// Título en castellano (TMDB con language=es-ES) y el original.
+		title: text('title').notNull(),
+		originalTitle: text('original_title'),
+		releaseYear: integer('release_year'),
+		directors: text('directors').array(),
+		runtime: integer('runtime'), // minutos
+		genres: text('genres').array(),
+		overview: text('overview'),
+		posterUrl: text('poster_url'),
+		tmdbData: text('tmdb_data'), // JSON raw guardado como text
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	() => [
+		// Catálogo global: lectura y escritura sin restricción de usuario
+		pgPolicy('movies_select', { for: 'select', to: appUser, using: sql`true` }),
+		pgPolicy('movies_insert', { for: 'insert', to: appUser, withCheck: sql`true` }),
+		pgPolicy('movies_update', { for: 'update', to: appUser, using: sql`true` })
+	]
+);
+
+// ─── User Movies ──────────────────────────────────────────────────────────────
+// Cada fila es una copia física (DVD, Blu-ray…) de un usuario. Comparte las
+// bibliotecas con los libros: «Casa» u «Oficina» son sitios, no tipos de cosa.
+// De momento solo la ve su dueño; grupos y préstamos llegarán más adelante.
+
+export const userMovies = pgTable(
+	'user_movies',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		libraryId: text('library_id')
+			.notNull()
+			.references(() => libraries.id, { onDelete: 'restrict' }),
+		// Nullable: null significa alta manual (la película no está en TMDB)
+		movieId: text('movie_id').references(() => movies.id, { onDelete: 'restrict' }),
+		// Campos de alta manual — tapan movies.* cuando movieId es null
+		title: text('title'),
+		originalTitle: text('original_title'),
+		directors: text('directors').array(),
+		releaseYear: integer('release_year'),
+		overview: text('overview'),
+		// Portada propia (p.ej. la de esta edición concreta). Igual que en
+		// user_books, también vale para películas de catálogo y tapa
+		// movies.poster_url.
+		coverUrl: text('cover_url'),
+		format: mediaFormatEnum('format').notNull(),
+		// Texto libre: «Steelbook», «Edición coleccionista», «Montaje del director»…
+		edition: text('edition'),
+		notes: text('notes'),
+		isAvailable: boolean('is_available').default(true).notNull(),
+		addedAt: timestamp('added_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	(table) => [
+		// Se puede tener la misma película en varios formatos (o varias copias),
+		// así que (userId, movieId) NO es único.
+		index('user_movies_user_idx').on(table.userId),
+		index('user_movies_movie_idx').on(table.movieId),
+		index('user_movies_library_idx').on(table.libraryId),
+		check(
+			'user_movies_movie_or_title',
+			sql`${table.movieId} IS NOT NULL OR ${table.title} IS NOT NULL`
+		),
+		pgPolicy('user_movies_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('user_movies_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('user_movies_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('user_movies_delete', {
 			for: 'delete',
 			to: appUser,
 			using: sql`${table.userId} = ${currentUserId}`
@@ -671,7 +771,18 @@ export const userBooksRelations = relations(userBooks, ({ one, many }) => ({
 
 export const librariesRelations = relations(libraries, ({ one, many }) => ({
 	user: one(user, { fields: [libraries.userId], references: [user.id] }),
-	userBooks: many(userBooks)
+	userBooks: many(userBooks),
+	userMovies: many(userMovies)
+}));
+
+export const moviesRelations = relations(movies, ({ many }) => ({
+	userMovies: many(userMovies)
+}));
+
+export const userMoviesRelations = relations(userMovies, ({ one }) => ({
+	user: one(user, { fields: [userMovies.userId], references: [user.id] }),
+	library: one(libraries, { fields: [userMovies.libraryId], references: [libraries.id] }),
+	movie: one(movies, { fields: [userMovies.movieId], references: [movies.id] })
 }));
 
 export const tagsRelations = relations(tags, ({ one, many }) => ({
