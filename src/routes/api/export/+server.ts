@@ -156,7 +156,8 @@ function serializeMoviesYaml(entries: UserMovieWithDetails[]): string {
 		lines.push(`    format: ${m.format}`);
 		if (m.edition) lines.push(`    edition: ${yamlStr(m.edition)}`);
 		if (m.movieId) lines.push(`    tmdb_id: ${m.movieId.replace('tmdb-', '')}`);
-		if (m.coverUrl) lines.push(`    cover_url: ${yamlStr(m.coverUrl)}`);
+		// La foto propia (/api/movies/…/cover) solo se ve con sesión: no se exporta.
+		if (m.coverUrl?.startsWith('https://')) lines.push(`    cover_url: ${yamlStr(m.coverUrl)}`);
 		if (m.notes) lines.push(`    notes: ${yamlStr(m.notes)}`);
 	}
 	return lines.join('\n') + '\n';

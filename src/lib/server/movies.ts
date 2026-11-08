@@ -5,11 +5,11 @@
 import { nanoid } from 'nanoid';
 import { eq, and, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { movies, userMovies, libraries } from './db/schema';
+import { movies, userMovies, libraries, movieCoverPhotos } from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import type { TmdbMovie } from './tmdb';
-
+import type { DecodedImage } from './imageData';
 import type { MediaFormat } from '$lib/mediaFormat';
 
 export { MEDIA_FORMATS, type MediaFormat } from '$lib/mediaFormat';
@@ -290,6 +290,56 @@ export async function updateUserMovie(
 		const values: Partial<typeof userMovies.$inferInsert> = { ...rest, updatedAt: new Date() };
 		if (libraryId !== undefined) values.libraryId = await resolveLibraryId(tx, userId, libraryId);
 		await tx.update(userMovies).set(values).where(eq(userMovies.id, userMovieId));
+		// Otra portada (o volver al póster): la foto guardada deja de usarse.
+		if (data.coverUrl !== undefined) {
+			await tx.delete(movieCoverPhotos).where(eq(movieCoverPhotos.userMovieId, userMovieId));
+		}
+	});
+}
+
+// ─── Foto propia de la carátula ───────────────────────────────────────────────
+
+export function coverPhotoUrl(userMovieId: string): string {
+	// El parámetro cambia con cada foto nueva, así el navegador (que la cachea
+	// como inmutable) nunca enseña la anterior.
+	return `/api/movies/${userMovieId}/cover?v=${nanoid(8)}`;
+}
+
+/** Guarda (o reemplaza) la foto y la pone de portada. false si la copia no es del usuario. */
+export async function saveCoverPhoto(
+	userId: string,
+	userMovieId: string,
+	image: DecodedImage
+): Promise<boolean> {
+	return withRLS(userId, async (tx) => {
+		const updated = await tx
+			.update(userMovies)
+			.set({ coverUrl: coverPhotoUrl(userMovieId), updatedAt: new Date() })
+			.where(and(eq(userMovies.id, userMovieId), eq(userMovies.userId, userId)))
+			.returning({ id: userMovies.id });
+		if (updated.length === 0) return false;
+
+		await tx
+			.insert(movieCoverPhotos)
+			.values({ userMovieId, userId, contentType: image.contentType, data: image.bytes })
+			.onConflictDoUpdate({
+				target: movieCoverPhotos.userMovieId,
+				set: { contentType: image.contentType, data: image.bytes, createdAt: new Date() }
+			});
+		return true;
+	});
+}
+
+export async function getCoverPhoto(
+	userId: string,
+	userMovieId: string
+): Promise<{ contentType: string; data: Uint8Array } | null> {
+	return withRLS(userId, async (tx) => {
+		const rows = await tx
+			.select({ contentType: movieCoverPhotos.contentType, data: movieCoverPhotos.data })
+			.from(movieCoverPhotos)
+			.where(eq(movieCoverPhotos.userMovieId, userMovieId));
+		return rows[0] ?? null;
 	});
 }
 

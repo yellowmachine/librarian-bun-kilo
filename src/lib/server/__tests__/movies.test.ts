@@ -21,7 +21,9 @@ import {
 	getUserMovie,
 	findDuplicateUserMovie,
 	updateUserMovie,
-	removeMovie
+	removeMovie,
+	saveCoverPhoto,
+	getCoverPhoto
 } from '../movies';
 import { deleteLibrary, createLibrary } from '../libraries';
 import type { TmdbMovie } from '../tmdb';
@@ -152,5 +154,45 @@ describe('videoteca', () => {
 		await removeMovie(ALICE, id);
 		await deleteLibrary(ALICE, office);
 		expect(await getUserMovies(ALICE)).toEqual([]);
+	});
+
+	it('guarda la foto propia de la carátula y la retira al volver al póster', async () => {
+		const movieId = await upsertMovie(BLADE_RUNNER);
+		const id = await addMovieToLibrary(ALICE, { movieId }, { format: 'bluray' });
+		const image = {
+			contentType: 'image/jpeg' as const,
+			bytes: Uint8Array.from([0xff, 0xd8, 0xff, 1])
+		};
+
+		expect(await saveCoverPhoto(BOB, id, image)).toBe(false);
+		expect(await saveCoverPhoto(ALICE, id, image)).toBe(true);
+
+		const withPhoto = await getUserMovie(ALICE, id);
+		expect(withPhoto?.coverUrl).toMatch(new RegExp(`^/api/movies/${id}/cover\\?v=`));
+		expect(withPhoto?.coverOverridden).toBe(true);
+
+		const photo = await getCoverPhoto(ALICE, id);
+		expect(photo?.contentType).toBe('image/jpeg');
+		expect(Array.from(photo!.data)).toEqual([0xff, 0xd8, 0xff, 1]);
+		expect(await getCoverPhoto(BOB, id)).toBeNull();
+
+		// Una foto nueva reemplaza a la anterior y cambia la URL
+		await saveCoverPhoto(ALICE, id, { ...image, bytes: Uint8Array.from([0xff, 0xd8, 0xff, 2]) });
+		expect((await getUserMovie(ALICE, id))?.coverUrl).not.toBe(withPhoto?.coverUrl);
+		expect(Array.from((await getCoverPhoto(ALICE, id))!.data)).toEqual([0xff, 0xd8, 0xff, 2]);
+
+		await updateUserMovie(ALICE, id, { coverUrl: null });
+		expect(await getCoverPhoto(ALICE, id)).toBeNull();
+		expect((await getUserMovie(ALICE, id))?.coverUrl).toBe(BLADE_RUNNER.posterUrl);
+	});
+
+	it('borrar la película borra su foto', async () => {
+		const id = await addMovieToLibrary(ALICE, { movieId: null, title: 'X' }, { format: 'dvd' });
+		await saveCoverPhoto(ALICE, id, {
+			contentType: 'image/png',
+			bytes: Uint8Array.from([0x89, 0x50])
+		});
+		await removeMovie(ALICE, id);
+		expect(await getCoverPhoto(ALICE, id)).toBeNull();
 	});
 });

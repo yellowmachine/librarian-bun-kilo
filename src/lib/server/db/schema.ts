@@ -10,7 +10,8 @@ import {
 	integer,
 	uniqueIndex,
 	index,
-	check
+	check,
+	customType
 } from 'drizzle-orm/pg-core';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -320,6 +321,42 @@ export const userMovies = pgTable(
 			for: 'delete',
 			to: appUser,
 			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
+// ─── Movie cover photos ───────────────────────────────────────────────────────
+// La foto que el usuario hizo a SU carátula (recortada y reducida en el
+// navegador, ~100 KB), para cuando prefiere su edición al póster de TMDB.
+// Va en la base de datos y no en disco: es poca cosa y así entra en las copias
+// de seguridad sin montar nada más. user_movies.cover_url apunta a
+// /api/movies/<id>/cover, que la sirve.
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+	dataType() {
+		return 'bytea';
+	}
+});
+
+export const movieCoverPhotos = pgTable(
+	'movie_cover_photos',
+	{
+		userMovieId: text('user_movie_id')
+			.primaryKey()
+			.references(() => userMovies.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		contentType: text('content_type').notNull(),
+		data: bytea('data').notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(table) => [
+		pgPolicy('movie_cover_photos_all', {
+			for: 'all',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`,
+			withCheck: sql`${table.userId} = ${currentUserId}`
 		})
 	]
 );
