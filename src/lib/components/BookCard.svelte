@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { BookOpen, X } from 'phosphor-svelte';
+	import { BookOpen, FilmSlate, X } from 'phosphor-svelte';
 
 	interface Props {
 		title: string;
@@ -10,6 +10,8 @@
 		isAvailable?: boolean;
 		/** "Copy 2 of 3" — solo variant 'grid', cuando hay más de una copia del mismo libro */
 		copyLabel?: string;
+		/** Marca la portada con un icono de película (listas que mezclan libros y películas) */
+		isMovie?: boolean;
 		/** Modo de presentación:
 		 *  - 'grid'   → portada vertical con título y autor debajo (biblioteca, grid)
 		 *  - 'list'   → fila horizontal con portada pequeña (resultados de búsqueda)
@@ -28,6 +30,7 @@
 		publishYear = null,
 		isAvailable = true,
 		copyLabel,
+		isMovie = false,
 		variant = 'grid',
 		href,
 		onclick
@@ -60,6 +63,14 @@
 			<div class="flex h-full items-center justify-center p-2">
 				<span class="text-center font-serif text-xs leading-snug text-ink-faint">{title}</span>
 			</div>
+		{/if}
+		{#if isMovie}
+			<span
+				class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white"
+				title="Movie"
+			>
+				<FilmSlate size={11} weight="fill" />
+			</span>
 		{/if}
 		{#if !isAvailable}
 			<div

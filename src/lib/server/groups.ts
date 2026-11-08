@@ -11,7 +11,8 @@ import {
 	tags,
 	userBooks,
 	books,
-	userBookTags
+	userBookTags,
+	userMovieTags
 } from './db/schema';
 import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
@@ -47,6 +48,7 @@ export type SharedTagWithBooks = {
 	ownerName: string;
 	ownerId: string;
 	bookCount: number;
+	movieCount: number;
 };
 
 export type GroupBookResult = {
@@ -339,7 +341,21 @@ export async function getSharedTagsInGroup(
 			bookCountMap.set(bt.tagId, (bookCountMap.get(bt.tagId) ?? 0) + 1);
 		}
 
-		return rows.map((row) => ({ ...row, bookCount: bookCountMap.get(row.tagId) ?? 0 }));
+		// Lo mismo para películas (user_movie_tags_select_in_group)
+		const allMovieTags = await tx
+			.select({ tagId: userMovieTags.tagId })
+			.from(userMovieTags)
+			.where(inArray(userMovieTags.tagId, tagIds));
+		const movieCountMap = new Map<string, number>();
+		for (const mt of allMovieTags) {
+			movieCountMap.set(mt.tagId, (movieCountMap.get(mt.tagId) ?? 0) + 1);
+		}
+
+		return rows.map((row) => ({
+			...row,
+			bookCount: bookCountMap.get(row.tagId) ?? 0,
+			movieCount: movieCountMap.get(row.tagId) ?? 0
+		}));
 	});
 }
 

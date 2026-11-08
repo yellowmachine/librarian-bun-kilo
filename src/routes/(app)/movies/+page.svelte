@@ -5,6 +5,7 @@
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { readableTagTextColor } from '$lib/tagColor';
+	import type { UserMovieWithDetails } from '$lib/server/movies';
 	import {
 		MEDIA_FORMATS,
 		MEDIA_FORMAT_LABELS,
@@ -13,7 +14,29 @@
 	} from '$lib/mediaFormat';
 
 	let { data } = $props();
-	const { userMovies, userLibraries, libraryId } = $derived(data);
+	const { userMovies, othersMovies, userLibraries, libraryId } = $derived(data);
+
+	// svelte-ignore state_referenced_locally
+	let activeTab = $state<'mine' | 'others'>(data.tab);
+	let ownerFilter = $state('');
+
+	// La pestaña elegida decide la lista; los filtros son los mismos para las dos.
+	type Row = UserMovieWithDetails & { ownerName?: string };
+	const source: Row[] = $derived(activeTab === 'mine' ? userMovies : othersMovies);
+
+	const owners = $derived(
+		othersMovies
+			.map((m) => ({ id: m.ownerId, name: m.ownerName }))
+			.filter((o, i, all) => all.findIndex((x) => x.id === o.id) === i)
+			.sort((a, b) => a.name.localeCompare(b.name))
+	);
+
+	function switchTab(tab: 'mine' | 'others') {
+		activeTab = tab;
+		activeTagIds.clear();
+		activeFormat = null;
+		ownerFilter = '';
+	}
 
 	const heading = $derived(
 		libraryId ? (userLibraries.find((lib) => lib.id === libraryId)?.name ?? 'Movies') : 'Movies'
@@ -25,7 +48,7 @@
 
 	// Etiquetas presentes en la videoteca, para filtrar
 	const tagsInUse = $derived(
-		userMovies
+		source
 			.flatMap((m) => m.tags)
 			.filter((tag, i, all) => all.findIndex((t) => t.id === tag.id) === i)
 			.sort((a, b) => a.name.localeCompare(b.name))
@@ -44,12 +67,11 @@
 	}
 
 	// Solo se ofrecen como filtro los formatos que el usuario tiene.
-	const formatsInUse = $derived(
-		MEDIA_FORMATS.filter((f) => userMovies.some((m) => m.format === f))
-	);
+	const formatsInUse = $derived(MEDIA_FORMATS.filter((f) => source.some((m) => m.format === f)));
 
 	const filtered = $derived.by(() => {
-		let list = userMovies;
+		let list = source;
+		if (activeTab === 'others' && ownerFilter) list = list.filter((m) => m.ownerId === ownerFilter);
 		if (activeFormat) list = list.filter((m) => m.format === activeFormat);
 		if (activeTagIds.size > 0)
 			list = list.filter((m) => m.tags.some((t) => activeTagIds.has(t.id)));
@@ -59,7 +81,8 @@
 				(m) =>
 					normalize(m.title).includes(q) ||
 					(m.originalTitle && normalize(m.originalTitle).includes(q)) ||
-					m.directors.some((d) => normalize(d).includes(q))
+					m.directors.some((d) => normalize(d).includes(q)) ||
+					(m.ownerName !== undefined && normalize(m.ownerName).includes(q))
 			);
 		}
 		return list;
@@ -70,7 +93,7 @@
 	<div class="flex items-end justify-between gap-4">
 		<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{heading}</h1>
 		<div class="flex shrink-0 items-center gap-2">
-			{#if userLibraries.length > 1}
+			{#if activeTab === 'mine' && userLibraries.length > 1}
 				<select
 					aria-label="Library"
 					value={libraryId ?? ''}
@@ -96,8 +119,38 @@
 		</div>
 	</div>
 
-	{#if userMovies.length > 0}
+	<div class="flex border-b border-paper-border">
+		{#each [{ key: 'mine', label: 'My movies', count: userMovies.length }, { key: 'others', label: 'From others', count: othersMovies.length }] as tab (tab.key)}
+			<button
+				onclick={() => switchTab(tab.key as 'mine' | 'others')}
+				class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
+				{activeTab === tab.key
+					? 'border-ink font-medium text-ink'
+					: 'border-transparent text-ink-faint hover:text-ink-muted'}"
+			>
+				{tab.label}
+				<span class="text-xs {activeTab === tab.key ? 'text-ink-muted' : 'text-ink-faint'}">
+					{tab.count}
+				</span>
+			</button>
+		{/each}
+	</div>
+
+	{#if source.length > 0}
 		<div class="space-y-3">
+			{#if activeTab === 'others' && owners.length > 1}
+				<select
+					aria-label="Owner"
+					bind:value={ownerFilter}
+					class="border border-paper-border bg-paper px-3 py-1.5 text-sm text-ink-muted focus:border-ink focus:ring-0"
+				>
+					<option value="">Everyone</option>
+					{#each owners as owner (owner.id)}
+						<option value={owner.id}>{owner.name}</option>
+					{/each}
+				</select>
+			{/if}
+
 			{#if tagsInUse.length > 0}
 				<div class="flex flex-wrap gap-1.5">
 					{#each tagsInUse as tag (tag.id)}
@@ -161,7 +214,9 @@
 				<input
 					type="search"
 					bind:value={search}
-					placeholder="Search by title or director..."
+					placeholder={activeTab === 'mine'
+						? 'Search by title or director...'
+						: 'Search by title, director or owner...'}
 					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
 				/>
 			</div>
@@ -178,11 +233,23 @@
 					coverUrl: m.coverUrl,
 					publishYear: m.releaseYear,
 					isAvailable: m.isAvailable,
-					copyLabel: formatLine(m.format, m.edition),
+					copyLabel:
+						m.ownerName !== undefined
+							? `${formatLine(m.format, m.edition)} · ${m.ownerName}`
+							: formatLine(m.format, m.edition),
 					href: `/movies/${m.userMovieId}`
 				}))}
 			/>
 		{/if}
+	{:else if activeTab === 'others'}
+		<div class="flex flex-col items-center justify-center py-24 text-center">
+			<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
+			<p class="max-w-sm text-sm text-ink-faint">
+				Nobody has shared movies with you yet. They show up here when someone in one of your groups
+				shares a tag their movies carry.
+			</p>
+			<a href="/groups" class="mt-4 text-sm text-ink underline underline-offset-2">Your groups</a>
+		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center py-24 text-center">
 			<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>

@@ -6,7 +6,8 @@ import {
 	updateUserMovie,
 	removeMovie,
 	applyMovieTags,
-	removeMovieTag
+	removeMovieTag,
+	forViewer
 } from '$lib/server/movies';
 import { withRLS } from '$lib/server/db/rls';
 import { hasOpenRouterApiKey } from '$lib/server/openrouterKey';
@@ -28,10 +29,17 @@ export const load = async ({ locals, params }: RequestEvent) => {
 		),
 		hasOpenRouterApiKey(userId)
 	]);
-	// Las películas de otros (visibles por grupo) tendrán su ficha de solo
-	// lectura más adelante; de momento, aquí solo entra el dueño.
-	if (!movie || movie.ownerId !== userId) error(404, 'Movie not found in your library');
-	return { movie, userLibraries, userTags, hasAiKey };
+	// También entra quien la ve por un grupo: ficha de solo lectura, sin lo
+	// privado del dueño (notas, biblioteca). La RLS decide quién la ve.
+	if (!movie) error(404, 'Movie not found');
+	const isOwner = movie.ownerId === userId;
+	return {
+		movie: forViewer(movie, userId),
+		isOwner,
+		userLibraries: isOwner ? userLibraries : [],
+		userTags: isOwner ? userTags : [],
+		hasAiKey: isOwner && hasAiKey
+	};
 };
 
 function optionalText(data: FormData, name: string, max: number): string | null {

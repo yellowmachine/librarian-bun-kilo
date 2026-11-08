@@ -6,6 +6,7 @@
 	interface PageData {
 		book?: { title?: string; libraryId?: string | null };
 		movie?: { title?: string; libraryId?: string | null };
+		isOwner?: boolean;
 		userLibraries?: { id: string; name: string }[];
 		group?: { name?: string };
 		loan?: { title?: string };
@@ -24,6 +25,12 @@
 				return [{ label: 'Movies', href: '/movies' }, { label: 'Add movie' }];
 			}
 			if (/^\/movies\/[^/]+$/.test(path)) {
+				if (data.isOwner === false) {
+					return [
+						{ label: 'Movies · From others', href: '/movies?tab=others' },
+						{ label: data.movie?.title ?? '…' }
+					];
+				}
 				const library = data.userLibraries?.find((lib) => lib.id === data.movie?.libraryId);
 				return [
 					{

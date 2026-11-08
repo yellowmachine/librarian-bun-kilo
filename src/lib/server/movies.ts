@@ -3,9 +3,17 @@
 // copia tapan los del catálogo (COALESCE), y en las altas manuales son los
 // únicos que hay.
 import { nanoid } from 'nanoid';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, ne, desc, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { movies, userMovies, libraries, movieCoverPhotos, tags, userMovieTags } from './db/schema';
+import {
+	movies,
+	userMovies,
+	libraries,
+	movieCoverPhotos,
+	tags,
+	userMovieTags,
+	user
+} from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import type { TmdbMovie } from './tmdb';
@@ -236,23 +244,80 @@ async function loadTags(tx: typeof db, userMovieIds: string[]): Promise<Map<stri
 export async function getUserMovie(
 	userId: string,
 	userMovieId: string
-): Promise<(UserMovieWithDetails & { coverOverridden: boolean }) | null> {
+): Promise<(UserMovieWithDetails & { coverOverridden: boolean; ownerName: string }) | null> {
 	return withRLS(userId, async (tx) => {
 		const rows = await tx
 			.select({
 				...movieColumns,
 				// La copia lleva portada propia que tapa el póster del catálogo: la
 				// ficha lo usa para ofrecer "volver al póster de TMDB".
-				coverOverridden: sql<boolean>`(${userMovies.coverUrl} IS NOT NULL)`
+				coverOverridden: sql<boolean>`(${userMovies.coverUrl} IS NOT NULL)`,
+				ownerName: user.name
 			})
 			.from(userMovies)
 			.leftJoin(movies, eq(userMovies.movieId, movies.id))
+			.innerJoin(user, eq(userMovies.userId, user.id))
 			.where(eq(userMovies.id, userMovieId));
 
 		if (rows.length === 0) return null;
 		const tagsByMovie = await loadTags(tx, [userMovieId]);
 		return { ...withArrays(rows[0]), tags: tagsByMovie.get(userMovieId) ?? [] };
 	});
+}
+
+// ─── Películas de otros ───────────────────────────────────────────────────────
+// Las que la RLS deja ver de otros usuarios: las que llevan una etiqueta
+// compartida con algún grupo del usuario. Sus etiquetas, igual: solo las
+// compartidas. Las notas y la biblioteca son del dueño y no salen.
+
+export type OthersMovie = UserMovieWithDetails & { ownerName: string };
+
+function withoutPrivate<T extends UserMovieWithDetails>(movie: T): T {
+	return { ...movie, notes: null, libraryId: '' };
+}
+
+async function visibleMovies(
+	userId: string,
+	opts: { excludeOwn: boolean; order: 'title' | 'recent'; limit: number }
+): Promise<OthersMovie[]> {
+	return withRLS(userId, async (tx) => {
+		const rows = await tx
+			.select({ ...movieColumns, ownerName: user.name })
+			.from(userMovies)
+			.leftJoin(movies, eq(userMovies.movieId, movies.id))
+			.innerJoin(user, eq(userMovies.userId, user.id))
+			.where(opts.excludeOwn ? ne(userMovies.userId, userId) : undefined)
+			.orderBy(
+				opts.order === 'recent'
+					? desc(userMovies.addedAt)
+					: sql`lower(COALESCE(${userMovies.title}, ${movies.title})) ASC`
+			)
+			.limit(opts.limit);
+
+		const tagsByMovie = await loadTags(
+			tx,
+			rows.map((r) => r.userMovieId)
+		);
+		return rows.map((row) => {
+			const movie = { ...withArrays(row), tags: tagsByMovie.get(row.userMovieId) ?? [] };
+			return row.ownerId === userId ? movie : withoutPrivate(movie);
+		});
+	});
+}
+
+/** Películas de otros visibles por grupo, por título. */
+export function getMoviesFromOthers(userId: string, limit = 500): Promise<OthersMovie[]> {
+	return visibleMovies(userId, { excludeOwn: true, order: 'title', limit });
+}
+
+/** Últimas películas añadidas que el usuario puede ver (como getGroupRecentBooks). */
+export function getRecentVisibleMovies(userId: string, limit = 50): Promise<OthersMovie[]> {
+	return visibleMovies(userId, { excludeOwn: false, order: 'recent', limit });
+}
+
+/** Para la ficha: lo que ve quien no es el dueño, sin lo privado. */
+export function forViewer<T extends UserMovieWithDetails>(movie: T, viewerId: string): T {
+	return movie.ownerId === viewerId ? movie : withoutPrivate(movie);
 }
 
 // ─── Duplicados ───────────────────────────────────────────────────────────────

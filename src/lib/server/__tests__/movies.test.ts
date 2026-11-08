@@ -25,7 +25,10 @@ import {
 	saveCoverPhoto,
 	getCoverPhoto,
 	applyMovieTags,
-	removeMovieTag
+	removeMovieTag,
+	getMoviesFromOthers,
+	getRecentVisibleMovies,
+	forViewer
 } from '../movies';
 import { deleteLibrary, createLibrary } from '../libraries';
 import type { TmdbMovie } from '../tmdb';
@@ -234,5 +237,59 @@ describe('videoteca', () => {
 			'Movie not found.'
 		);
 		await expect(removeMovieTag(ALICE, id, 'x')).rejects.toThrow('Movie not found.');
+	});
+});
+
+describe('películas de otros', () => {
+	// Bob tiene dos películas; «Alien» lleva su etiqueta «Cine», compartida con
+	// el grupo de Alice y Bob, y otra privada «Notas». «Privada» no se comparte.
+	let shared: string;
+	let hidden: string;
+
+	beforeEach(async () => {
+		shared = await addMovieToLibrary(
+			BOB,
+			{ movieId: null, title: 'Alien' },
+			{ format: 'bluray', notes: 'Rayado el disco 2' }
+		);
+		hidden = await addMovieToLibrary(BOB, { movieId: null, title: 'Privada' }, { format: 'dvd' });
+		await applyMovieTags(BOB, shared, [], [{ name: 'Cine' }, { name: 'Notas' }]);
+		const seed = [
+			`INSERT INTO groups (id, name, created_by) VALUES ('grp', 'Club', '${BOB}')`,
+			`INSERT INTO group_members (group_id, user_id, role) VALUES ('grp', '${BOB}', 'owner'), ('grp', '${ALICE}', 'member')`,
+			`INSERT INTO shared_tags (id, tag_id, group_id, shared_by) SELECT 'st', id, 'grp', '${BOB}' FROM tags WHERE name = 'Cine'`
+		];
+		await holder.tdb.asSuperuser(async (tx) => {
+			for (const stmt of seed) await tx.execute(stmt as string);
+		});
+	});
+
+	it('solo las compartidas, con su dueño, sin notas y solo con etiquetas compartidas', async () => {
+		await addMovieToLibrary(ALICE, { movieId: null, title: 'Mía' }, { format: 'dvd' });
+		const others = await getMoviesFromOthers(ALICE);
+
+		expect(others.map((m) => m.userMovieId)).toEqual([shared]);
+		expect(others[0]).toMatchObject({
+			title: 'Alien',
+			ownerName: 'Bob',
+			notes: null,
+			libraryId: ''
+		});
+		expect(others[0].tags.map((t) => t.name)).toEqual(['Cine']);
+		expect(others.some((m) => m.userMovieId === hidden)).toBe(false);
+	});
+
+	it('la actividad incluye las propias y las compartidas, de la más reciente a la más antigua', async () => {
+		const mine = await addMovieToLibrary(ALICE, { movieId: null, title: 'Mía' }, { format: 'dvd' });
+		const recent = await getRecentVisibleMovies(ALICE);
+		expect(recent.map((m) => m.userMovieId)).toEqual([mine, shared]);
+	});
+
+	it('la ficha de otro: visible si se comparte, sin lo privado', async () => {
+		const movie = await getUserMovie(ALICE, shared);
+		expect(movie?.ownerName).toBe('Bob');
+		expect(forViewer(movie!, ALICE).notes).toBeNull();
+		expect(forViewer(movie!, BOB).notes).toBe('Rayado el disco 2');
+		expect(await getUserMovie(ALICE, hidden)).toBeNull();
 	});
 });

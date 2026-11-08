@@ -173,7 +173,13 @@
 									{st.tagName}
 								</span>
 								<span class="text-sm text-ink-muted">{st.ownerName}</span>
-								<span class="ml-auto text-xs text-ink-faint">{st.bookCount} books</span>
+								<span class="ml-auto text-xs text-ink-faint">
+									{st.bookCount}
+									{st.bookCount === 1 ? 'book' : 'books'}
+									{#if st.movieCount > 0}
+										· {st.movieCount} {st.movieCount === 1 ? 'movie' : 'movies'}
+									{/if}
+								</span>
 							</li>
 						{/each}
 					</ul>
