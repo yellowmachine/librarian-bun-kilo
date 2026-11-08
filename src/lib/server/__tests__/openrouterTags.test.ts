@@ -80,3 +80,40 @@ describe('suggestTagsForBook', () => {
 		expect(await suggestTagsForBook('key', BOOK, ['Infantil'])).toEqual(none);
 	});
 });
+
+describe('suggestTagsForBook · películas', () => {
+	function promptOf(fetchMock: ReturnType<typeof vi.spyOn>): string {
+		const init = fetchMock.mock.calls[0][1] as RequestInit;
+		return JSON.parse(init.body as string).messages[0].content;
+	}
+
+	it('describe la obra como película, con directores y géneros', async () => {
+		const fetchMock = vi
+			.spyOn(global, 'fetch')
+			.mockResolvedValueOnce(modelReply('{"existing": ["Cine"], "new": []}'));
+
+		const result = await suggestTagsForBook(
+			'key',
+			{ kind: 'movie', title: 'Alien', authors: ['Ridley Scott'], subjects: ['Terror'] },
+			['Cine']
+		);
+
+		expect(result).toEqual({ existing: ['Cine'], proposed: [] });
+		const prompt = promptOf(fetchMock);
+		expect(prompt).toContain('this movie in their home video collection');
+		expect(prompt).toContain('Director(s): Ridley Scott');
+		expect(prompt).toContain('Genres: Terror');
+		expect(prompt).toContain('other books and movies too');
+		expect(prompt).not.toContain('Author(s)');
+	});
+
+	it('los libros siguen describiéndose como libros', async () => {
+		const fetchMock = vi
+			.spyOn(global, 'fetch')
+			.mockResolvedValueOnce(modelReply('{"existing": [], "new": []}'));
+		await suggestTagsForBook('key', BOOK, []);
+		const prompt = promptOf(fetchMock);
+		expect(prompt).toContain('this book in their personal library');
+		expect(prompt).toContain('Author(s): Roald Dahl');
+	});
+});

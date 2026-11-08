@@ -3,9 +3,9 @@
 // copia tapan los del catálogo (COALESCE), y en las altas manuales son los
 // únicos que hay.
 import { nanoid } from 'nanoid';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { movies, userMovies, libraries, movieCoverPhotos } from './db/schema';
+import { movies, userMovies, libraries, movieCoverPhotos, tags, userMovieTags } from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import type { TmdbMovie } from './tmdb';
@@ -145,7 +145,10 @@ export type UserMovieWithDetails = {
 	isAvailable: boolean;
 	notes: string | null;
 	addedAt: Date;
+	tags: MovieTag[];
 };
+
+export type MovieTag = { id: string; name: string; color: string | null };
 
 export type MovieFilter = { type: 'all' } | { type: 'library'; libraryId: string };
 
@@ -169,7 +172,7 @@ const movieColumns = {
 	addedAt: userMovies.addedAt
 };
 
-type MovieRow = Omit<UserMovieWithDetails, 'directors' | 'genres'> & {
+type MovieRow = Omit<UserMovieWithDetails, 'directors' | 'genres' | 'tags'> & {
 	directors: string[] | null;
 	genres: string[] | null;
 };
@@ -195,8 +198,39 @@ export async function getUserMovies(
 			.where(where)
 			.orderBy(sql`lower(COALESCE(${userMovies.title}, ${movies.title})) ASC`, userMovies.addedAt);
 
-		return rows.map(withArrays);
+		const tagsByMovie = await loadTags(
+			tx,
+			rows.map((r) => r.userMovieId)
+		);
+		return rows.map((row) => ({
+			...withArrays(row),
+			tags: tagsByMovie.get(row.userMovieId) ?? []
+		}));
 	});
+}
+
+// Etiquetas de varias copias en una consulta. La RLS de user_movie_tags ya
+// filtra: el dueño ve todas las suyas; un miembro de grupo, solo las compartidas.
+async function loadTags(tx: typeof db, userMovieIds: string[]): Promise<Map<string, MovieTag[]>> {
+	const byMovie = new Map<string, MovieTag[]>();
+	if (userMovieIds.length === 0) return byMovie;
+	const rows = await tx
+		.select({
+			userMovieId: userMovieTags.userMovieId,
+			id: tags.id,
+			name: tags.name,
+			color: tags.color
+		})
+		.from(userMovieTags)
+		.innerJoin(tags, eq(userMovieTags.tagId, tags.id))
+		.where(inArray(userMovieTags.userMovieId, userMovieIds))
+		.orderBy(tags.name);
+	for (const { userMovieId, ...tag } of rows) {
+		const list = byMovie.get(userMovieId) ?? [];
+		list.push(tag);
+		byMovie.set(userMovieId, list);
+	}
+	return byMovie;
 }
 
 export async function getUserMovie(
@@ -215,7 +249,9 @@ export async function getUserMovie(
 			.leftJoin(movies, eq(userMovies.movieId, movies.id))
 			.where(eq(userMovies.id, userMovieId));
 
-		return rows.length > 0 ? withArrays(rows[0]) : null;
+		if (rows.length === 0) return null;
+		const tagsByMovie = await loadTags(tx, [userMovieId]);
+		return { ...withArrays(rows[0]), tags: tagsByMovie.get(userMovieId) ?? [] };
 	});
 }
 
@@ -224,7 +260,11 @@ export async function getUserMovie(
 // DVD y en Blu-ray es justo lo que hace un coleccionista.
 
 function normalizeText(s: string): string {
-	return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+	return s
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.trim();
 }
 
 export type MovieDuplicateMatch = {
@@ -346,5 +386,75 @@ export async function getCoverPhoto(
 export async function removeMovie(userId: string, userMovieId: string): Promise<void> {
 	await withRLS(userId, async (tx) => {
 		await tx.delete(userMovies).where(eq(userMovies.id, userMovieId));
+	});
+}
+
+// ─── Etiquetas ────────────────────────────────────────────────────────────────
+// Las mismas etiquetas que los libros. Todas las operaciones comprueban que la
+// copia es del usuario (además de la RLS, que exige película Y etiqueta propias).
+
+async function assertOwnMovie(tx: typeof db, userId: string, userMovieId: string): Promise<void> {
+	const own = await tx
+		.select({ id: userMovies.id })
+		.from(userMovies)
+		.where(and(eq(userMovies.id, userMovieId), eq(userMovies.userId, userId)));
+	if (own.length === 0) throw new Error('Movie not found.');
+}
+
+/**
+ * Asigna etiquetas existentes (tagIds, solo las del usuario) y crea las nuevas
+ * (newNames; si ya hay una con ese nombre, sin distinguir mayúsculas, se
+ * reutiliza). Devuelve los ids asignados.
+ */
+export async function applyMovieTags(
+	userId: string,
+	userMovieId: string,
+	tagIds: string[],
+	newTags: { name: string; color?: string | null }[] = []
+): Promise<string[]> {
+	return withRLS(userId, async (tx) => {
+		await assertOwnMovie(tx, userId, userMovieId);
+
+		const userTags = await tx
+			.select({ id: tags.id, name: tags.name })
+			.from(tags)
+			.where(eq(tags.userId, userId));
+		const ownIds = new Set(userTags.map((t) => t.id));
+		const toAssign = new Set(tagIds.filter((id) => ownIds.has(id)));
+
+		for (const { name: raw, color } of newTags) {
+			const name = raw.trim().slice(0, 50);
+			if (!name) continue;
+			const existing = userTags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+			if (existing) {
+				toAssign.add(existing.id);
+				continue;
+			}
+			const id = nanoid();
+			await tx.insert(tags).values({ id, userId, name, color: color ?? null });
+			userTags.push({ id, name });
+			toAssign.add(id);
+		}
+
+		if (toAssign.size > 0) {
+			await tx
+				.insert(userMovieTags)
+				.values([...toAssign].map((tagId) => ({ userMovieId, tagId })))
+				.onConflictDoNothing();
+		}
+		return [...toAssign];
+	});
+}
+
+export async function removeMovieTag(
+	userId: string,
+	userMovieId: string,
+	tagId: string
+): Promise<void> {
+	await withRLS(userId, async (tx) => {
+		await assertOwnMovie(tx, userId, userMovieId);
+		await tx
+			.delete(userMovieTags)
+			.where(and(eq(userMovieTags.userMovieId, userMovieId), eq(userMovieTags.tagId, tagId)));
 	});
 }

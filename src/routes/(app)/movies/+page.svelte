@@ -21,7 +21,10 @@
 	let activeFormat = $state<MediaFormat | null>(null);
 
 	function normalize(s: string) {
-		return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+		return s
+			.normalize('NFD')
+			.replace(/[\u0300-\u036f]/g, '')
+			.toLowerCase();
 	}
 
 	// Solo se ofrecen como filtro los formatos que el usuario tiene.

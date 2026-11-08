@@ -29,6 +29,13 @@
       "when": 1794158636810,
       "tag": "0003_movie_cover_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794159486885,
+      "tag": "0004_movie_tags",
+      "breakpoints": true
     }
   ]
 }

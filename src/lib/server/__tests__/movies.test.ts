@@ -23,7 +23,9 @@ import {
 	updateUserMovie,
 	removeMovie,
 	saveCoverPhoto,
-	getCoverPhoto
+	getCoverPhoto,
+	applyMovieTags,
+	removeMovieTag
 } from '../movies';
 import { deleteLibrary, createLibrary } from '../libraries';
 import type { TmdbMovie } from '../tmdb';
@@ -194,5 +196,43 @@ describe('videoteca', () => {
 		});
 		await removeMovie(ALICE, id);
 		expect(await getCoverPhoto(ALICE, id)).toBeNull();
+	});
+
+	it('etiqueta con existentes y nuevas, reutilizando por nombre y sin tocar etiquetas ajenas', async () => {
+		const id = await addMovieToLibrary(ALICE, { movieId: null, title: 'Alien' }, { format: 'dvd' });
+		await holder.tdb.asSuperuser((tx) =>
+			tx.execute(
+				`INSERT INTO tags (id, user_id, name) VALUES
+					('t-terror', '${ALICE}', 'Terror'),
+					('t-bob', '${BOB}', 'De Bob')` as string
+			)
+		);
+
+		const assigned = await applyMovieTags(
+			ALICE,
+			id,
+			['t-terror', 't-bob'],
+			[
+				{ name: 'terror' }, // ya existe (otra caja): se reutiliza
+				{ name: 'Ciencia ficción', color: '#123456' }
+			]
+		);
+		expect(assigned).toHaveLength(2);
+		expect(assigned).not.toContain('t-bob');
+
+		const movie = await getUserMovie(ALICE, id);
+		expect(movie?.tags.map((t) => t.name)).toEqual(['Ciencia ficción', 'Terror']);
+		expect((await getUserMovies(ALICE))[0].tags).toHaveLength(2);
+
+		await removeMovieTag(ALICE, id, 't-terror');
+		expect((await getUserMovie(ALICE, id))?.tags.map((t) => t.name)).toEqual(['Ciencia ficción']);
+	});
+
+	it('no deja etiquetar ni desetiquetar una película ajena', async () => {
+		const id = await addMovieToLibrary(BOB, { movieId: null, title: 'De Bob' }, { format: 'dvd' });
+		await expect(applyMovieTags(ALICE, id, [], [{ name: 'Mía' }])).rejects.toThrow(
+			'Movie not found.'
+		);
+		await expect(removeMovieTag(ALICE, id, 'x')).rejects.toThrow('Movie not found.');
 	});
 });

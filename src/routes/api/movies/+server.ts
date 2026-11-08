@@ -4,6 +4,7 @@ import * as v from 'valibot';
 import {
 	MEDIA_FORMATS,
 	addMovieToLibrary,
+	applyMovieTags,
 	findDuplicateUserMovie,
 	upsertMovie
 } from '$lib/server/movies';
@@ -29,7 +30,17 @@ const AddMovieSchema = v.pipe(
 		),
 		notes: text(1000),
 		libraryId: text(64),
-		allowDuplicate: v.optional(v.boolean())
+		allowDuplicate: v.optional(v.boolean()),
+		// Etiquetas: existentes (ids) y nuevas, como en POST /api/books
+		tagsToAdd: v.optional(v.array(v.pipe(v.string(), v.trim(), v.maxLength(100)))),
+		tagsToCreate: v.optional(
+			v.array(
+				v.object({
+					name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50)),
+					color: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(20))))
+				})
+			)
+		)
 	}),
 	v.check(({ movieId, title }) => Boolean(movieId || title), 'A movieId or a title is required.')
 );
@@ -47,6 +58,17 @@ export async function POST({ locals, request }: RequestEvent) {
 	const result = v.safeParse(AddMovieSchema, raw);
 	if (!result.success) error(400, result.issues[0].message);
 	const body = result.output;
+
+	// Las etiquetas van tras el alta, en su propia transacción: si fallan, la
+	// película queda añadida igualmente (el usuario puede etiquetarla en su ficha).
+	const tagIds = body.tagsToAdd ?? [];
+	const newTags = body.tagsToCreate ?? [];
+	async function tagNewMovie(userMovieId: string) {
+		if (tagIds.length === 0 && newTags.length === 0) return;
+		await applyMovieTags(userId, userMovieId, tagIds, newTags).catch((e) =>
+			console.error('POST /api/movies: tagging failed', e)
+		);
+	}
 
 	try {
 		const copy = {
@@ -71,6 +93,7 @@ export async function POST({ locals, request }: RequestEvent) {
 			if (!movie) error(404, 'Movie not found on TMDB');
 			const movieId = await upsertMovie(movie);
 			const userMovieId = await addMovieToLibrary(userId, { movieId }, copy);
+			await tagNewMovie(userMovieId);
 			return json({ userMovieId, movieId, title: movie.title }, { status: 201 });
 		}
 
@@ -96,6 +119,7 @@ export async function POST({ locals, request }: RequestEvent) {
 			},
 			copy
 		);
+		await tagNewMovie(userMovieId);
 		return json({ userMovieId, movieId: null, title }, { status: 201 });
 	} catch (e) {
 		if (isHttpError(e)) throw e;

@@ -1,16 +1,35 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { getUserMovie, updateUserMovie, removeMovie } from '$lib/server/movies';
+import { eq } from 'drizzle-orm';
+import {
+	getUserMovie,
+	updateUserMovie,
+	removeMovie,
+	applyMovieTags,
+	removeMovieTag
+} from '$lib/server/movies';
+import { withRLS } from '$lib/server/db/rls';
+import { tags } from '$lib/server/db/schema';
 import { getUserLibraries } from '$lib/server/libraries';
 import { isMediaFormat } from '$lib/mediaFormat';
 
 export const load = async ({ locals, params }: RequestEvent) => {
-	const [movie, userLibraries] = await Promise.all([
-		getUserMovie(locals.user!.id, params.id!),
-		getUserLibraries(locals.user!.id)
+	const userId = locals.user!.id;
+	const [movie, userLibraries, userTags] = await Promise.all([
+		getUserMovie(userId, params.id!),
+		getUserLibraries(userId),
+		withRLS(userId, (tx) =>
+			tx
+				.select({ id: tags.id, name: tags.name, color: tags.color })
+				.from(tags)
+				.where(eq(tags.userId, userId))
+				.orderBy(tags.name)
+		)
 	]);
-	if (!movie) error(404, 'Movie not found in your library');
-	return { movie, userLibraries };
+	// Las películas de otros (visibles por grupo) tendrán su ficha de solo
+	// lectura más adelante; de momento, aquí solo entra el dueño.
+	if (!movie || movie.ownerId !== userId) error(404, 'Movie not found in your library');
+	return { movie, userLibraries, userTags };
 };
 
 function optionalText(data: FormData, name: string, max: number): string | null {
@@ -63,8 +82,53 @@ export const actions = {
 		return { coverSaved: true };
 	},
 
+	// ── Etiquetas (TagCombobox manda name/color o tagId) ────────────────────
+	createTag: async ({ locals, params, request }: RequestEvent) => {
+		const data = await request.formData();
+		const name = (data.get('name') as string | null)?.trim();
+		if (!name) return fail(400, { error: 'Name is required' });
+		const color = (data.get('color') as string | null)?.trim() || null;
+		return tagAction(() => applyMovieTags(locals.user!.id, params.id!, [], [{ name, color }]));
+	},
+
+	addTag: async ({ locals, params, request }: RequestEvent) => {
+		const tagId = (await request.formData()).get('tagId') as string | null;
+		if (!tagId) return fail(400, { error: 'tagId is required' });
+		return tagAction(() => applyMovieTags(locals.user!.id, params.id!, [tagId]));
+	},
+
+	// Etiquetas sugeridas por la IA: existentes (tagId) y nuevas (newTag)
+	applyTags: async ({ locals, params, request }: RequestEvent) => {
+		const data = await request.formData();
+		const tagIds = data.getAll('tagId').map(String).filter(Boolean);
+		const newTags = data
+			.getAll('newTag')
+			.map((n) => ({ name: String(n) }))
+			.filter((t) => t.name.trim());
+		if (tagIds.length === 0 && newTags.length === 0)
+			return fail(400, { error: 'No tags to apply.' });
+		return tagAction(() => applyMovieTags(locals.user!.id, params.id!, tagIds, newTags));
+	},
+
+	removeTag: async ({ locals, params, request }: RequestEvent) => {
+		const tagId = (await request.formData()).get('tagId') as string | null;
+		if (!tagId) return fail(400, { error: 'tagId is required' });
+		return tagAction(() => removeMovieTag(locals.user!.id, params.id!, tagId));
+	},
+
 	remove: async ({ locals, params }: RequestEvent) => {
 		await removeMovie(locals.user!.id, params.id!);
 		redirect(303, '/movies');
 	}
 };
+
+async function tagAction(run: () => Promise<unknown>) {
+	try {
+		await run();
+	} catch (e) {
+		if (e instanceof Error && e.message === 'Movie not found.')
+			return fail(404, { error: e.message });
+		throw e;
+	}
+	return { tagsUpdated: true };
+}

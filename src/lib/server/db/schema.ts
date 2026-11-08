@@ -63,6 +63,11 @@ const isGroupAdmin = (groupId: unknown, userId: unknown) =>
 	sql`is_group_admin(${groupId}, ${userId})`;
 const isGroupCreator = (groupId: unknown, userId: unknown) =>
 	sql`is_group_creator(${groupId}, ${userId})`;
+// Si la copia de película es del usuario, sin pasar por la RLS de user_movies:
+// su política de grupos lee user_movie_tags, y la de inserción de
+// user_movie_tags no puede leer user_movies sin entrar en recursión (42P17).
+const ownsUserMovie = (userMovieId: unknown, userId: unknown) =>
+	sql`owns_user_movie(${userMovieId}, ${userId})`;
 
 // ─── Books ────────────────────────────────────────────────────────────────────
 
@@ -260,7 +265,7 @@ export const movies = pgTable(
 // ─── User Movies ──────────────────────────────────────────────────────────────
 // Cada fila es una copia física (DVD, Blu-ray…) de un usuario. Comparte las
 // bibliotecas con los libros: «Casa» u «Oficina» son sitios, no tipos de cosa.
-// De momento solo la ve su dueño; grupos y préstamos llegarán más adelante.
+// La ve su dueño y, si lleva una etiqueta compartida, los miembros de ese grupo.
 
 export const userMovies = pgTable(
 	'user_movies',
@@ -307,6 +312,19 @@ export const userMovies = pgTable(
 			to: appUser,
 			using: sql`${table.userId} = ${currentUserId}`
 		}),
+		// Igual que los libros: un miembro de un grupo ve las películas que
+		// llevan una etiqueta compartida con ese grupo.
+		pgPolicy('user_movies_select_in_group', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from user_movie_tags umt
+				join shared_tags st on st.tag_id = umt.tag_id
+				join group_members gm on gm.group_id = st.group_id
+				where umt.user_movie_id = ${table.id}
+				  and gm.user_id = ${currentUserId}
+			)`
+		}),
 		pgPolicy('user_movies_insert', {
 			for: 'insert',
 			to: appUser,
@@ -352,11 +370,27 @@ export const movieCoverPhotos = pgTable(
 		createdAt: timestamp('created_at').defaultNow().notNull()
 	},
 	(table) => [
-		pgPolicy('movie_cover_photos_all', {
-			for: 'all',
+		// La ve quien pueda ver la película (la subconsulta pasa por la RLS de
+		// user_movies: dueño, grupos…); si no, a los demás les saldría rota.
+		pgPolicy('movie_cover_photos_select', {
+			for: 'select',
 			to: appUser,
-			using: sql`${table.userId} = ${currentUserId}`,
+			using: sql`exists (select 1 from user_movies um where um.id = ${table.userMovieId})`
+		}),
+		pgPolicy('movie_cover_photos_insert', {
+			for: 'insert',
+			to: appUser,
 			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_cover_photos_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_cover_photos_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
 		})
 	]
 );
@@ -454,6 +488,67 @@ export const userBookTags = pgTable(
 			)`
 		}),
 		pgPolicy('user_book_tags_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`exists (
+				select 1 from tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			)`
+		})
+	]
+);
+
+// ─── User Movie Tags ──────────────────────────────────────────────────────────
+// Mismas etiquetas que los libros: compartir una con un grupo comparte los
+// libros Y las películas que la llevan.
+//
+// A diferencia de user_book_tags, insertar exige que la película también sea
+// tuya (no solo la etiqueta): si no, se podría poner una etiqueta propia
+// compartida a una película ajena visible por un grupo y exponerla a otro.
+
+export const userMovieTags = pgTable(
+	'user_movie_tags',
+	{
+		userMovieId: text('user_movie_id')
+			.notNull()
+			.references(() => userMovies.id, { onDelete: 'cascade' }),
+		tagId: text('tag_id')
+			.notNull()
+			.references(() => tags.id, { onDelete: 'cascade' })
+	},
+	(table) => [
+		uniqueIndex('user_movie_tags_pk').on(table.userMovieId, table.tagId),
+		index('user_movie_tags_tag_idx').on(table.tagId),
+		pgPolicy('user_movie_tags_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			)`
+		}),
+		pgPolicy('user_movie_tags_select_in_group', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from shared_tags st
+				join group_members gm on gm.group_id = st.group_id
+				where st.tag_id = ${table.tagId}
+				  and gm.user_id = ${currentUserId}
+			)`
+		}),
+		pgPolicy('user_movie_tags_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`exists (
+				select 1 from tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			) and ${ownsUserMovie(table.userMovieId, currentUserId)}`
+		}),
+		pgPolicy('user_movie_tags_delete', {
 			for: 'delete',
 			to: appUser,
 			using: sql`exists (
@@ -816,7 +911,8 @@ export const moviesRelations = relations(movies, ({ many }) => ({
 	userMovies: many(userMovies)
 }));
 
-export const userMoviesRelations = relations(userMovies, ({ one }) => ({
+export const userMoviesRelations = relations(userMovies, ({ one, many }) => ({
+	tags: many(userMovieTags),
 	user: one(user, { fields: [userMovies.userId], references: [user.id] }),
 	library: one(libraries, { fields: [userMovies.libraryId], references: [libraries.id] }),
 	movie: one(movies, { fields: [userMovies.movieId], references: [movies.id] })
@@ -825,12 +921,18 @@ export const userMoviesRelations = relations(userMovies, ({ one }) => ({
 export const tagsRelations = relations(tags, ({ one, many }) => ({
 	user: one(user, { fields: [tags.userId], references: [user.id] }),
 	userBookTags: many(userBookTags),
+	userMovieTags: many(userMovieTags),
 	sharedTags: many(sharedTags)
 }));
 
 export const userBookTagsRelations = relations(userBookTags, ({ one }) => ({
 	userBook: one(userBooks, { fields: [userBookTags.userBookId], references: [userBooks.id] }),
 	tag: one(tags, { fields: [userBookTags.tagId], references: [tags.id] })
+}));
+
+export const userMovieTagsRelations = relations(userMovieTags, ({ one }) => ({
+	userMovie: one(userMovies, { fields: [userMovieTags.userMovieId], references: [userMovies.id] }),
+	tag: one(tags, { fields: [userMovieTags.tagId], references: [tags.id] })
 }));
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({
