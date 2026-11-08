@@ -5,16 +5,19 @@ import {
 	removeOpenRouterApiKey,
 	setOpenRouterApiKey
 } from '$lib/server/openrouterKey';
+import { getMonthCostUsd } from '$lib/server/aiUsage';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const userId = locals.user!.id;
-	const [sent, hasKey] = await Promise.all([
+	const [sent, hasKey, monthCostUsd] = await Promise.all([
 		invitations.sentBy(userId),
-		hasOpenRouterApiKey(userId)
+		hasOpenRouterApiKey(userId),
+		getMonthCostUsd(userId)
 	]);
 	return {
 		hasKey,
+		monthCostUsd,
 		invitations: sent.map(({ token, ...i }) => ({
 			...i,
 			// El enlace solo mientras vale, para pasarlo a mano si el correo no llega.

@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, Tag, Trash, Star, PencilSimple, Sparkle } from 'phosphor-svelte';
+	import { ArrowLeft, Tag, Trash, PencilSimple, Sparkle } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import AuthorListInput from '$lib/components/AuthorListInput.svelte';
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
-	import StarRating from '$lib/components/StarRating.svelte';
+	import ReviewsSection from '$lib/components/ReviewsSection.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { readableTagTextColor } from '$lib/tagColor';
 	import type { BookSearchResult } from '$lib/types';
@@ -112,11 +112,6 @@
 	let movedTimer: ReturnType<typeof setTimeout>;
 
 	// Reseña
-	let reviewRating = $state(myReview?.rating ?? 0);
-	let reviewBody = $state(myReview?.body ?? '');
-	let reviewSavedOk = $state(false);
-	let reviewSavedTimer: ReturnType<typeof setTimeout>;
-	let showReviewForm = $state(!!myReview || false);
 
 	// Edit form state (manual books only)
 	let editOpen = $state(false);
@@ -219,25 +214,7 @@
 			clearTimeout(movedTimer);
 			movedTimer = setTimeout(() => (movedOk = false), 2500);
 		}
-		if (form?.reviewSaved) {
-			reviewSavedOk = true;
-			clearTimeout(reviewSavedTimer);
-			reviewSavedTimer = setTimeout(() => (reviewSavedOk = false), 2500);
-		}
-		if (form?.reviewDeleted) {
-			reviewRating = 0;
-			reviewBody = '';
-			showReviewForm = false;
-		}
 	});
-
-	function formatDate(date: Date | string) {
-		return new Date(date).toLocaleDateString('es-ES', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
 </script>
 
 <div class="mx-auto max-w-lg space-y-10">
@@ -863,133 +840,15 @@
 			</p>
 		</div>
 	{/if}
-	{#if book.bookId}
-		<div class="space-y-6 border-t border-paper-border pt-6">
-			<div class="flex items-center justify-between">
-				<div class="flex items-center gap-2">
-					<Star size={16} class="text-ink-faint" />
-					<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Reviews</span>
-				</div>
-				<div class="flex items-center gap-3">
-					{#if reviewStats && reviewStats.totalReviews > 0}
-						<div class="flex items-center gap-2">
-							<StarRating value={Math.round(reviewStats.averageRating ?? 0)} readonly size={16} />
-							<span class="text-xs text-ink-muted">
-								{reviewStats.averageRating?.toFixed(1)} · {reviewStats.totalReviews}
-								{reviewStats.totalReviews === 1 ? 'reseña' : 'reseñas'}
-							</span>
-						</div>
-					{/if}
-					<a
-						href={`/books/${book.bookId}/reviews`}
-						class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
-					>
-						See all →
-					</a>
-				</div>
-			</div>
-
-			<!-- Mi reseña -->
-			{#if !showReviewForm && !myReview}
-				<button
-					type="button"
-					onclick={() => (showReviewForm = true)}
-					class="text-sm text-ink-faint underline underline-offset-2 hover:text-ink"
-				>
-					Write a review
-				</button>
-			{/if}
-
-			{#if showReviewForm || myReview}
-				<div class="space-y-3 border border-paper-border p-4">
-					<p class="text-xs font-medium tracking-widest text-ink-muted uppercase">Your review</p>
-
-					{#if form?.reviewError}
-						<p class="text-xs text-red-600">{form.reviewError}</p>
-					{/if}
-
-					<form
-						method="POST"
-						action="?/saveReview"
-						use:enhance={() => {
-							return async ({ update }) => {
-								await update({ reset: false });
-							};
-						}}
-						class="space-y-3"
-					>
-						<div>
-							<StarRating bind:value={reviewRating} name="rating" size={24} />
-						</div>
-						<textarea
-							name="body"
-							bind:value={reviewBody}
-							rows="3"
-							placeholder="Tell us what you thought… (optional)"
-							class="w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
-						></textarea>
-						<div class="flex items-center gap-3">
-							<button
-								type="submit"
-								disabled={reviewRating === 0}
-								class="border border-ink bg-ink px-4 py-1.5 text-sm text-paper hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
-							>
-								{myReview ? 'Update' : 'Publish'}
-							</button>
-							{#if reviewSavedOk}
-								<span class="text-xs text-ink-faint">Saved</span>
-							{/if}
-							{#if !myReview}
-								<button
-									type="button"
-									onclick={() => (showReviewForm = false)}
-									class="text-sm text-ink-faint hover:text-ink-muted"
-								>
-									Cancel
-								</button>
-							{/if}
-						</div>
-					</form>
-
-					{#if myReview}
-						<form
-							method="POST"
-							action="?/deleteReview"
-							onsubmit={(e) => {
-								e.preventDefault();
-								openConfirm('Remove your review?', e.currentTarget as HTMLFormElement);
-							}}
-						>
-							<button type="submit" class="text-xs text-ink-faint hover:text-red-500">
-								Remove review
-							</button>
-						</form>
-					{/if}
-				</div>
-			{/if}
-
-			<!-- Reseñas de otros usuarios -->
-			{#if reviews.length > 0}
-				<div class="space-y-4">
-					{#each reviews as review (review.id)}
-						{#if review.userId !== myReview?.userId}
-							<div class="space-y-1.5 border-b border-paper-ui pb-4 last:border-0">
-								<div class="flex items-center justify-between">
-									<span class="text-xs font-medium text-ink-muted">{review.userName}</span>
-									<span class="text-xs text-ink-faint">{formatDate(review.createdAt)}</span>
-								</div>
-								<StarRating value={review.rating} readonly size={14} />
-								{#if review.body}
-									<p class="text-sm leading-relaxed text-ink-muted">{review.body}</p>
-								{/if}
-							</div>
-						{/if}
-					{/each}
-				</div>
-			{:else if !myReview}
-				<p class="text-xs text-ink-faint">There are no reviews for this book yet.</p>
-			{/if}
-		</div>
+	{#if book.bookId && reviewStats}
+		<ReviewsSection
+			{myReview}
+			{reviews}
+			stats={reviewStats}
+			{form}
+			allHref={`/books/${book.bookId}/reviews`}
+			emptyText="There are no reviews for this book yet."
+		/>
 	{/if}
 
 	<!-- Eliminar (solo propietario) -->

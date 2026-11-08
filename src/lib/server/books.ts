@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { books, userBooks, tags, userBookTags, libraries } from './db/schema';
+import { books, userBooks, tags, userBookTags, libraries, loans } from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
@@ -83,11 +83,13 @@ export async function addBookToLibrary(
 	return withRLS(userId, async (tx) => {
 		if (source.bookId !== null && !allowDuplicate) {
 			// OpenLibrary book — reuse the existing copy unless the caller has
-			// explicitly confirmed they want a separate physical copy.
+			// explicitly confirmed they want a separate physical copy. Solo entre
+			// las copias PROPIAS: la RLS también deja ver las de otros por grupo o
+			// préstamo, y sin este filtro se devolvía la copia de otro usuario.
 			const dup = await tx
 				.select({ id: userBooks.id })
 				.from(userBooks)
-				.where(eq(userBooks.bookId, source.bookId));
+				.where(and(eq(userBooks.bookId, source.bookId), eq(userBooks.userId, userId)));
 
 			if (dup.length > 0) return dup[0].id;
 		}
@@ -340,6 +342,17 @@ export async function searchUserAuthors(
 	);
 }
 
+// ─── Lo que ve quien no es el dueño ───────────────────────────────────────────
+// La RLS deja leer la fila entera de un libro compartido, pero las notas y la
+// biblioteca son del dueño: no se mandan al navegador de nadie más (no basta
+// con no pintarlas, irían en los datos de la página).
+
+export function forBookViewer<
+	T extends { ownerId: string; notes: string | null; libraryId: string }
+>(book: T, viewerId: string): T {
+	return book.ownerId === viewerId ? book : { ...book, notes: null, libraryId: '' };
+}
+
 // ─── Libros de un contacto (RLS del viewer) ───────────────────────────────────
 
 export async function getContactBooks(
@@ -390,11 +403,12 @@ export async function getContactBooks(
 			tagsByBook.set(tag.userBookId, list);
 		}
 
-		return rows.map((row) => ({
-			...row,
-			authors: row.authors ?? [],
-			tags: tagsByBook.get(row.userBookId) ?? []
-		}));
+		return rows.map((row) =>
+			forBookViewer(
+				{ ...row, authors: row.authors ?? [], tags: tagsByBook.get(row.userBookId) ?? [] },
+				viewerId
+			)
+		);
 	});
 }
 
@@ -484,8 +498,24 @@ export async function updateUserBook(
 
 // ─── Eliminar libro de la biblioteca ─────────────────────────────────────────
 
+export const OPEN_LOAN_ERROR = 'You can’t remove this book because it has an active loan.';
+
+/**
+ * No con un préstamo en curso (la FK de loans es SET NULL, así que la base no
+ * lo impediría). Los terminados se quedan en el historial con su foto fija.
+ */
 export async function removeFromLibrary(userId: string, userBookId: string): Promise<void> {
 	await withRLS(userId, async (tx) => {
+		const open = await tx
+			.select({ id: loans.id })
+			.from(loans)
+			.where(
+				and(
+					eq(loans.userBookId, userBookId),
+					inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+				)
+			);
+		if (open.length > 0) throw new Error(OPEN_LOAN_ERROR);
 		await tx.delete(userBooks).where(eq(userBooks.id, userBookId));
 	});
 }

@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { loans, userBooks, books } from './db/schema';
+import { loans, userBooks, books, userMovies, movies } from './db/schema';
 import { user } from './db/auth.schema';
 import { withRLS } from './db/rls';
 import { sendLoanRequestEmail, sendLoanAcceptedEmail } from './email';
@@ -9,6 +9,68 @@ import { sendLoanRequestEmail, sendLoanAcceptedEmail } from './email';
 // COALESCE helpers: userBooks manual fields override books catalog fields
 const effectiveTitle = sql<string>`COALESCE(${userBooks.title}, ${books.title})`;
 const effectiveAuthors = sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`;
+
+// Lo prestado es un libro o una película: con los cuatro LEFT JOIN, solo uno
+// de los dos lados trae datos y COALESCE se queda con ese. Si el dueño ya
+// borró la copia, no trae ninguno y queda la foto fija del préstamo (item_*).
+const itemTitle = sql<string>`COALESCE(
+	${userBooks.title}, ${books.title}, ${userMovies.title}, ${movies.title}, ${loans.itemTitle}
+)`;
+const itemCreators = sql<string[] | null>`COALESCE(
+	${userBooks.authors}, ${books.authors}, ${userMovies.directors}, ${movies.directors},
+	${loans.itemCreators}
+)`;
+const itemCover = sql<string | null>`COALESCE(
+	${userBooks.coverUrl}, ${books.coverUrl}, ${userMovies.coverUrl}, ${movies.posterUrl},
+	${loans.itemCoverUrl}
+)`;
+
+const loanColumns = {
+	id: loans.id,
+	status: loans.status,
+	requestedAt: loans.requestedAt,
+	acceptedAt: loans.acceptedAt,
+	activeAt: loans.activeAt,
+	returnRequestedAt: loans.returnRequestedAt,
+	returnedAt: loans.returnedAt,
+	dueDate: loans.dueDate,
+	notes: loans.notes,
+	ownerNotes: loans.ownerNotes,
+	itemKind: loans.itemKind,
+	userBookId: loans.userBookId,
+	userMovieId: loans.userMovieId,
+	bookId: userBooks.bookId,
+	movieId: userMovies.movieId,
+	title: itemTitle,
+	authors: itemCreators,
+	coverUrl: itemCover,
+	borrowerId: loans.borrowerId,
+	ownerId: loans.ownerId
+};
+
+function selectLoans(tx: typeof db) {
+	return tx
+		.select(loanColumns)
+		.from(loans)
+		.leftJoin(userBooks, eq(loans.userBookId, userBooks.id))
+		.leftJoin(books, eq(userBooks.bookId, books.id))
+		.leftJoin(userMovies, eq(loans.userMovieId, userMovies.id))
+		.leftJoin(movies, eq(userMovies.movieId, movies.id));
+}
+
+type LoanRow = Awaited<ReturnType<ReturnType<typeof selectLoans>['where']>>[number];
+
+// Dónde está su ficha (null si el dueño ya borró la copia)
+function itemFields(row: LoanRow) {
+	return {
+		itemHref: row.userMovieId
+			? `/movies/${row.userMovieId}`
+			: row.userBookId
+				? `/library/${row.userBookId}`
+				: null,
+		authors: row.authors ?? []
+	};
+}
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -32,10 +94,16 @@ export type LoanWithDetails = {
 	dueDate: Date | null;
 	notes: string | null;
 	ownerNotes: string | null;
-	// Libro
-	userBookId: string;
+	// Lo prestado: un libro (userBookId) o una película (userMovieId)
+	itemKind: 'book' | 'movie';
+	/** null si el dueño borró la copia (el préstamo queda en el historial) */
+	itemHref: string | null;
+	userBookId: string | null;
+	userMovieId: string | null;
 	bookId: string | null;
+	movieId: string | null;
 	title: string;
+	/** Autores del libro o directores de la película */
 	authors: string[];
 	coverUrl: string | null;
 	// Personas
@@ -49,56 +117,83 @@ export type LoanWithDetails = {
 
 // ─── Solicitar préstamo ───────────────────────────────────────────────────────
 
+export type LoanItem =
+	| { kind: 'book'; userBookId: string }
+	| { kind: 'movie'; userMovieId: string };
+
 export async function requestLoan(
 	borrowerId: string,
-	userBookId: string,
+	item: LoanItem,
 	notes?: string
 ): Promise<string> {
 	const { loanId, ownerId, bookTitle } = await withRLS(borrowerId, async (tx) => {
-		// user_books_select_in_group policy allows borrower to read the book via shared tags
-		const ubRows = await tx
-			.select({
-				userId: userBooks.userId,
-				isAvailable: userBooks.isAvailable,
-				bookId: userBooks.bookId,
-				manualTitle: userBooks.title
-			})
-			.from(userBooks)
-			.where(eq(userBooks.id, userBookId));
+		// La RLS (…_select_in_group) deja leer lo ajeno compartido por etiqueta.
+		const rows =
+			item.kind === 'book'
+				? await tx
+						.select({
+							ownerId: userBooks.userId,
+							isAvailable: userBooks.isAvailable,
+							title: effectiveTitle,
+							creators: effectiveAuthors,
+							coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`
+						})
+						.from(userBooks)
+						.leftJoin(books, eq(userBooks.bookId, books.id))
+						.where(eq(userBooks.id, item.userBookId))
+				: await tx
+						.select({
+							ownerId: userMovies.userId,
+							isAvailable: userMovies.isAvailable,
+							title: sql<string>`COALESCE(${userMovies.title}, ${movies.title})`,
+							creators: sql<
+								string[] | null
+							>`COALESCE(${userMovies.directors}, ${movies.directors})`,
+							coverUrl: sql<string | null>`COALESCE(${userMovies.coverUrl}, ${movies.posterUrl})`
+						})
+						.from(userMovies)
+						.leftJoin(movies, eq(userMovies.movieId, movies.id))
+						.where(eq(userMovies.id, item.userMovieId));
 
-		if (ubRows.length === 0) throw new Error('Book not found');
-		const { userId: ownerId, isAvailable, bookId, manualTitle } = ubRows[0];
+		const noun = item.kind === 'book' ? 'book' : 'movie';
+		if (rows.length === 0)
+			throw new Error(item.kind === 'book' ? 'Book not found' : 'Movie not found');
+		const { ownerId, isAvailable, title, creators, coverUrl } = rows[0];
 
-		if (!isAvailable) throw new Error('Book is not available');
-		if (ownerId === borrowerId) throw new Error("You can't request your own book.");
+		if (!isAvailable) throw new Error(`This ${noun} is not available.`);
+		if (ownerId === borrowerId) throw new Error(`You can't request your own ${noun}.`);
+
+		const itemMatch =
+			item.kind === 'book'
+				? eq(loans.userBookId, item.userBookId)
+				: eq(loans.userMovieId, item.userMovieId);
 
 		// Check for existing active/pending loan (loans are visible to both parties via RLS)
 		const existing = await tx
 			.select({ id: loans.id })
 			.from(loans)
-			.where(
-				and(
-					eq(loans.userBookId, userBookId),
-					inArray(loans.status, ['requested', 'accepted', 'active'])
-				)
-			);
-		if (existing.length > 0) throw new Error('There is already an active request for this book.');
-
-		const bookRows = bookId
-			? await tx.select({ title: books.title }).from(books).where(eq(books.id, bookId))
-			: [];
+			.where(and(itemMatch, inArray(loans.status, ['requested', 'accepted', 'active'])));
+		if (existing.length > 0)
+			throw new Error(`There is already an active request for this ${noun}.`);
 
 		const id = nanoid();
 		await tx.insert(loans).values({
 			id,
-			userBookId,
+			itemKind: item.kind,
+			// Foto fija para el historial, por si el dueño borra la copia. La
+			// portada solo si es pública: la foto propia de una película se va con ella.
+			itemTitle: title ?? '?',
+			itemCreators: creators ?? null,
+			itemCoverUrl: coverUrl?.startsWith('https://') ? coverUrl : null,
+			userBookId: item.kind === 'book' ? item.userBookId : null,
+			userMovieId: item.kind === 'movie' ? item.userMovieId : null,
 			borrowerId,
 			ownerId,
 			status: 'requested',
 			notes: notes ?? null
 		});
 
-		return { loanId: id, ownerId, bookTitle: bookRows[0]?.title ?? manualTitle ?? '' };
+		return { loanId: id, ownerId, bookTitle: title ?? '' };
 	});
 
 	// Notificar al owner — queries solo a la tabla user (sin RLS) para obtener nombres y emails
@@ -129,55 +224,8 @@ export async function getUserLoans(userId: string): Promise<{
 }> {
 	const rows = await withRLS(userId, async (tx) => {
 		// Dos queries separadas porque Drizzle no soporta bien self-joins con alias
-		const ownerLoans = await tx
-			.select({
-				id: loans.id,
-				status: loans.status,
-				requestedAt: loans.requestedAt,
-				acceptedAt: loans.acceptedAt,
-				activeAt: loans.activeAt,
-				returnRequestedAt: loans.returnRequestedAt,
-				returnedAt: loans.returnedAt,
-				dueDate: loans.dueDate,
-				notes: loans.notes,
-				ownerNotes: loans.ownerNotes,
-				userBookId: loans.userBookId,
-				bookId: userBooks.bookId,
-				title: effectiveTitle,
-				authors: effectiveAuthors,
-				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
-				borrowerId: loans.borrowerId,
-				ownerId: loans.ownerId
-			})
-			.from(loans)
-			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-			.leftJoin(books, eq(userBooks.bookId, books.id))
-			.where(eq(loans.ownerId, userId));
-
-		const borrowerLoans = await tx
-			.select({
-				id: loans.id,
-				status: loans.status,
-				requestedAt: loans.requestedAt,
-				acceptedAt: loans.acceptedAt,
-				activeAt: loans.activeAt,
-				returnRequestedAt: loans.returnRequestedAt,
-				returnedAt: loans.returnedAt,
-				dueDate: loans.dueDate,
-				notes: loans.notes,
-				ownerNotes: loans.ownerNotes,
-				userBookId: loans.userBookId,
-				bookId: userBooks.bookId,
-				title: effectiveTitle,
-				authors: effectiveAuthors,
-				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
-				borrowerId: loans.borrowerId,
-				ownerId: loans.ownerId
-			})
-			.from(loans)
-			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-			.leftJoin(books, eq(userBooks.bookId, books.id))
-			.where(eq(loans.borrowerId, userId));
+		const ownerLoans = await selectLoans(tx).where(eq(loans.ownerId, userId));
+		const borrowerLoans = await selectLoans(tx).where(eq(loans.borrowerId, userId));
 
 		return { ownerLoans, borrowerLoans };
 	});
@@ -212,8 +260,8 @@ export async function getUserLoans(userId: string): Promise<{
 		const ownerInfo = asOwner ? self : (userMap.get(row.ownerId) ?? { name: '?', email: '' });
 		return {
 			...row,
+			...itemFields(row),
 			status: row.status as LoanStatus,
-			authors: row.authors ?? [],
 			borrowerName: borrowerInfo.name,
 			borrowerEmail: borrowerInfo.email ?? '',
 			ownerName: ownerInfo.name,
@@ -230,32 +278,7 @@ export async function getUserLoans(userId: string): Promise<{
 // ─── Obtener préstamo por ID ──────────────────────────────────────────────────
 
 export async function getLoan(userId: string, loanId: string): Promise<LoanWithDetails | null> {
-	const rows = await withRLS(userId, (tx) =>
-		tx
-			.select({
-				id: loans.id,
-				status: loans.status,
-				requestedAt: loans.requestedAt,
-				acceptedAt: loans.acceptedAt,
-				activeAt: loans.activeAt,
-				returnRequestedAt: loans.returnRequestedAt,
-				returnedAt: loans.returnedAt,
-				dueDate: loans.dueDate,
-				notes: loans.notes,
-				ownerNotes: loans.ownerNotes,
-				userBookId: loans.userBookId,
-				bookId: userBooks.bookId,
-				title: effectiveTitle,
-				authors: effectiveAuthors,
-				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
-				borrowerId: loans.borrowerId,
-				ownerId: loans.ownerId
-			})
-			.from(loans)
-			.innerJoin(userBooks, eq(loans.userBookId, userBooks.id))
-			.leftJoin(books, eq(userBooks.bookId, books.id))
-			.where(eq(loans.id, loanId))
-	);
+	const rows = await withRLS(userId, (tx) => selectLoans(tx).where(eq(loans.id, loanId)));
 
 	if (rows.length === 0) return null;
 	const row = rows[0];
@@ -272,8 +295,8 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
 
 	return {
 		...row,
+		...itemFields(row),
 		status: row.status as LoanStatus,
-		authors: row.authors ?? [],
 		borrowerName: borrower.name,
 		borrowerEmail: borrower.email ?? '',
 		ownerName: owner.name,
@@ -349,21 +372,14 @@ export async function transitionLoan(
 			})
 			.where(eq(loans.id, loanId));
 
-		// Si el préstamo se activa, marcar el libro como no disponible
-		if (toStatus === 'active') {
-			await tx
-				.update(userBooks)
-				.set({ isAvailable: false, updatedAt: new Date() })
-				.where(eq(userBooks.id, loan.userBookId));
-		}
-
-		// Si se devuelve, cancela o rechaza → libro disponible de nuevo
-		if (['returned', 'rejected', 'cancelled'].includes(toStatus)) {
-			await tx
-				.update(userBooks)
-				.set({ isAvailable: true, updatedAt: new Date() })
-				.where(eq(userBooks.id, loan.userBookId));
-		}
+		// Activo → no disponible; devuelto, cancelado o rechazado → disponible
+		const isAvailable =
+			toStatus === 'active'
+				? false
+				: ['returned', 'rejected', 'cancelled'].includes(toStatus)
+					? true
+					: null;
+		if (isAvailable !== null) await setItemAvailability(tx, loan, isAvailable);
 	});
 
 	// Notificar al borrower cuando el owner acepta
@@ -379,6 +395,19 @@ export async function transitionLoan(
 	}
 
 	return { success: true };
+}
+
+async function setItemAvailability(
+	tx: typeof db,
+	loan: Pick<LoanWithDetails, 'userBookId' | 'userMovieId'>,
+	isAvailable: boolean
+): Promise<void> {
+	const values = { isAvailable, updatedAt: new Date() };
+	if (loan.userMovieId) {
+		await tx.update(userMovies).set(values).where(eq(userMovies.id, loan.userMovieId));
+	} else if (loan.userBookId) {
+		await tx.update(userBooks).set(values).where(eq(userBooks.id, loan.userBookId));
+	}
 }
 
 // ─── Cargar libro ajeno para solicitar préstamo ───────────────────────────────
@@ -445,6 +474,49 @@ export async function getBookForBorrow(
 			ownerName: ownerRows[0]?.name ?? '?',
 			existingLoanId: existingRows[0]?.id ?? null,
 			existingLoanStatus: (existingRows[0]?.status as LoanStatus) ?? null
+		};
+	});
+}
+
+// ─── Película ajena: ¿se puede pedir? ─────────────────────────────────────────
+// Lo que necesita la ficha de una película que no es tuya para ofrecer
+// «Pedir prestada»: si está disponible y si ya tienes una petición abierta.
+
+export type BorrowableMovie = {
+	userMovieId: string;
+	isAvailable: boolean;
+	ownerId: string;
+	existingLoanId: string | null;
+	existingLoanStatus: LoanStatus | null;
+};
+
+export async function getMovieForBorrow(
+	userId: string,
+	userMovieId: string
+): Promise<BorrowableMovie | null> {
+	return withRLS(userId, async (tx) => {
+		const rows = await tx
+			.select({ isAvailable: userMovies.isAvailable, ownerId: userMovies.userId })
+			.from(userMovies)
+			.where(eq(userMovies.id, userMovieId));
+		if (rows.length === 0 || rows[0].ownerId === userId) return null;
+
+		const existing = await tx
+			.select({ id: loans.id, status: loans.status })
+			.from(loans)
+			.where(
+				and(
+					eq(loans.userMovieId, userMovieId),
+					eq(loans.borrowerId, userId),
+					inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+				)
+			);
+
+		return {
+			userMovieId,
+			...rows[0],
+			existingLoanId: existing[0]?.id ?? null,
+			existingLoanStatus: (existing[0]?.status as LoanStatus) ?? null
 		};
 	});
 }

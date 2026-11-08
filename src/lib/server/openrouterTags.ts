@@ -2,10 +2,10 @@
 // unos pocos nuevos que merecería crear — vía OpenRouter con la clave del
 // usuario, mismo endpoint/modelo que el escaneo de estanterías
 // (openrouterVision.ts).
-import { env } from '$env/dynamic/private';
 import { extractJson, filterKnownTags } from './openrouterVision';
+import { openRouterChat } from './openrouter';
+import type { AiLogContext } from './aiUsage';
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const TAGS_MODEL = 'google/gemini-2.5-flash-lite';
 const TAGS_TIMEOUT_MS = 20_000;
 const MAX_DESCRIPTION_CHARS = 2000;
@@ -21,6 +21,8 @@ export interface TagSuggestions {
 }
 
 export interface TagSuggestionInput {
+	/** 'movie': authors son los directores y subjects los géneros. Por defecto 'book'. */
+	kind?: 'book' | 'movie';
 	title: string;
 	authors: string[];
 	description?: string | null;
@@ -40,28 +42,50 @@ export function subjectsFromOpenLibraryData(raw: string | null | undefined): str
 	}
 }
 
+// Las etiquetas son las mismas para libros y películas: el prompt solo cambia
+// cómo se describe la obra.
+const WORDING = {
+	book: {
+		item: 'book',
+		items: 'books',
+		place: 'personal library',
+		creators: 'Author(s)',
+		subjects: 'Library subjects',
+		notCreator: 'author'
+	},
+	movie: {
+		item: 'movie',
+		items: 'books and movies',
+		place: 'home video collection',
+		creators: 'Director(s)',
+		subjects: 'Genres',
+		notCreator: 'director'
+	}
+} as const;
+
 function buildPrompt(book: TagSuggestionInput, availableTagNames: string[]): string {
+	const w = WORDING[book.kind ?? 'book'];
 	const lines = [
 		`Title: ${book.title}`,
-		book.authors.length > 0 ? `Author(s): ${book.authors.join(', ')}` : null,
+		book.authors.length > 0 ? `${w.creators}: ${book.authors.join(', ')}` : null,
 		book.subjects?.length
-			? `Library subjects: ${book.subjects.slice(0, MAX_SUBJECTS).join('; ')}`
+			? `${w.subjects}: ${book.subjects.slice(0, MAX_SUBJECTS).join('; ')}`
 			: null,
 		book.description ? `Synopsis: ${book.description.slice(0, MAX_DESCRIPTION_CHARS)}` : null
 	].filter(Boolean);
 	const existing =
 		availableTagNames.length > 0
-			? `The user organizes their books with these existing tags: [${availableTagNames.map((t) => `"${t}"`).join(', ')}].`
+			? `The user organizes their ${w.items} with these existing tags: [${availableTagNames.map((t) => `"${t}"`).join(', ')}].`
 			: 'The user has no tags yet.';
 
-	return `A user has this book in their personal library:
+	return `A user has this ${w.item} in their ${w.place}:
 
 ${lines.join('\n')}
 
 ${existing}
 
-1. "existing": pick the tags from that list that fit this book's subject, genre or form — zero, one or several — using the information above and your own knowledge of the book. Only use names from this exact list. Tags may be in a different language than the book; match by meaning.
-2. "new": suggest up to ${MAX_NEW_TAGS} NEW tags worth creating for this book, only if they capture something important that no existing tag covers (genre, subject, form or audience). They must be short (1–3 words), general enough to apply to other books too (never the title or author), and must not duplicate or be synonyms of existing tags. Write them in the same language and style as the existing tags (or in Spanish if there are none). If nothing important is missing, return an empty array.
+1. "existing": pick the tags from that list that fit this ${w.item}'s subject, genre or form — zero, one or several — using the information above and your own knowledge of the ${w.item}. Only use names from this exact list. Tags may be in a different language than the ${w.item}; match by meaning.
+2. "new": suggest up to ${MAX_NEW_TAGS} NEW tags worth creating for this ${w.item}, only if they capture something important that no existing tag covers (genre, subject, form or audience). They must be short (1–3 words), general enough to apply to other ${w.items} too (never the title or ${w.notCreator}), and must not duplicate or be synonyms of existing tags. Write them in the same language and style as the existing tags (or in Spanish if there are none). If nothing important is missing, return an empty array.
 
 Respond with ONLY a JSON object (no markdown, no explanation), e.g. {"existing": ["..."], "new": ["..."]}`;
 }
@@ -102,44 +126,26 @@ function parseSuggestions(content: string, availableTagNames: string[]): TagSugg
 export async function suggestTagsForBook(
 	apiKey: string,
 	book: TagSuggestionInput,
-	availableTagNames: string[]
+	availableTagNames: string[],
+	log?: AiLogContext
 ): Promise<TagSuggestions> {
-	const none: TagSuggestions = { existing: [], proposed: [] };
-	try {
-		const res = await fetch(OPENROUTER_URL, {
-			method: 'POST',
-			signal: AbortSignal.timeout(TAGS_TIMEOUT_MS),
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				'Content-Type': 'application/json',
-				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.scholio.review',
-				'X-Title': 'Librarian'
-			},
-			body: JSON.stringify({
-				model: TAGS_MODEL,
-				max_tokens: 512,
-				messages: [{ role: 'user', content: buildPrompt(book, availableTagNames) }]
-			})
-		});
-
-		if (!res.ok) {
-			const body = await res.text().catch(() => '');
-			console.error(`suggestTagsForBook: OpenRouter ${res.status}`, body.slice(0, 1000));
-			return none;
+	const suggestions = await openRouterChat<TagSuggestions>(
+		apiKey,
+		{
+			model: TAGS_MODEL,
+			max_tokens: 512,
+			messages: [{ role: 'user', content: buildPrompt(book, availableTagNames) }]
+		},
+		{
+			label: 'suggestTagsForBook',
+			timeoutMs: TAGS_TIMEOUT_MS,
+			log,
+			parse: (message) => {
+				if (!message.content) throw new Error('empty content');
+				const value = parseSuggestions(message.content, availableTagNames);
+				return { value, resultCount: value.existing.length + value.proposed.length };
+			}
 		}
-
-		const data = await res.json();
-		const content: string | undefined = data.choices?.[0]?.message?.content;
-		if (!content) return none;
-
-		try {
-			return parseSuggestions(content, availableTagNames);
-		} catch {
-			console.error('suggestTagsForBook: could not parse model output', content.slice(0, 1000));
-			return none;
-		}
-	} catch (err) {
-		console.error('suggestTagsForBook: unexpected failure', err);
-		return none;
-	}
+	);
+	return suggestions ?? { existing: [], proposed: [] };
 }

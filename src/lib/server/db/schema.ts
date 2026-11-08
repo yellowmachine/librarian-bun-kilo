@@ -10,7 +10,9 @@ import {
 	integer,
 	uniqueIndex,
 	index,
-	check
+	check,
+	customType,
+	doublePrecision
 } from 'drizzle-orm/pg-core';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -41,6 +43,23 @@ export const loanStatusEnum = pgEnum('loan_status', [
 	'cancelled'
 ]);
 
+// Qué se presta (loans.item_kind): se guarda aparte del enlace porque el
+// enlace se pierde si el dueño borra la copia, y el historial debe seguir
+// sabiendo qué era.
+export const loanItemKindEnum = pgEnum('loan_item_kind', ['book', 'movie']);
+
+// Para qué se llamó a la IA (ai_usage_log.kind).
+export const aiCallKindEnum = pgEnum('ai_call_kind', [
+	'book_shelf_scan', // libros desde una foto de estantería
+	'movie_scan', // películas desde una foto de carátulas o lomos
+	'book_tags', // etiquetas sugeridas para un libro
+	'movie_tags', // etiquetas sugeridas para una película
+	'book_cover_search' // portada de un libro buscada en la web
+]);
+
+// Soporte físico de una copia de la videoteca (user_movies.format).
+export const mediaFormatEnum = pgEnum('media_format', ['dvd', 'bluray', 'uhd_bluray']);
+
 // ─── Helper SQL ───────────────────────────────────────────────────────────────
 // current_setting('app.current_user_id', true) devuelve '' si no está seteado,
 // en lugar de lanzar un error.
@@ -59,6 +78,14 @@ const isGroupAdmin = (groupId: unknown, userId: unknown) =>
 	sql`is_group_admin(${groupId}, ${userId})`;
 const isGroupCreator = (groupId: unknown, userId: unknown) =>
 	sql`is_group_creator(${groupId}, ${userId})`;
+// Si la copia de película es del usuario, sin pasar por la RLS de user_movies:
+// su política de grupos lee user_movie_tags, y la de inserción de
+// user_movie_tags no puede leer user_movies sin entrar en recursión (42P17).
+const ownsUserMovie = (userMovieId: unknown, userId: unknown) =>
+	sql`owns_user_movie(${userMovieId}, ${userId})`;
+// Lo mismo para libros (user_books_select_in_group lee user_book_tags).
+const ownsUserBook = (userBookId: unknown, userId: unknown) =>
+	sql`owns_user_book(${userBookId}, ${userId})`;
 
 // ─── Books ────────────────────────────────────────────────────────────────────
 
@@ -224,6 +251,179 @@ export const userBooks = pgTable(
 	]
 );
 
+// ─── Movies ───────────────────────────────────────────────────────────────────
+// Catálogo global de películas, rellenado desde TMDB (src/lib/server/tmdb.ts).
+// Mismo papel que `books` para la videoteca.
+
+export const movies = pgTable(
+	'movies',
+	{
+		id: text('id').primaryKey(), // "tmdb-<id>", ej: "tmdb-78"
+		// Título en castellano (TMDB con language=es-ES) y el original.
+		title: text('title').notNull(),
+		originalTitle: text('original_title'),
+		releaseYear: integer('release_year'),
+		directors: text('directors').array(),
+		runtime: integer('runtime'), // minutos
+		genres: text('genres').array(),
+		overview: text('overview'),
+		posterUrl: text('poster_url'),
+		tmdbData: text('tmdb_data'), // JSON raw guardado como text
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	() => [
+		// Catálogo global: lectura y escritura sin restricción de usuario
+		pgPolicy('movies_select', { for: 'select', to: appUser, using: sql`true` }),
+		pgPolicy('movies_insert', { for: 'insert', to: appUser, withCheck: sql`true` }),
+		pgPolicy('movies_update', { for: 'update', to: appUser, using: sql`true` })
+	]
+);
+
+// ─── User Movies ──────────────────────────────────────────────────────────────
+// Cada fila es una copia física (DVD, Blu-ray…) de un usuario. Comparte las
+// bibliotecas con los libros: «Casa» u «Oficina» son sitios, no tipos de cosa.
+// La ve su dueño, los miembros de un grupo con el que comparte una de sus
+// etiquetas, y quien la ha pedido prestada.
+
+export const userMovies = pgTable(
+	'user_movies',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		libraryId: text('library_id')
+			.notNull()
+			.references(() => libraries.id, { onDelete: 'restrict' }),
+		// Nullable: null significa alta manual (la película no está en TMDB)
+		movieId: text('movie_id').references(() => movies.id, { onDelete: 'restrict' }),
+		// Campos de alta manual — tapan movies.* cuando movieId es null
+		title: text('title'),
+		originalTitle: text('original_title'),
+		directors: text('directors').array(),
+		releaseYear: integer('release_year'),
+		overview: text('overview'),
+		// Portada propia (p.ej. la de esta edición concreta). Igual que en
+		// user_books, también vale para películas de catálogo y tapa
+		// movies.poster_url.
+		coverUrl: text('cover_url'),
+		format: mediaFormatEnum('format').notNull(),
+		// Texto libre: «Steelbook», «Edición coleccionista», «Montaje del director»…
+		edition: text('edition'),
+		notes: text('notes'),
+		isAvailable: boolean('is_available').default(true).notNull(),
+		addedAt: timestamp('added_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	(table) => [
+		// Se puede tener la misma película en varios formatos (o varias copias),
+		// así que (userId, movieId) NO es único.
+		index('user_movies_user_idx').on(table.userId),
+		index('user_movies_movie_idx').on(table.movieId),
+		index('user_movies_library_idx').on(table.libraryId),
+		check(
+			'user_movies_movie_or_title',
+			sql`${table.movieId} IS NOT NULL OR ${table.title} IS NOT NULL`
+		),
+		pgPolicy('user_movies_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		// Igual que los libros: un miembro de un grupo ve las películas que
+		// llevan una etiqueta compartida con ese grupo.
+		pgPolicy('user_movies_select_in_group', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from user_movie_tags umt
+				join shared_tags st on st.tag_id = umt.tag_id
+				join group_members gm on gm.group_id = st.group_id
+				where umt.user_movie_id = ${table.id}
+				  and gm.user_id = ${currentUserId}
+			)`
+		}),
+		// Quien la pide prestada la ve (como user_books_select_on_loan)
+		pgPolicy('user_movies_select_on_loan', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from loans l
+				where l.user_movie_id = ${table.id}
+				  and l.borrower_id = ${currentUserId}
+			)`
+		}),
+		pgPolicy('user_movies_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('user_movies_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('user_movies_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
+// ─── Movie cover photos ───────────────────────────────────────────────────────
+// La foto que el usuario hizo a SU carátula (recortada y reducida en el
+// navegador, ~100 KB), para cuando prefiere su edición al póster de TMDB.
+// Va en la base de datos y no en disco: es poca cosa y así entra en las copias
+// de seguridad sin montar nada más. user_movies.cover_url apunta a
+// /api/movies/<id>/cover, que la sirve.
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+	dataType() {
+		return 'bytea';
+	}
+});
+
+export const movieCoverPhotos = pgTable(
+	'movie_cover_photos',
+	{
+		userMovieId: text('user_movie_id')
+			.primaryKey()
+			.references(() => userMovies.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		contentType: text('content_type').notNull(),
+		data: bytea('data').notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(table) => [
+		// La ve quien pueda ver la película (la subconsulta pasa por la RLS de
+		// user_movies: dueño, grupos…); si no, a los demás les saldría rota.
+		pgPolicy('movie_cover_photos_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (select 1 from user_movies um where um.id = ${table.userMovieId})`
+		}),
+		pgPolicy('movie_cover_photos_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_cover_photos_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_cover_photos_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
 // ─── Tags ─────────────────────────────────────────────────────────────────────
 
 export const tags = pgTable(
@@ -307,6 +507,9 @@ export const userBookTags = pgTable(
 				  and gm.user_id = ${currentUserId}
 			)`
 		}),
+		// Etiqueta Y libro propios: si bastara con la etiqueta, se podría poner
+		// una propia, compartida con otro grupo, a un libro ajeno visible por
+		// grupo, y exponerlo a gente que su dueño no eligió.
 		pgPolicy('user_book_tags_insert', {
 			for: 'insert',
 			to: appUser,
@@ -314,9 +517,70 @@ export const userBookTags = pgTable(
 				select 1 from tags t
 				where t.id = ${table.tagId}
 				  and t.user_id = ${currentUserId}
-			)`
+			) and ${ownsUserBook(table.userBookId, currentUserId)}`
 		}),
 		pgPolicy('user_book_tags_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`exists (
+				select 1 from tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			)`
+		})
+	]
+);
+
+// ─── User Movie Tags ──────────────────────────────────────────────────────────
+// Mismas etiquetas que los libros: compartir una con un grupo comparte los
+// libros Y las películas que la llevan.
+//
+// A diferencia de user_book_tags, insertar exige que la película también sea
+// tuya (no solo la etiqueta): si no, se podría poner una etiqueta propia
+// compartida a una película ajena visible por un grupo y exponerla a otro.
+
+export const userMovieTags = pgTable(
+	'user_movie_tags',
+	{
+		userMovieId: text('user_movie_id')
+			.notNull()
+			.references(() => userMovies.id, { onDelete: 'cascade' }),
+		tagId: text('tag_id')
+			.notNull()
+			.references(() => tags.id, { onDelete: 'cascade' })
+	},
+	(table) => [
+		uniqueIndex('user_movie_tags_pk').on(table.userMovieId, table.tagId),
+		index('user_movie_tags_tag_idx').on(table.tagId),
+		pgPolicy('user_movie_tags_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			)`
+		}),
+		pgPolicy('user_movie_tags_select_in_group', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from shared_tags st
+				join group_members gm on gm.group_id = st.group_id
+				where st.tag_id = ${table.tagId}
+				  and gm.user_id = ${currentUserId}
+			)`
+		}),
+		pgPolicy('user_movie_tags_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`exists (
+				select 1 from tags t
+				where t.id = ${table.tagId}
+				  and t.user_id = ${currentUserId}
+			) and ${ownsUserMovie(table.userMovieId, currentUserId)}`
+		}),
+		pgPolicy('user_movie_tags_delete', {
 			for: 'delete',
 			to: appUser,
 			using: sql`exists (
@@ -496,9 +760,17 @@ export const loans = pgTable(
 	'loans',
 	{
 		id: text('id').primaryKey(),
-		userBookId: text('user_book_id')
-			.notNull()
-			.references(() => userBooks.id, { onDelete: 'restrict' }),
+		// Lo prestado: un libro O una película. Si el dueño borra la copia, el
+		// enlace queda a null y el préstamo sigue en el historial con la foto
+		// fija de abajo (item_*), tomada al pedirlo.
+		itemKind: loanItemKindEnum('item_kind').notNull(),
+		userBookId: text('user_book_id').references(() => userBooks.id, { onDelete: 'set null' }),
+		userMovieId: text('user_movie_id').references(() => userMovies.id, {
+			onDelete: 'set null'
+		}),
+		itemTitle: text('item_title').notNull(),
+		itemCreators: text('item_creators').array(), // autores o directores
+		itemCoverUrl: text('item_cover_url'), // solo URLs públicas (https)
 		borrowerId: text('borrower_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'restrict' }),
@@ -519,6 +791,13 @@ export const loans = pgTable(
 		index('loans_borrower_idx').on(table.borrowerId),
 		index('loans_owner_idx').on(table.ownerId),
 		index('loans_user_book_idx').on(table.userBookId),
+		index('loans_user_movie_idx').on(table.userMovieId),
+		// Como mucho un enlace (ninguno si la copia se borró), y del tipo que toca
+		check(
+			'loans_item_matches_kind',
+			sql`(${table.itemKind} = 'book' and ${table.userMovieId} is null)
+				or (${table.itemKind} = 'movie' and ${table.userBookId} is null)`
+		),
 		index('loans_status_idx').on(table.status),
 		pgPolicy('loans_select', {
 			for: 'select',
@@ -592,6 +871,49 @@ export const bookReviews = pgTable(
 	]
 );
 
+// ─── Movie Reviews ────────────────────────────────────────────────────────────
+// Como book_reviews: una reseña por usuario y película del catálogo (TMDB),
+// visible para todos. Las películas dadas de alta a mano no tienen.
+
+export const movieReviews = pgTable(
+	'movie_reviews',
+	{
+		id: text('id').primaryKey(),
+		movieId: text('movie_id')
+			.notNull()
+			.references(() => movies.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		rating: integer('rating').notNull(), // 1–5 estrellas
+		body: text('body'),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		updatedAt: timestamp('updated_at').defaultNow().notNull()
+	},
+	(table) => [
+		uniqueIndex('movie_reviews_movie_user_idx').on(table.movieId, table.userId),
+		index('movie_reviews_movie_idx').on(table.movieId),
+		index('movie_reviews_user_idx').on(table.userId),
+		check('movie_reviews_rating_range', sql`${table.rating} between 1 and 5`),
+		pgPolicy('movie_reviews_select', { for: 'select', to: appUser, using: sql`true` }),
+		pgPolicy('movie_reviews_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_reviews_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('movie_reviews_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
 // ─── Invitations ──────────────────────────────────────────────────────────────
 // Librarian es una red por invitación: cualquiera invita por email y el enlace
 // (/invitacion/<token>) caduca a los 7 días. Solo se crea cuenta con contraseña
@@ -649,6 +971,51 @@ export const userApiKeys = pgTable(
 	]
 );
 
+// ─── AI usage log ─────────────────────────────────────────────────────────────
+// Una fila por llamada a OpenRouter con la clave del usuario, para que vea qué
+// ha gastado y en qué. El coste es el que devuelve OpenRouter en cada
+// respuesta (usage.cost, en dólares). Sin coste (null) si la llamada falló
+// antes de que OpenRouter lo informara.
+
+export const aiUsageLog = pgTable(
+	'ai_usage_log',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		kind: aiCallKindEnum('kind').notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		// De qué iba: «Dune», «Blade Runner»… (null en las fotos)
+		subject: text('subject'),
+		// Qué salió: libros o películas reconocidos, etiquetas sugeridas, portadas…
+		resultCount: integer('result_count'),
+		success: boolean('success').notNull(),
+		// Si falló, por qué, corto: «HTTP 402», «timeout», «invalid response»…
+		error: text('error'),
+		model: text('model'),
+		promptTokens: integer('prompt_tokens'),
+		completionTokens: integer('completion_tokens'),
+		costUsd: doublePrecision('cost_usd'),
+		durationMs: integer('duration_ms'),
+		// Id de la generación en OpenRouter, para cuadrar con su panel de actividad
+		generationId: text('generation_id')
+	},
+	(table) => [
+		index('ai_usage_log_user_date_idx').on(table.userId, table.createdAt),
+		pgPolicy('ai_usage_log_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('ai_usage_log_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const booksRelations = relations(books, ({ many }) => ({
@@ -671,18 +1038,43 @@ export const userBooksRelations = relations(userBooks, ({ one, many }) => ({
 
 export const librariesRelations = relations(libraries, ({ one, many }) => ({
 	user: one(user, { fields: [libraries.userId], references: [user.id] }),
-	userBooks: many(userBooks)
+	userBooks: many(userBooks),
+	userMovies: many(userMovies)
+}));
+
+export const moviesRelations = relations(movies, ({ many }) => ({
+	userMovies: many(userMovies),
+	reviews: many(movieReviews)
+}));
+
+export const movieReviewsRelations = relations(movieReviews, ({ one }) => ({
+	movie: one(movies, { fields: [movieReviews.movieId], references: [movies.id] }),
+	user: one(user, { fields: [movieReviews.userId], references: [user.id] })
+}));
+
+export const userMoviesRelations = relations(userMovies, ({ one, many }) => ({
+	tags: many(userMovieTags),
+	loans: many(loans),
+	user: one(user, { fields: [userMovies.userId], references: [user.id] }),
+	library: one(libraries, { fields: [userMovies.libraryId], references: [libraries.id] }),
+	movie: one(movies, { fields: [userMovies.movieId], references: [movies.id] })
 }));
 
 export const tagsRelations = relations(tags, ({ one, many }) => ({
 	user: one(user, { fields: [tags.userId], references: [user.id] }),
 	userBookTags: many(userBookTags),
+	userMovieTags: many(userMovieTags),
 	sharedTags: many(sharedTags)
 }));
 
 export const userBookTagsRelations = relations(userBookTags, ({ one }) => ({
 	userBook: one(userBooks, { fields: [userBookTags.userBookId], references: [userBooks.id] }),
 	tag: one(tags, { fields: [userBookTags.tagId], references: [tags.id] })
+}));
+
+export const userMovieTagsRelations = relations(userMovieTags, ({ one }) => ({
+	userMovie: one(userMovies, { fields: [userMovieTags.userMovieId], references: [userMovies.id] }),
+	tag: one(tags, { fields: [userMovieTags.tagId], references: [tags.id] })
 }));
 
 export const groupsRelations = relations(groups, ({ one, many }) => ({
@@ -709,6 +1101,7 @@ export const sharedTagsRelations = relations(sharedTags, ({ one }) => ({
 
 export const loansRelations = relations(loans, ({ one }) => ({
 	userBook: one(userBooks, { fields: [loans.userBookId], references: [userBooks.id] }),
+	userMovie: one(userMovies, { fields: [loans.userMovieId], references: [userMovies.id] }),
 	borrower: one(user, { fields: [loans.borrowerId], references: [user.id] }),
 	owner: one(user, { fields: [loans.ownerId], references: [user.id] })
 }));

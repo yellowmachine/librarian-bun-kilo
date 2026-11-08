@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import type { RequestEvent } from '@sveltejs/kit';
 import { eq, and, sql } from 'drizzle-orm';
 import { withRLS } from '$lib/server/db/rls';
-import { tags, userBookTags, sharedTags } from '$lib/server/db/schema';
+import { tags, userBookTags, userMovieTags, sharedTags } from '$lib/server/db/schema';
 
 export const load = async ({ locals }: RequestEvent) => {
 	const result = await withRLS(locals.user!.id, async (tx) => {
@@ -13,10 +13,12 @@ export const load = async ({ locals }: RequestEvent) => {
 				name: tags.name,
 				color: tags.color,
 				bookCount: sql<number>`count(distinct ${userBookTags.userBookId})::int`,
+				movieCount: sql<number>`count(distinct ${userMovieTags.userMovieId})::int`,
 				groupCount: sql<number>`count(distinct ${sharedTags.groupId})::int`
 			})
 			.from(tags)
 			.leftJoin(userBookTags, eq(tags.id, userBookTags.tagId))
+			.leftJoin(userMovieTags, eq(tags.id, userMovieTags.tagId))
 			.leftJoin(sharedTags, eq(tags.id, sharedTags.tagId))
 			.where(eq(tags.userId, locals.user!.id))
 			.groupBy(tags.id)

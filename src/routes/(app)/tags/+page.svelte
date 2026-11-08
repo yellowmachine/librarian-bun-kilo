@@ -29,10 +29,23 @@
 		editing = null;
 	}
 
-	function requestDelete(tag: { id: string; bookCount: number; groupCount: number }) {
+	type TagUsage = { bookCount: number; movieCount: number; groupCount: number };
+
+	const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+	// "3 books, 1 movie and 2 groups" — solo lo que no es cero
+	function usageParts(tag: TagUsage): string[] {
+		return [
+			tag.bookCount > 0 ? plural(tag.bookCount, 'book', 'books') : null,
+			tag.movieCount > 0 ? plural(tag.movieCount, 'movie', 'movies') : null,
+			tag.groupCount > 0 ? plural(tag.groupCount, 'group', 'groups') : null
+		].filter((p): p is string => p !== null);
+	}
+
+	function requestDelete(tag: { id: string } & TagUsage) {
 		editing = null;
 		// Si el tag no está en uso, no hace falta confirmación
-		if (tag.bookCount === 0 && tag.groupCount === 0) {
+		if (usageParts(tag).length === 0) {
 			confirmingDelete = '__direct__' + tag.id;
 		} else {
 			confirmingDelete = tag.id;
@@ -171,15 +184,10 @@
 							</span>
 							<span class="flex-1 text-xs text-ink-muted">
 								Se eliminará de
-								{#if tag.bookCount > 0}
-									<strong>{tag.bookCount} {tag.bookCount === 1 ? 'book' : 'books'}</strong>
-								{/if}
-								{#if tag.bookCount > 0 && tag.groupCount > 0}
-									and
-								{/if}
-								{#if tag.groupCount > 0}
-									<strong>{tag.groupCount} {tag.groupCount === 1 ? 'group' : 'groups'}</strong>
-								{/if}.
+								{#each usageParts(tag) as part, i (part)}{#if i > 0}{i ===
+										usageParts(tag).length - 1
+											? ' and '
+											: ', '}{/if}<strong>{part}</strong>{/each}.
 							</span>
 							<form
 								method="POST"
@@ -219,8 +227,10 @@
 								{tag.name}
 							</span>
 							<span class="text-xs text-ink-faint">
-								{tag.bookCount}
-								{tag.bookCount === 1 ? 'book' : 'books'}
+								{plural(tag.bookCount, 'book', 'books')}
+								{#if tag.movieCount > 0}
+									· {plural(tag.movieCount, 'movie', 'movies')}
+								{/if}
 								{#if tag.groupCount > 0}
 									· {tag.groupCount} {tag.groupCount === 1 ? 'group' : 'groups'}
 								{/if}

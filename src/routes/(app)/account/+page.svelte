@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { input, label, primary, problem } from '$lib/auth-form';
+	import { formatUsd } from '$lib/aiUsageLabels';
 
 	let { data, form } = $props();
 
@@ -105,6 +106,17 @@
 				>. Se guarda cifrada.
 			</p>
 		</div>
+
+		<a
+			href="/account/ai-usage"
+			class="flex items-center justify-between border border-paper-border px-4 py-3 text-sm transition-colors hover:border-ink-faint"
+		>
+			<span class="text-ink-muted">
+				Consumo de IA este mes:
+				<strong class="font-medium text-ink">{formatUsd(data.monthCostUsd)}</strong>
+			</span>
+			<span class="text-xs text-ink-faint">Ver detalle →</span>
+		</a>
 
 		{#if form?.key?.message}
 			<p class={problem} role="alert">{form.key.message}</p>

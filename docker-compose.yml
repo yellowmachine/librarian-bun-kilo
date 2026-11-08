@@ -26,6 +26,7 @@ services:
       KMS_MASTER_KEY: ${KMS_MASTER_KEY}
       # Opcional: cuota propia para la búsqueda de portadas en Google Books
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
       # Email (SMTP)
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}

@@ -5,6 +5,8 @@
 
 	interface PageData {
 		book?: { title?: string; libraryId?: string | null };
+		movie?: { title?: string; libraryId?: string | null };
+		isOwner?: boolean;
 		userLibraries?: { id: string; name: string }[];
 		group?: { name?: string };
 		loan?: { title?: string };
@@ -15,7 +17,30 @@
 		const data = page.data as PageData;
 
 		// Raíces — sin breadcrumb
-		if (path === '/library' || path === '/groups' || path === '/loans') return [];
+		if (path === '/library' || path === '/movies' || path === '/groups' || path === '/loans')
+			return [];
+
+		if (path.startsWith('/movies')) {
+			if (path === '/movies/add') {
+				return [{ label: 'Movies', href: '/movies' }, { label: 'Add movie' }];
+			}
+			if (/^\/movies\/[^/]+$/.test(path)) {
+				if (data.isOwner === false) {
+					return [
+						{ label: 'Movies · From others', href: '/movies?tab=others' },
+						{ label: data.movie?.title ?? '…' }
+					];
+				}
+				const library = data.userLibraries?.find((lib) => lib.id === data.movie?.libraryId);
+				return [
+					{
+						label: library ? `Movies · ${library.name}` : 'Movies',
+						href: library ? `/movies?libraryId=${library.id}` : '/movies'
+					},
+					{ label: data.movie?.title ?? '…' }
+				];
+			}
+		}
 
 		if (path.startsWith('/library')) {
 			if (path === '/library/add') {
@@ -31,6 +56,10 @@
 					{ label: data.book?.title ?? '…' }
 				];
 			}
+		}
+
+		if (path === '/account/ai-usage') {
+			return [{ label: 'Tu cuenta', href: '/account' }, { label: 'Consumo de IA' }];
 		}
 
 		if (path.startsWith('/tags')) {

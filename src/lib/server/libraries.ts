@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { libraries, userBooks } from './db/schema';
+import { libraries, userBooks, userMovies } from './db/schema';
 import { withRLS } from './db/rls';
 
 export const DEFAULT_LIBRARY_NAME = 'Default';
@@ -105,7 +105,7 @@ export async function setDefaultLibrary(userId: string, libraryId: string): Prom
 	});
 }
 
-// ─── Borrar biblioteca (solo si no es la default y no tiene libros) ──────────
+// ─── Borrar biblioteca (solo si no es la default y no tiene libros ni películas)
 
 export async function deleteLibrary(userId: string, libraryId: string): Promise<void> {
 	await withRLS(userId, async (tx) => {
@@ -123,6 +123,13 @@ export async function deleteLibrary(userId: string, libraryId: string): Promise<
 			.where(eq(userBooks.libraryId, libraryId));
 
 		if (count > 0) throw new Error('Move or remove the books in this library before deleting it.');
+
+		const [{ count: movieCount }] = await tx
+			.select({ count: sql<number>`count(*)::int` })
+			.from(userMovies)
+			.where(eq(userMovies.libraryId, libraryId));
+
+		if (movieCount > 0) throw new Error('Remove the movies in this library before deleting it.');
 
 		await tx
 			.delete(libraries)

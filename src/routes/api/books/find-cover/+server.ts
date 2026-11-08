@@ -29,7 +29,8 @@ export async function POST({ locals, request }: RequestEvent) {
 
 	const found = await findCoverCandidates(
 		{ title, authors: authors.filter(Boolean), isbn: isbn || undefined, publishYear },
-		apiKey
+		apiKey,
+		{ userId: locals.user.id, kind: 'book_cover_search', subject: title }
 	);
 	return json(found);
 }

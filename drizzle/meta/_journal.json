@@ -15,6 +15,62 @@
       "when": 1793269830209,
       "tag": "0001_init",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794157919899,
+      "tag": "0002_movies",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794158636810,
+      "tag": "0003_movie_cover_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794159486885,
+      "tag": "0004_movie_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794160066848,
+      "tag": "0005_book_tags_owner",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794160773840,
+      "tag": "0006_movie_loans",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794161126869,
+      "tag": "0007_loan_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794161475548,
+      "tag": "0008_movie_reviews",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794162156860,
+      "tag": "0009_ai_usage_log",
+      "breakpoints": true
     }
   ]
 }

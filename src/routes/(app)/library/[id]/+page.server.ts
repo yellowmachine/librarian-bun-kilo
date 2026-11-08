@@ -1,16 +1,18 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import {
 	getUserBook,
 	updateUserBook,
 	removeFromLibrary,
 	resolveBook,
-	upsertBook
+	upsertBook,
+	forBookViewer,
+	OPEN_LOAN_ERROR
 } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
-import { tags, userBookTags, loans, userBooks, books } from '$lib/server/db/schema';
+import { tags, userBookTags, userBooks, books } from '$lib/server/db/schema';
 import { fetchWorkById } from '$lib/server/openlibrary';
 import { db } from '$lib/server/db/index';
 import {
@@ -42,7 +44,17 @@ export const load = async ({ locals, params }: RequestEvent) => {
 		isOwner ? getUserLibraries(locals.user!.id) : Promise.resolve([])
 	]);
 
-	return { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries };
+	return {
+		// Sin las notas ni la biblioteca del dueño si quien mira es otro
+		book: forBookViewer(book, locals.user!.id),
+		isOwner,
+		userTags,
+		myReview,
+		reviews,
+		reviewStats,
+		borrowInfo,
+		userLibraries
+	};
 };
 
 export const actions = {
@@ -82,6 +94,8 @@ export const actions = {
 		const color = (data.get('color') as string)?.trim() || null;
 
 		if (!name) return fail(400, { error: 'Name is required' });
+		if (!(await ownsBook(locals.user!.id, params.id!)))
+			return fail(404, { error: 'Book not found.' });
 
 		const tagId = nanoid();
 		await withRLS(locals.user!.id, async (tx) => {
@@ -97,6 +111,8 @@ export const actions = {
 		const data = await request.formData();
 		const tagId = data.get('tagId') as string;
 		if (!tagId) return fail(400, { error: 'tagId is required' });
+		if (!(await ownsBook(locals.user!.id, params.id!)))
+			return fail(404, { error: 'Book not found.' });
 
 		await withRLS(locals.user!.id, (tx) =>
 			tx.insert(userBookTags).values({ userBookId: params.id!, tagId }).onConflictDoNothing()
@@ -428,7 +444,7 @@ export const actions = {
 
 		let loanId: string;
 		try {
-			loanId = await requestLoan(locals.user!.id, params.id!, notes);
+			loanId = await requestLoan(locals.user!.id, { kind: 'book', userBookId: params.id! }, notes);
 		} catch (e) {
 			return fail(400, { error: e instanceof Error ? e.message : 'Error sending request.' });
 		}
@@ -437,28 +453,22 @@ export const actions = {
 
 	// Eliminar libro de la biblioteca
 	remove: async ({ locals, params }: RequestEvent) => {
-		// Verificar que no hay préstamos activos antes de eliminar
-		// (la FK onDelete:restrict lanzaría un error de DB sin este guard)
-		const activeLoans = await withRLS(locals.user!.id, (tx) =>
-			tx
-				.select({ id: loans.id })
-				.from(loans)
-				.where(
-					and(
-						eq(loans.userBookId, params.id!),
-						inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
-					)
-				)
-		);
-
-		if (activeLoans.length > 0) {
-			return fail(400, {
-				error: 'You can’t remove this book because it has an active loan.'
-			});
+		// removeFromLibrary se niega si hay un préstamo en curso; los terminados
+		// quedan en el historial con su foto fija (loans.item_*).
+		try {
+			await removeFromLibrary(locals.user!.id, params.id!);
+		} catch (e) {
+			if (e instanceof Error && e.message === OPEN_LOAN_ERROR)
+				return fail(400, { error: e.message });
+			throw e;
 		}
-
-		await removeFromLibrary(locals.user!.id, params.id!);
-		//return { removed: true };
 		redirect(303, '/library');
 	}
 };
+
+// Solo el dueño etiqueta un libro. La RLS ya lo exige (user_book_tags_insert),
+// pero así quien lo intente con un libro ajeno recibe un 404 y no un 500.
+async function ownsBook(userId: string, userBookId: string): Promise<boolean> {
+	const book = await getUserBook(userId, userBookId);
+	return book?.ownerId === userId;
+}

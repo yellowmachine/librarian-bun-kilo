@@ -7,7 +7,8 @@
 		SignOut,
 		ClockCounterClockwise,
 		Plus,
-		UserCircle
+		UserCircle,
+		FilmSlate
 	} from 'phosphor-svelte';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
 
@@ -19,8 +20,12 @@
 		return currentPath.startsWith(path);
 	}
 
+	// «Add» añade lo que se está viendo: películas en la videoteca, libros en el resto.
+	const inMovies = $derived(isActive('/movies'));
+
 	const NAV = [
 		{ href: '/library', label: 'Library', icon: BookOpen },
+		{ href: '/movies', label: 'Movies', icon: FilmSlate },
 		{ href: '/activity', label: 'Activity', icon: ClockCounterClockwise },
 		{ href: '/groups', label: 'Groups', icon: Books },
 		{ href: '/loans', label: 'Loans', icon: ArrowsLeftRight }
@@ -70,8 +75,8 @@
 			<!-- Usuario + salir -->
 			<div class="flex items-center gap-3">
 				<a
-					href="/library/add"
-					title="Add book"
+					href={inMovies ? '/movies/add' : '/library/add'}
+					title={inMovies ? 'Add movie' : 'Add book'}
 					class="flex items-center gap-1.5 rounded-md border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
 				>
 					<Plus size={15} weight="bold" />

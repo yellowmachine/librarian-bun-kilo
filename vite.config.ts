@@ -39,6 +39,14 @@ export default defineConfig({
 							cacheName: 'openlibrary-covers',
 							expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 }
 						}
+					},
+					{
+						urlPattern: /^https:\/\/image\.tmdb\.org\//,
+						handler: 'CacheFirst',
+						options: {
+							cacheName: 'tmdb-posters',
+							expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 }
+						}
 					}
 				]
 			},

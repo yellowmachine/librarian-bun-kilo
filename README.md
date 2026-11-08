@@ -330,6 +330,7 @@ Pushes to `main` trigger `.github/workflows/build-ghcr.yml`:
 | `SEILIDE_URL` / `SEILIDE_CLIENT_ID` / `SEILIDE_CLIENT_SECRET`                        | optional | «Entrar con Seilide», see [Seilide](#seilide)                                            |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `EMAIL_FROM` | optional | SMTP config (Proton: `smtp.protonmail.ch`, `no-reply@scholio.review` and its SMTP token) |
 | `GOOGLE_BOOKS_API_KEY`                                                               | optional | Own quota for cover search                                                               |
+| `TMDB_API_KEY`                                                                       | optional | Movie search and posters for the video library (TMDB v4 read token or v3 key)            |
 | `SENTRY_DSN` / `PUBLIC_SENTRY_DSN`                                                   | optional | Error tracking                                                                           |
 
 `DATABASE_URL` and `MIGRATION_DATABASE_URL` are built by `docker-compose.yml` from those passwords.

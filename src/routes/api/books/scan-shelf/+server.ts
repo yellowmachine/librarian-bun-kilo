@@ -34,7 +34,8 @@ export async function POST({ locals, request }: RequestEvent) {
 	const candidates = await identifyBooksFromImage(
 		apiKey,
 		result.output.image,
-		userTags.map((t) => t.name)
+		userTags.map((t) => t.name),
+		{ userId: locals.user.id, kind: 'book_shelf_scan' }
 	);
 	return json({ candidates });
 }

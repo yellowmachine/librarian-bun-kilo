@@ -1,27 +1,29 @@
 <script lang="ts">
 	import BookGrid from '$lib/components/BookGrid.svelte';
-	import type { GroupActivityBook } from '$lib/server/groups';
 
 	let { data } = $props();
-	const { books } = $derived(data);
+	const { items } = $derived(data);
 </script>
 
 <div class="space-y-8">
 	<div>
 		<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">Recent activity</h1>
-		<p class="mt-1 text-sm text-ink-faint">Last {books.length} books added across your groups</p>
+		<p class="mt-1 text-sm text-ink-faint">
+			Last {items.length} books and movies added across your groups
+		</p>
 	</div>
 
-	{#if books.length > 0}
+	{#if items.length > 0}
 		<BookGrid
-			books={(books as GroupActivityBook[]).map((b) => ({
-				id: b.userBookId,
-				title: b.title,
-				authors: b.authors,
-				coverUrl: b.coverUrl,
-				publishYear: b.publishYear,
-				isAvailable: b.isAvailable,
-				href: `/library/${b.userBookId}`
+			books={items.map((item) => ({
+				id: `${item.kind}:${item.id}`,
+				title: item.title,
+				authors: item.creators,
+				coverUrl: item.coverUrl,
+				publishYear: item.year,
+				isAvailable: item.isAvailable,
+				isMovie: item.kind === 'movie',
+				href: item.href
 			}))}
 		/>
 	{:else}
