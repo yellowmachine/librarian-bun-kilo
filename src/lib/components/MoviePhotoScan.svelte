@@ -4,7 +4,7 @@
 	// Con una sola película, además puede quedarse su foto como portada.
 	import { onMount } from 'svelte';
 	import { Check } from 'phosphor-svelte';
-	import Spinner from './Spinner.svelte';
+	import Espera from './Espera.svelte';
 	import { cropImage, resizeImageFile } from '$lib/image';
 	import { MEDIA_FORMATS, MEDIA_FORMAT_LABELS, type MediaFormat } from '$lib/mediaFormat';
 	import type { MovieSearchResult } from '$lib/types';
@@ -169,15 +169,12 @@
 		{#if preview}
 			<img src={preview} alt="" class="max-h-64 w-full object-contain opacity-60" />
 		{/if}
-		<div class="flex items-center justify-center gap-2 py-4 text-sm text-ink-faint">
-			<Spinner size="sm" /> Reading the covers…
-		</div>
+		<Espera>Reading the covers…</Espera>
 	</div>
 {:else if phase === 'adding'}
-	<div class="flex items-center justify-center gap-2 py-12 text-sm text-ink-faint">
-		<Spinner size="sm" /> Adding {progress + 1 > selectedCount ? selectedCount : progress + 1} of
-		{selectedCount}…
-	</div>
+	<Espera>
+		Adding {progress + 1 > selectedCount ? selectedCount : progress + 1} of {selectedCount}…
+	</Espera>
 {:else}
 	<div class="space-y-5">
 		<p class="text-sm text-ink-muted">

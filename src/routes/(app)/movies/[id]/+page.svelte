@@ -4,7 +4,7 @@
 	import { Sparkle, Trash } from 'phosphor-svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
 	import { readableTagTextColor } from '$lib/tagColor';
-	import Spinner from '$lib/components/Spinner.svelte';
+	import Espera from '$lib/components/Espera.svelte';
 	import { resizeImageFile } from '$lib/image';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -265,10 +265,11 @@
 						disabled={suggesting}
 						class="flex items-center gap-1 text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
 					>
-						{#if suggesting}<Spinner size="sm" />{:else}<Sparkle size={12} />{/if}
+						<Sparkle size={12} />
 						Suggest
 					</button>
 				{/if}
+				{#if suggesting}<Espera>Suggesting tags…</Espera>{/if}
 			</div>
 
 			{#if suggestion}
@@ -398,9 +399,9 @@
 					disabled={uploadingPhoto}
 					class="flex items-center gap-1.5 text-ink-muted underline underline-offset-2 hover:text-ink"
 				>
-					{#if uploadingPhoto}<Spinner size="sm" />{/if}
 					Photo of my copy
 				</button>
+				{#if uploadingPhoto}<Espera>Uploading photo…</Espera>{/if}
 				<button
 					type="button"
 					onclick={() => (editingCover = !editingCover)}
