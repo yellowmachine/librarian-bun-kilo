@@ -5,6 +5,7 @@
 
 	interface PageData {
 		book?: { title?: string; libraryId?: string | null };
+		movie?: { title?: string; libraryId?: string | null };
 		userLibraries?: { id: string; name: string }[];
 		group?: { name?: string };
 		loan?: { title?: string };
@@ -15,7 +16,24 @@
 		const data = page.data as PageData;
 
 		// Raíces — sin breadcrumb
-		if (path === '/library' || path === '/groups' || path === '/loans') return [];
+		if (path === '/library' || path === '/movies' || path === '/groups' || path === '/loans')
+			return [];
+
+		if (path.startsWith('/movies')) {
+			if (path === '/movies/add') {
+				return [{ label: 'Movies', href: '/movies' }, { label: 'Add movie' }];
+			}
+			if (/^\/movies\/[^/]+$/.test(path)) {
+				const library = data.userLibraries?.find((lib) => lib.id === data.movie?.libraryId);
+				return [
+					{
+						label: library ? `Movies · ${library.name}` : 'Movies',
+						href: library ? `/movies?libraryId=${library.id}` : '/movies'
+					},
+					{ label: data.movie?.title ?? '…' }
+				];
+			}
+		}
 
 		if (path.startsWith('/library')) {
 			if (path === '/library/add') {

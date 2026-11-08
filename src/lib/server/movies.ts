@@ -10,8 +10,9 @@ import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import type { TmdbMovie } from './tmdb';
 
-export const MEDIA_FORMATS = ['dvd', 'bluray', 'uhd_bluray'] as const;
-export type MediaFormat = (typeof MEDIA_FORMATS)[number];
+import type { MediaFormat } from '$lib/mediaFormat';
+
+export { MEDIA_FORMATS, type MediaFormat } from '$lib/mediaFormat';
 
 // ─── COALESCE helpers ─────────────────────────────────────────────────────────
 
