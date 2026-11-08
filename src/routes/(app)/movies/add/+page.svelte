@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Info } from 'phosphor-svelte';
+	import { ArrowLeft, Camera, Info } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
+	import MoviePhotoScan, { type ScanSummary } from '$lib/components/MoviePhotoScan.svelte';
 	import {
 		MEDIA_FORMATS,
 		MEDIA_FORMAT_LABELS,
@@ -13,9 +14,9 @@
 	import type { MovieSearchResult } from '$lib/types';
 
 	let { data } = $props();
-	const { tmdbEnabled, userLibraries } = $derived(data);
+	const { tmdbEnabled, canScan, userLibraries } = $derived(data);
 
-	type Mode = 'search' | 'confirm' | 'manual';
+	type Mode = 'search' | 'confirm' | 'manual' | 'photo';
 	// Sin TMDB solo queda el alta manual.
 	// svelte-ignore state_referenced_locally
 	let mode = $state<Mode>(data.tmdbEnabled ? 'search' : 'manual');
@@ -55,6 +56,39 @@
 	const duplicateLibraryName = $derived(
 		userLibraries.find((lib) => lib.id === duplicate?.libraryId)?.name ?? 'your library'
 	);
+
+	// ── Alta por foto ─────────────────────────────────────────────────────────
+	let photoInput = $state<HTMLInputElement>();
+	let photoFile = $state<File | null>(null);
+	let scanSummary = $state<ScanSummary | null>(null);
+	// Para volver al modo de partida al cancelar la foto
+	let modeBeforePhoto: Mode = 'search';
+
+	function onPhotoSelected(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		errorMsg = '';
+		scanSummary = null;
+		modeBeforePhoto = mode === 'photo' ? modeBeforePhoto : mode;
+		photoFile = file;
+		mode = 'photo';
+	}
+
+	function leavePhoto() {
+		photoFile = null;
+		mode = modeBeforePhoto;
+	}
+
+	async function onScanDone(summary: ScanSummary, singleId: string | null) {
+		if (singleId && summary.added === 1) {
+			await goto(`/movies/${singleId}`);
+			return;
+		}
+		scanSummary = summary;
+		leavePhoto();
+	}
 
 	async function onSearch(e: SubmitEvent) {
 		e.preventDefault();
@@ -250,6 +284,25 @@
 	{/if}
 {/snippet}
 
+{#snippet photoButton()}
+	{#if canScan}
+		<button
+			type="button"
+			onclick={() => photoInput?.click()}
+			class="group flex w-full items-center justify-center gap-3 border border-paper-border p-4 text-sm text-ink-muted transition-colors hover:border-ink hover:text-ink"
+		>
+			<Camera size={22} weight="thin" class="text-ink-faint group-hover:text-ink" />
+			Take a photo of the cover (or of several spines)
+		</button>
+	{:else}
+		<p class="text-center text-xs text-ink-faint">
+			Connect an OpenRouter key in <a href="/account" class="underline underline-offset-2"
+				>your account</a
+			> to add movies from a photo.
+		</p>
+	{/if}
+{/snippet}
+
 {#snippet actions(onAdd: () => void)}
 	<div class="flex gap-3">
 		<button
@@ -277,6 +330,11 @@
 			href="/movies"
 			aria-label="Back"
 			onclick={(e) => {
+				if (mode === 'photo') {
+					e.preventDefault();
+					leavePhoto();
+					return;
+				}
 				if (mode === 'search' || !tmdbEnabled) return;
 				e.preventDefault();
 				back();
@@ -290,7 +348,46 @@
 		<p class="border border-ink bg-paper-ui px-4 py-2.5 text-sm text-ink">{errorMsg}</p>
 	{/if}
 
-	{#if mode === 'search'}
+	{#if scanSummary}
+		<div
+			class="flex items-center justify-between border border-paper-border bg-paper-ui px-4 py-2.5 text-sm text-ink-muted"
+		>
+			<span>
+				Added {scanSummary.added}
+				{scanSummary.added === 1 ? 'movie' : 'movies'} from the photo.
+				{#if scanSummary.duplicates > 0}{scanSummary.duplicates} you already had.{/if}
+				{#if scanSummary.failed > 0}{scanSummary.failed} could not be added.{/if}
+			</span>
+			<a href="/movies" class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2"
+				>View movies</a
+			>
+		</div>
+	{/if}
+
+	<input
+		bind:this={photoInput}
+		type="file"
+		accept="image/*"
+		capture="environment"
+		class="hidden"
+		onchange={onPhotoSelected}
+	/>
+
+	{#if mode === 'photo' && photoFile}
+		{#key photoFile}
+			<MoviePhotoScan
+				file={photoFile}
+				{userLibraries}
+				bind:libraryId
+				onCancel={leavePhoto}
+				onDone={onScanDone}
+				onError={(message) => {
+					errorMsg = message;
+					leavePhoto();
+				}}
+			/>
+		{/key}
+	{:else if mode === 'search'}
 		<form onsubmit={onSearch} class="flex gap-2">
 			<!-- svelte-ignore a11y_autofocus -->
 			<input
@@ -334,6 +431,8 @@
 			{/if}
 		{/if}
 
+		{@render photoButton()}
+
 		<p class="text-center text-sm text-ink-faint">
 			Not there? <button
 				type="button"
@@ -361,6 +460,7 @@
 				<p class="border border-paper-border bg-paper-ui px-4 py-2.5 text-sm text-ink-muted">
 					Movie search isn't set up on this server, so movies are entered by hand.
 				</p>
+				{@render photoButton()}
 			{/if}
 
 			<div>

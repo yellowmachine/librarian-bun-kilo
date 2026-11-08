@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { Trash } from 'phosphor-svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
+	import { resizeImageFile } from '$lib/image';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
@@ -10,6 +13,38 @@
 	const { movie, userLibraries } = $derived(data);
 
 	let confirmingRemove = $state(false);
+
+	// ── Foto propia de la carátula ────────────────────────────────────────────
+	let photoInput = $state<HTMLInputElement>();
+	let uploadingPhoto = $state(false);
+	let photoError = $state('');
+
+	async function onPhotoSelected(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		uploadingPhoto = true;
+		photoError = '';
+		try {
+			const image = await resizeImageFile(file, 800, 0.82);
+			const res = await fetch(`/api/movies/${movie.userMovieId}/cover`, {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ image })
+			});
+			if (!res.ok) {
+				photoError =
+					(await res.json().catch(() => null))?.message ?? 'The photo could not be saved.';
+				return;
+			}
+			await invalidateAll();
+		} catch {
+			photoError = 'The photo could not be saved.';
+		} finally {
+			uploadingPhoto = false;
+		}
+	}
 	let removeForm = $state<HTMLFormElement>();
 	let editingCover = $state(false);
 
@@ -151,7 +186,7 @@
 					type="url"
 					required
 					pattern="https://.*"
-					placeholder="https://... (e.g. a photo of this edition)"
+					placeholder="https://..."
 					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
 				/>
 				<button
@@ -160,19 +195,37 @@
 				>
 			</form>
 		{/if}
-		<div class="flex gap-4 text-xs">
+		<input
+			bind:this={photoInput}
+			type="file"
+			accept="image/*"
+			capture="environment"
+			class="hidden"
+			onchange={onPhotoSelected}
+		/>
+		{#if photoError}<p class="text-xs text-red-700">{photoError}</p>{/if}
+		<div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+			<button
+				type="button"
+				onclick={() => photoInput?.click()}
+				disabled={uploadingPhoto}
+				class="flex items-center gap-1.5 text-ink-muted underline underline-offset-2 hover:text-ink"
+			>
+				{#if uploadingPhoto}<Spinner size="sm" />{/if}
+				Photo of my copy
+			</button>
 			<button
 				type="button"
 				onclick={() => (editingCover = !editingCover)}
 				class="text-ink-muted underline underline-offset-2 hover:text-ink"
 			>
-				{editingCover ? 'Cancel' : 'Use another image'}
+				{editingCover ? 'Cancel' : 'Image from a URL'}
 			</button>
-			{#if movie.coverOverridden && movie.movieId}
+			{#if movie.coverOverridden}
 				<form method="POST" action="?/setCover" use:enhance>
 					<input type="hidden" name="coverUrl" value="" />
 					<button type="submit" class="text-ink-muted underline underline-offset-2 hover:text-ink">
-						Back to the TMDB poster
+						{movie.movieId ? 'Back to the TMDB poster' : 'Remove cover'}
 					</button>
 				</form>
 			{/if}
