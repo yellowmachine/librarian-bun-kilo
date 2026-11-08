@@ -288,7 +288,7 @@
 					onclick={() => (format = f)}
 					class="border py-2 text-sm transition-colors
 					{format === f
-						? 'border-ink bg-ink text-paper'
+						? 'border-brown-700 bg-brown-700 text-brown-50'
 						: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
 				>
 					{MEDIA_FORMAT_LABELS[f]}
@@ -307,7 +307,7 @@
 			bind:value={edition}
 			maxlength="200"
 			placeholder="Steelbook, collector's edition, director's cut..."
-			class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+			class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 		/>
 	</div>
 
@@ -321,7 +321,7 @@
 			rows="2"
 			maxlength="1000"
 			placeholder="Condition, extras, region..."
-			class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+			class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 		></textarea>
 	</div>
 
@@ -336,7 +336,7 @@
 			<select
 				id="library"
 				bind:value={libraryId}
-				class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			>
 				{#each userLibraries as lib (lib.id)}
 					<option value={lib.id}>{lib.name}</option>
@@ -363,7 +363,7 @@
 				<button
 					type="button"
 					onclick={suggestManualTags}
-					class="flex items-center gap-1 tracking-normal text-ink-faint normal-case underline underline-offset-2 hover:text-ink"
+					class="flex items-center gap-1 tracking-normal link-action normal-case"
 				>
 					<Sparkle size={12} /> Suggest
 				</button>
@@ -396,10 +396,7 @@
 			<p class="text-sm text-ink-muted">
 				You already have this movie on {formatLine(duplicate.format, duplicate.edition)} in
 				<strong>{duplicateLibraryName}</strong>.
-				<a
-					href="/movies/{duplicate.userMovieId}"
-					class="underline underline-offset-2 hover:text-ink">View it</a
-				>
+				<a href="/movies/{duplicate.userMovieId}" class="link-action">View it</a>
 			</p>
 		</div>
 	{/if}
@@ -417,9 +414,8 @@
 		</button>
 	{:else}
 		<p class="text-center text-xs text-ink-faint">
-			Connect an OpenRouter key in <a href="/account" class="underline underline-offset-2"
-				>your account</a
-			> to add movies from a photo.
+			Connect an OpenRouter key in <a href="/account" class="link-action">your account</a> to add movies
+			from a photo.
 		</p>
 	{/if}
 {/snippet}
@@ -429,7 +425,7 @@
 		<button
 			type="button"
 			onclick={() => (data.tmdbEnabled ? back() : history.back())}
-			class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
+			class="flex-1 border btn-secondary py-2.5 text-sm"
 		>
 			Cancel
 		</button>
@@ -437,7 +433,7 @@
 			type="submit"
 			onclick={onAdd}
 			disabled={saving}
-			class="flex flex-1 items-center justify-center gap-2 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90 disabled:opacity-60"
+			class="flex flex-1 items-center justify-center gap-2 border btn-primary py-2.5 text-sm disabled:opacity-60"
 		>
 			{#if saving}<Spinner size="sm" />{/if}
 			{duplicate ? 'Add another copy' : 'Add to my movies'}
@@ -479,9 +475,7 @@
 				{#if scanSummary.duplicates > 0}{scanSummary.duplicates} you already had.{/if}
 				{#if scanSummary.failed > 0}{scanSummary.failed} could not be added.{/if}
 			</span>
-			<a href="/movies" class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2"
-				>View movies</a
-			>
+			<a href="/movies" class="ml-4 shrink-0 text-xs link-action">View movies</a>
 		</div>
 	{/if}
 
@@ -516,13 +510,9 @@
 				bind:value={query}
 				placeholder="Title, optionally with the year: Alien 1979"
 				autofocus
-				class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			/>
-			<button
-				type="submit"
-				disabled={searching}
-				class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-			>
+			<button type="submit" disabled={searching} class="border btn-primary px-4 py-2 text-sm">
 				Search
 			</button>
 		</form>
@@ -555,10 +545,8 @@
 		{@render photoButton()}
 
 		<p class="text-center text-sm text-ink-faint">
-			Not there? <button
-				type="button"
-				onclick={enterManual}
-				class="text-ink underline underline-offset-2">Enter it manually</button
+			Not there? <button type="button" onclick={enterManual} class="link-action"
+				>Enter it manually</button
 			>
 		</p>
 	{:else if mode === 'confirm' && selected}
@@ -599,7 +587,7 @@
 					required
 					maxlength="500"
 					autofocus
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -615,7 +603,7 @@
 					type="text"
 					bind:value={manualOriginalTitle}
 					maxlength="500"
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -632,7 +620,7 @@
 						type="text"
 						bind:value={manualDirectors}
 						placeholder="Separate several with commas"
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 				<div>
@@ -649,7 +637,7 @@
 						min="1800"
 						max="2999"
 						bind:value={manualYear}
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 			</div>
@@ -666,7 +654,7 @@
 					bind:value={manualOverview}
 					rows="3"
 					maxlength="5000"
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -683,7 +671,7 @@
 					bind:value={manualCoverUrl}
 					pattern="https://.*"
 					placeholder="https://..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 

@@ -21,14 +21,11 @@
 		<div class="flex gap-2">
 			<button
 				onclick={() => (showJoinForm = !showJoinForm)}
-				class="border border-paper-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-ink hover:text-ink"
+				class="border btn-secondary px-4 py-2 text-sm"
 			>
 				Join
 			</button>
-			<a
-				href="/groups/new"
-				class="flex items-center gap-1.5 border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-			>
+			<a href="/groups/new" class="flex items-center gap-1.5 border btn-primary px-4 py-2 text-sm">
 				<Plus size={16} weight="bold" /> New
 			</a>
 		</div>
@@ -48,17 +45,12 @@
 					placeholder="ABC12345"
 					autofocus
 					maxlength="8"
-					class="min-w-0 flex-1 border border-paper-border px-3 py-2 font-mono text-sm tracking-widest uppercase focus:border-ink focus:ring-0"
+					class="min-w-0 flex-1 border border-paper-border px-3 py-2 font-mono text-sm tracking-widest uppercase focus:border-brown-600 focus:ring-0"
 				/>
-				<button
-					type="submit"
-					class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90"
-				>
-					Enter
-				</button>
+				<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Enter </button>
 			</form>
 			{#if form?.joinError}
-				<p class="mt-2 text-sm text-red-500">{form.joinError}</p>
+				<p class="mt-2 text-sm text-red-700">{form.joinError}</p>
 			{/if}
 		</div>
 	{/if}
@@ -69,11 +61,9 @@
 			<Users size={48} weight="thin" class="mb-4 text-ink-faint" />
 			<p class="text-sm text-ink-faint">You don't belong to any groups yet.</p>
 			<div class="mt-4 flex gap-4 text-sm">
-				<a href="/groups/new" class="text-ink underline underline-offset-2">Create group</a>
+				<a href="/groups/new" class="link-action">Create group</a>
 				<span class="text-ink-faint">|</span>
-				<button onclick={() => (showJoinForm = true)} class="text-ink underline underline-offset-2">
-					Join with code
-				</button>
+				<button onclick={() => (showJoinForm = true)} class="link-action"> Join with code </button>
 			</div>
 		</div>
 	{:else}

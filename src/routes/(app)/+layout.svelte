@@ -35,29 +35,31 @@
 <div class="flex min-h-screen flex-col bg-paper">
 	<!-- ── Cabecera ──────────────────────────────────────────────────────── -->
 	<header data-top-bar class="sticky top-0 z-30 border-b border-paper-border bg-paper">
-		<div class="mx-auto flex max-w-4xl items-center justify-between px-5 py-3">
+		<div class="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-3">
 			<!-- Logotipo -->
 			<a
 				href="/library"
 				class="flex items-center gap-2 font-serif text-xl font-normal tracking-tight text-ink"
 			>
 				<img src="/icons/icon.svg" alt="" class="h-7 w-7 shrink-0" />
-				<!-- En móvil no cabe entero junto al icono: «Librarian», como el short_name del manifest -->
-				<span class="whitespace-nowrap"
-					><span class="hidden sm:inline">The Svelte </span>Librarian</span
-				>
+				<!-- «Librarian», como el short_name del manifest: «The Svelte Librarian» no cabe junto al
+				     menú en el ancho de la página (max-w-4xl). -->
+				<span class="whitespace-nowrap">Librarian</span>
 			</a>
 
-			<!-- Nav principal — solo visible en sm+ -->
+			<!-- Nav principal — solo visible en sm+; hasta lg, solo los iconos (no cabe con el texto) -->
 			<nav class="hidden items-center gap-1 sm:flex">
 				{#each NAV as item (item.href)}
 					<a
 						href={item.href}
+						title={item.label}
 						class="relative flex items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors
-						{isActive(item.href) ? 'bg-ink text-paper' : 'text-ink-muted hover:bg-paper-ui hover:text-ink'}"
+						{isActive(item.href)
+							? 'bg-brown-700 text-brown-50'
+							: 'text-ink-muted hover:bg-paper-ui hover:text-ink'}"
 					>
 						<item.icon weight={isActive(item.href) ? 'fill' : 'regular'} size={16} />
-						<span>{item.label}</span>
+						<span class="sr-only lg:not-sr-only">{item.label}</span>
 
 						{#if item.href === '/loans' && pendingLoans > 0}
 							<span
@@ -77,7 +79,7 @@
 				<a
 					href={inMovies ? '/movies/add' : '/library/add'}
 					title={inMovies ? 'Add movie' : 'Add book'}
-					class="flex items-center gap-1.5 rounded-md border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
+					class="flex items-center gap-1.5 rounded-md border btn-primary px-3 py-2 text-sm"
 				>
 					<Plus size={15} weight="bold" />
 					<span class="hidden sm:inline">Add</span>
@@ -89,7 +91,7 @@
 					{isActive('/account') ? 'text-ink' : ''}"
 				>
 					<UserCircle size={18} weight={isActive('/account') ? 'fill' : 'regular'} />
-					<span class="hidden sm:inline">{user.name}</span>
+					<span class="hidden max-w-32 truncate lg:inline">{user.name}</span>
 				</a>
 				<form method="POST" action="/logout">
 					<button
@@ -137,7 +139,7 @@
 				<a
 					href={item.href}
 					class="relative flex flex-1 flex-col items-center gap-1 py-3 text-xs transition-colors
-					{isActive(item.href) ? 'text-ink' : 'text-ink-faint'}"
+					{isActive(item.href) ? 'text-brown-700' : 'text-ink-faint'}"
 				>
 					<item.icon weight={isActive(item.href) ? 'fill' : 'regular'} size={22} />
 					<span>{item.label}</span>

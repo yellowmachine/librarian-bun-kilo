@@ -34,18 +34,10 @@
 		</div>
 		<p class="mt-3 text-sm text-ink-muted">Do you want to add it anyway?</p>
 		<div class="mt-5 flex justify-end gap-2">
-			<button
-				type="button"
-				onclick={oncancel}
-				class="border border-paper-border px-4 py-1.5 text-sm text-ink-muted hover:border-ink-faint"
-			>
+			<button type="button" onclick={oncancel} class="border btn-secondary px-4 py-1.5 text-sm">
 				Cancel
 			</button>
-			<button
-				type="button"
-				onclick={onconfirm}
-				class="border border-ink bg-ink px-4 py-1.5 text-sm text-paper hover:bg-ink/90"
-			>
+			<button type="button" onclick={onconfirm} class="border btn-primary px-4 py-1.5 text-sm">
 				Add anyway
 			</button>
 		</div>

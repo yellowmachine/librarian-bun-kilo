@@ -161,7 +161,7 @@
 	}
 
 	const selectClass =
-		'w-full border border-paper-border bg-paper px-2 py-1.5 text-sm focus:border-ink focus:ring-0';
+		'w-full border border-paper-border bg-paper px-2 py-1.5 text-sm focus:border-brown-600 focus:ring-0';
 </script>
 
 {#if phase === 'analyzing'}
@@ -197,7 +197,9 @@
 							aria-label={item.selected ? 'Skip' : 'Add'}
 							aria-pressed={item.selected}
 							class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors
-							{item.selected ? 'border-ink bg-ink text-paper' : 'border-paper-border text-transparent'}"
+							{item.selected
+								? 'border-brown-700 bg-brown-700 text-brown-50'
+								: 'border-paper-border text-transparent'}"
 						>
 							<Check size={12} weight="bold" />
 						</button>
@@ -273,7 +275,7 @@
 							aria-pressed={coverChoice === option.key}
 							class="space-y-1.5 border p-2 text-xs transition-colors disabled:opacity-40
 							{coverChoice === option.key
-								? 'border-ink text-ink'
+								? 'border-brown-700 text-ink'
 								: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
 						>
 							<div class="aspect-[2/3] w-full overflow-hidden bg-paper-ui">
@@ -289,18 +291,14 @@
 		{/if}
 
 		<div class="flex gap-3">
-			<button
-				type="button"
-				onclick={onCancel}
-				class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
-			>
+			<button type="button" onclick={onCancel} class="flex-1 border btn-secondary py-2.5 text-sm">
 				Cancel
 			</button>
 			<button
 				type="button"
 				onclick={addSelected}
 				disabled={selectedCount === 0}
-				class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90 disabled:opacity-40"
+				class="flex-1 border btn-primary py-2.5 text-sm disabled:opacity-40"
 			>
 				{selectedCount === 1 ? 'Add movie' : `Add ${selectedCount} movies`}
 			</button>

@@ -41,7 +41,9 @@
 					aria-label={checked ? 'Deselect' : 'Select'}
 					aria-pressed={checked}
 					class="absolute top-1.5 left-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border transition-colors
-					{checked ? 'border-ink bg-ink text-paper' : 'border-paper-border bg-paper/90 text-transparent'}"
+					{checked
+						? 'border-brown-700 bg-brown-700 text-brown-50'
+						: 'border-paper-border bg-paper/90 text-transparent'}"
 				>
 					<Check size={12} weight="bold" />
 				</button>

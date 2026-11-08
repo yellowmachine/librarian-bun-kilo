@@ -73,7 +73,7 @@
 					</div>
 					<button
 						onclick={copyInviteCode}
-						class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-xs text-ink-muted hover:border-ink-faint hover:text-ink"
+						class="flex items-center gap-1.5 border btn-secondary px-3 py-2 text-xs"
 					>
 						<Copy size={14} />
 						{copied ? 'Copied!' : 'Copy'}
@@ -93,10 +93,7 @@
 				<InviteQR inviteCode={group.inviteCode} />
 			{:else if isOwner}
 				<form method="POST" action="?/regenerateCode" use:enhance>
-					<button
-						type="submit"
-						class="flex items-center gap-1.5 text-sm text-ink-faint hover:text-ink"
-					>
+					<button type="submit" class="flex items-center gap-1.5 text-sm action-text">
 						<ArrowsClockwise size={14} /> Generate invitation code
 					</button>
 				</form>
@@ -112,7 +109,7 @@
 					onclick={() => (activeTab = tab.key as 'shared' | 'members')}
 					class="border-b-2 pb-3 text-sm transition-colors
 					{activeTab === tab.key
-						? 'border-ink font-medium text-ink'
+						? 'border-brown-700 font-medium text-ink'
 						: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 				>
 					{tab.label}
@@ -141,7 +138,7 @@
 									type="submit"
 									class="flex items-center gap-1.5 border px-3 py-1 text-xs transition-all
 									{tag.alreadyShared
-										? 'border-ink bg-ink text-paper hover:border-red-600 hover:bg-red-600'
+										? 'border-brown-700 bg-brown-700 text-brown-50 hover:border-red-600 hover:bg-red-600'
 										: 'border-dashed border-paper-border text-ink-muted hover:border-ink hover:text-ink'}"
 								>
 									{tag.name}
@@ -168,7 +165,7 @@
 									class="border px-3 py-0.5 text-xs"
 									style={st.tagColor
 										? `border-color: ${st.tagColor}44; color: ${st.tagColor}`
-										: 'border-color: #e8e2da; color: #3d3d3d'}
+										: 'border-color: var(--color-paper-border); color: #3d3d3d'}
 								>
 									{st.tagName}
 								</span>
@@ -207,7 +204,7 @@
 					{#if isOwnerOrAdmin && member.role !== 'owner'}
 						<button
 							type="button"
-							class="text-ink-faint hover:text-red-400"
+							class="text-ink-faint hover:text-red-700"
 							onclick={() => (pendingRemove = { userId: member.userId, name: member.name })}
 						>
 							<X size={14} />
@@ -220,7 +217,7 @@
 		{#if !isOwner}
 			<button
 				type="button"
-				class="text-sm text-ink-faint hover:text-red-500"
+				class="text-sm text-ink-faint hover:text-red-700"
 				onclick={() => (confirmLeave = true)}
 			>
 				Leave this group?
@@ -239,7 +236,7 @@
 			<div class="mt-5 flex justify-end gap-3">
 				<button
 					type="button"
-					class="border border-paper-border px-4 py-2 text-sm text-ink-muted hover:border-ink-faint hover:text-ink"
+					class="border btn-secondary px-4 py-2 text-sm"
 					onclick={() => (pendingRemove = null)}
 				>
 					Cancel
@@ -275,7 +272,7 @@
 			<div class="mt-5 flex justify-end gap-3">
 				<button
 					type="button"
-					class="border border-paper-border px-4 py-2 text-sm text-ink-muted hover:border-ink-faint hover:text-ink"
+					class="border btn-secondary px-4 py-2 text-sm"
 					onclick={() => (confirmLeave = false)}
 				>
 					Cancel

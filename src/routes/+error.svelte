@@ -11,10 +11,7 @@
 		<p class="mt-2 text-sm text-ink-faint">
 			{page.error?.message ?? 'An unexpected error has occurred.'}
 		</p>
-		<a
-			href="/library"
-			class="mt-8 inline-block border border-ink bg-ink px-6 py-2.5 text-sm text-paper hover:bg-ink/90"
-		>
+		<a href="/library" class="mt-8 inline-block border btn-primary px-6 py-2.5 text-sm">
 			Back to your library
 		</a>
 	</div>

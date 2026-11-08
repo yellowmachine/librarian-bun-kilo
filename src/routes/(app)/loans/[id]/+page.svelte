@@ -209,15 +209,15 @@
 							name="ownerNotes"
 							placeholder="Message to the borrower (optional)"
 							rows="2"
-							class="mb-2 w-full resize-none border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+							class="mb-2 w-full resize-none border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 						></textarea>
 					{/if}
 					<button
 						type="submit"
 						class="w-full py-2.5 text-sm transition-colors
-						{action.variant === 'primary' ? 'border border-ink bg-ink text-paper hover:bg-ink/90' : ''}
+						{action.variant === 'primary' ? 'border btn-primary' : ''}
 						{action.variant === 'danger'
-							? 'border border-paper-border text-red-500 hover:border-red-300 hover:bg-red-50'
+							? 'border border-paper-border text-red-700 hover:border-red-300 hover:bg-red-50'
 							: ''}
 						{action.variant === 'ghost'
 							? 'border border-paper-border text-ink-muted hover:border-ink-faint'

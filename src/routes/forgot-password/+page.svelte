@@ -27,8 +27,6 @@
 		</form>
 	{/if}
 	<p class="mt-8 text-center text-sm">
-		<a href="/login" class="text-ink-faint underline-offset-2 hover:text-ink hover:underline"
-			>Volver a entrar</a
-		>
+		<a href="/login" class="link-action">Volver a entrar</a>
 	</p>
 </AuthCard>

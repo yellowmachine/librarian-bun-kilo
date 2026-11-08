@@ -67,7 +67,7 @@
 			type="search"
 			bind:value={inputValue}
 			placeholder="Search by title or author…"
-			class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+			class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 		/>
 	</form>
 
@@ -79,7 +79,7 @@
 					onclick={() => (activeTab = tab.key as 'borrower' | 'owner')}
 					class="flex items-center gap-2 border-b-2 pb-3 text-sm transition-colors
 					{activeTab === tab.key
-						? 'border-ink font-medium text-ink'
+						? 'border-brown-700 font-medium text-ink'
 						: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 				>
 					{tab.label}

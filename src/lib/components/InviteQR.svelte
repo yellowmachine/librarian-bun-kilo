@@ -20,7 +20,7 @@
 	<button
 		type="button"
 		onclick={() => (visible = !visible)}
-		class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-xs text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+		class="flex items-center gap-1.5 border btn-secondary px-3 py-2 text-xs"
 	>
 		<QrCode size={14} />
 		{visible ? 'Hide QR' : 'Show QR'}
