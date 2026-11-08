@@ -39,7 +39,7 @@ Respond with ONLY a JSON array (no markdown, no explanation), one object per boo
 [{"title": "...", "author": "..." or null, "confidence": "high" | "medium" | "low"${tagsField}}]`;
 }
 
-function toConfidence(value: unknown): ShelfBookCandidate['confidence'] {
+export function toConfidence(value: unknown): ShelfBookCandidate['confidence'] {
 	return value === 'high' || value === 'medium' || value === 'low' ? value : 'medium';
 }
 
@@ -68,15 +68,18 @@ export function extractJson(content: string): string {
 }
 
 /**
- * Best-effort: cualquier fallo (red, parseo, respuesta vacía) devuelve una
- * lista vacía en vez de lanzar — un fallo aquí no debe romper el flujo de
- * añadir libros, simplemente no habrá candidatos que revisar.
+ * Manda una foto y un prompt al modelo de visión y devuelve la respuesta ya
+ * parseada como array JSON, o null si algo falla (red, error HTTP, respuesta
+ * vacía, JSON inválido o que no es un array). Nunca lanza: lo registra con
+ * `label` delante y deja que quien llama decida qué hacer sin candidatos.
+ * Lo usan el escaneo de estanterías y el de carátulas (movieVision.ts).
  */
-export async function identifyBooksFromImage(
+export async function askVisionModel(
 	apiKey: string,
+	prompt: string,
 	imageDataUrl: string,
-	availableTagNames: string[] = []
-): Promise<ShelfBookCandidate[]> {
+	label: string
+): Promise<unknown[] | null> {
 	try {
 		const res = await fetch(OPENROUTER_URL, {
 			method: 'POST',
@@ -94,7 +97,7 @@ export async function identifyBooksFromImage(
 					{
 						role: 'user',
 						content: [
-							{ type: 'text', text: buildPrompt(availableTagNames) },
+							{ type: 'text', text: prompt },
 							{ type: 'image_url', image_url: { url: imageDataUrl } }
 						]
 					}
@@ -104,60 +107,73 @@ export async function identifyBooksFromImage(
 
 		if (!res.ok) {
 			const body = await res.text().catch(() => '');
-			console.error(`identifyBooksFromImage: OpenRouter ${res.status}`, body.slice(0, 1000));
-			return [];
+			console.error(`${label}: OpenRouter ${res.status}`, body.slice(0, 1000));
+			return null;
 		}
 
 		const data = await res.json();
 		const content: string | undefined = data.choices?.[0]?.message?.content;
 		if (!content) {
-			console.error(
-				'identifyBooksFromImage: empty content in response',
-				JSON.stringify(data).slice(0, 1000)
-			);
-			return [];
+			console.error(`${label}: empty content in response`, JSON.stringify(data).slice(0, 1000));
+			return null;
 		}
 
 		let parsed: unknown;
 		try {
 			parsed = JSON.parse(extractJson(content));
 		} catch (parseErr) {
-			console.error('identifyBooksFromImage: could not parse model output as JSON', {
+			console.error(`${label}: could not parse model output as JSON`, {
 				error: parseErr,
 				content: content.slice(0, 1000)
 			});
-			return [];
+			return null;
 		}
 		if (!Array.isArray(parsed)) {
-			console.error(
-				'identifyBooksFromImage: parsed output is not an array',
-				content.slice(0, 1000)
-			);
-			return [];
+			console.error(`${label}: parsed output is not an array`, content.slice(0, 1000));
+			return null;
 		}
-
-		const candidates: ShelfBookCandidate[] = parsed
-			.filter(
-				(c): c is { title: unknown; author?: unknown; confidence?: unknown } =>
-					c && typeof c.title === 'string' && c.title.trim().length > 0
-			)
-			.map((c) => ({
-				title: (c.title as string).trim(),
-				author: typeof c.author === 'string' && c.author.trim() ? c.author.trim() : null,
-				confidence: toConfidence(c.confidence),
-				tags: filterKnownTags((c as { tags?: unknown }).tags, availableTagNames)
-			}));
-
-		if (candidates.length === 0) {
-			console.error(
-				'identifyBooksFromImage: model returned zero valid candidates',
-				content.slice(0, 1000)
-			);
-		}
-
-		return candidates;
+		return parsed;
 	} catch (err) {
-		console.error('identifyBooksFromImage: unexpected failure', err);
-		return [];
+		console.error(`${label}: unexpected failure`, err);
+		return null;
 	}
+}
+
+/**
+ * Best-effort: cualquier fallo (red, parseo, respuesta vacía) devuelve una
+ * lista vacía en vez de lanzar — un fallo aquí no debe romper el flujo de
+ * añadir libros, simplemente no habrá candidatos que revisar.
+ */
+export async function identifyBooksFromImage(
+	apiKey: string,
+	imageDataUrl: string,
+	availableTagNames: string[] = []
+): Promise<ShelfBookCandidate[]> {
+	const parsed = await askVisionModel(
+		apiKey,
+		buildPrompt(availableTagNames),
+		imageDataUrl,
+		'identifyBooksFromImage'
+	);
+	if (!parsed) return [];
+
+	const candidates: ShelfBookCandidate[] = parsed
+		.filter(
+			(c): c is { title: unknown; author?: unknown; confidence?: unknown } =>
+				typeof c === 'object' &&
+				c !== null &&
+				typeof (c as { title?: unknown }).title === 'string' &&
+				(c as { title: string }).title.trim().length > 0
+		)
+		.map((c) => ({
+			title: (c.title as string).trim(),
+			author: typeof c.author === 'string' && c.author.trim() ? c.author.trim() : null,
+			confidence: toConfidence(c.confidence),
+			tags: filterKnownTags((c as { tags?: unknown }).tags, availableTagNames)
+		}));
+
+	if (candidates.length === 0) {
+		console.error('identifyBooksFromImage: model returned zero valid candidates');
+	}
+	return candidates;
 }
