@@ -3,6 +3,8 @@
 	import { MagnifyingGlass, Plus } from 'phosphor-svelte';
 	import BookGrid from '$lib/components/BookGrid.svelte';
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { readableTagTextColor } from '$lib/tagColor';
 	import {
 		MEDIA_FORMATS,
 		MEDIA_FORMAT_LABELS,
@@ -19,6 +21,20 @@
 
 	let search = $state('');
 	let activeFormat = $state<MediaFormat | null>(null);
+	const activeTagIds = new SvelteSet<string>();
+
+	// Etiquetas presentes en la videoteca, para filtrar
+	const tagsInUse = $derived(
+		userMovies
+			.flatMap((m) => m.tags)
+			.filter((tag, i, all) => all.findIndex((t) => t.id === tag.id) === i)
+			.sort((a, b) => a.name.localeCompare(b.name))
+	);
+
+	function toggleTag(id: string) {
+		if (activeTagIds.has(id)) activeTagIds.delete(id);
+		else activeTagIds.add(id);
+	}
 
 	function normalize(s: string) {
 		return s
@@ -35,6 +51,8 @@
 	const filtered = $derived.by(() => {
 		let list = userMovies;
 		if (activeFormat) list = list.filter((m) => m.format === activeFormat);
+		if (activeTagIds.size > 0)
+			list = list.filter((m) => m.tags.some((t) => activeTagIds.has(t.id)));
 		if (search.trim()) {
 			const q = normalize(search);
 			list = list.filter(
@@ -80,6 +98,36 @@
 
 	{#if userMovies.length > 0}
 		<div class="space-y-3">
+			{#if tagsInUse.length > 0}
+				<div class="flex flex-wrap gap-1.5">
+					{#each tagsInUse as tag (tag.id)}
+						{@const active = activeTagIds.has(tag.id)}
+						<button
+							onclick={() => toggleTag(tag.id)}
+							aria-pressed={active}
+							class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
+							style={active
+								? tag.color
+									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
+									: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+								: tag.color
+									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
+									: 'border-color: #e8e2da; color: #b0aaa4'}
+						>
+							{tag.name}
+						</button>
+					{/each}
+					{#if activeTagIds.size > 0}
+						<button
+							onclick={() => activeTagIds.clear()}
+							class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
+						>
+							Clear
+						</button>
+					{/if}
+				</div>
+			{/if}
+
 			{#if formatsInUse.length > 1}
 				<div class="flex flex-wrap gap-1.5">
 					<button

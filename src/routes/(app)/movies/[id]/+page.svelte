@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { Trash } from 'phosphor-svelte';
+	import { Sparkle, Trash } from 'phosphor-svelte';
+	import TagCombobox from '$lib/components/TagCombobox.svelte';
+	import { readableTagTextColor } from '$lib/tagColor';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import { resizeImageFile } from '$lib/image';
 	import BookCard from '$lib/components/BookCard.svelte';
@@ -10,7 +12,42 @@
 	import { MEDIA_FORMATS, MEDIA_FORMAT_LABELS, formatLine } from '$lib/mediaFormat';
 
 	let { data, form } = $props();
-	const { movie, userLibraries } = $derived(data);
+	const { movie, userLibraries, userTags, hasAiKey } = $derived(data);
+
+	// ── Etiquetas ─────────────────────────────────────────────────────────────
+	const assignedTagIds = $derived(new Set(movie.tags.map((t) => t.id)));
+	const availableTags = $derived(userTags.filter((t) => !assignedTagIds.has(t.id)));
+
+	let suggesting = $state(false);
+	let suggestion = $state<{ tagIds: string[]; newTags: string[] } | null>(null);
+	// Lo sugerido que aún no tiene: las existentes que falten y las nuevas
+	const suggestedExisting = $derived(
+		(suggestion?.tagIds ?? [])
+			.filter((id) => !assignedTagIds.has(id))
+			.map((id) => userTags.find((t) => t.id === id))
+			.filter((t) => t !== undefined)
+	);
+	const suggestedNew = $derived(
+		(suggestion?.newTags ?? []).filter(
+			(name) => !movie.tags.some((t) => t.name.toLowerCase() === name.toLowerCase())
+		)
+	);
+
+	async function suggestTags() {
+		suggesting = true;
+		try {
+			const res = await fetch('/api/movies/suggest-tags', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ userMovieId: movie.userMovieId })
+			});
+			suggestion = res.ok ? await res.json() : { tagIds: [], newTags: [] };
+		} catch {
+			suggestion = { tagIds: [], newTags: [] };
+		} finally {
+			suggesting = false;
+		}
+	}
 
 	let confirmingRemove = $state(false);
 
@@ -146,6 +183,85 @@
 			{#if form?.success}<span class="text-xs text-ink-faint">Saved.</span>{/if}
 		</div>
 	</form>
+
+	<!-- ── Etiquetas ────────────────────────────────────────────────────── -->
+	<div class="space-y-3">
+		<div class="flex items-center gap-3">
+			<span class={labelClass}>Tags</span>
+			{#if hasAiKey}
+				<button
+					type="button"
+					onclick={suggestTags}
+					disabled={suggesting}
+					class="flex items-center gap-1 text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
+				>
+					{#if suggesting}<Spinner size="sm" />{:else}<Sparkle size={12} />{/if}
+					Suggest
+				</button>
+			{/if}
+		</div>
+
+		{#if suggestion}
+			{#if suggestedExisting.length === 0 && suggestedNew.length === 0}
+				<p class="text-xs text-ink-faint">No new tag suggestions.</p>
+			{:else}
+				<form
+					method="POST"
+					action="?/applyTags"
+					use:enhance={() =>
+						async ({ update }) => {
+							await update();
+							suggestion = null;
+						}}
+					class="flex flex-wrap items-center gap-2 border border-dashed border-paper-border px-3 py-2"
+				>
+					<Sparkle size={12} class="text-ink-faint" />
+					{#each suggestedExisting as tag (tag.id)}
+						<input type="hidden" name="tagId" value={tag.id} />
+						<span class="text-xs text-ink-muted">{tag.name}</span>
+					{/each}
+					{#each suggestedNew as name (name)}
+						<input type="hidden" name="newTag" value={name} />
+						<span class="text-xs text-ink-muted">+ {name}</span>
+					{/each}
+					<button type="submit" class="ml-auto text-xs text-ink hover:underline">Add all</button>
+					<button
+						type="button"
+						onclick={() => (suggestion = null)}
+						class="text-xs text-ink-faint hover:text-ink"
+					>
+						Dismiss
+					</button>
+				</form>
+			{/if}
+		{/if}
+
+		{#if movie.tags.length > 0}
+			<div class="flex flex-wrap gap-2">
+				{#each movie.tags as tag (tag.id)}
+					<form method="POST" action="?/removeTag" use:enhance class="inline">
+						<input type="hidden" name="tagId" value={tag.id} />
+						<button
+							type="submit"
+							title="Remove tag"
+							class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-500"
+							style={tag.color
+								? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
+								: 'border-color: #e8e2da; color: #3d3d3d'}
+						>
+							{tag.name}
+							<span class="opacity-0 group-hover:opacity-100">×</span>
+						</button>
+					</form>
+				{/each}
+			</div>
+		{/if}
+
+		<TagCombobox {availableTags} />
+		<p class="text-xs text-ink-faint">
+			Tags shared with a group show this movie to its members, like your books.
+		</p>
+	</div>
 
 	<!-- ── Biblioteca ───────────────────────────────────────────────────── -->
 	{#if userLibraries.length > 1}

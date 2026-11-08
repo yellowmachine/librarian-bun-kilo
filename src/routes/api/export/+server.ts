@@ -159,6 +159,8 @@ function serializeMoviesYaml(entries: UserMovieWithDetails[]): string {
 		// La foto propia (/api/movies/…/cover) solo se ve con sesión: no se exporta.
 		if (m.coverUrl?.startsWith('https://')) lines.push(`    cover_url: ${yamlStr(m.coverUrl)}`);
 		if (m.notes) lines.push(`    notes: ${yamlStr(m.notes)}`);
+		if (m.tags.length > 0)
+			lines.push(`    tags: [${m.tags.map((t) => yamlStr(t.name)).join(', ')}]`);
 	}
 	return lines.join('\n') + '\n';
 }

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Camera, Info } from 'phosphor-svelte';
+	import { ArrowLeft, Camera, Info, Sparkle } from 'phosphor-svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
+	import TagSelectorLocal from '$lib/components/TagSelectorLocal.svelte';
 	import MoviePhotoScan, { type ScanSummary } from '$lib/components/MoviePhotoScan.svelte';
 	import {
 		MEDIA_FORMATS,
@@ -14,7 +15,7 @@
 	import type { MovieSearchResult } from '$lib/types';
 
 	let { data } = $props();
-	const { tmdbEnabled, canScan, userLibraries } = $derived(data);
+	const { tmdbEnabled, canScan, hasAiKey, userLibraries, userTags } = $derived(data);
 
 	type Mode = 'search' | 'confirm' | 'manual' | 'photo';
 	// Sin TMDB solo queda el alta manual.
@@ -27,6 +28,67 @@
 	let searched = $state(false);
 	let results = $state<MovieSearchResult[]>([]);
 	let selected = $state<MovieSearchResult | null>(null);
+
+	// ── Etiquetas (las mismas que los libros) ─────────────────────────────────
+	let selectedTagIds = $state<string[]>([]);
+	let tagsToCreate = $state<{ name: string; color: string | null }[]>([]);
+	let suggestingTags = $state(false);
+	let tagsSuggested = $state(false);
+	let proposedNewTags = $state<string[]>([]);
+	const pendingProposedTags = $derived(
+		proposedNewTags.filter(
+			(name) => !tagsToCreate.some((t) => t.name.toLowerCase() === name.toLowerCase())
+		)
+	);
+
+	function resetTags() {
+		selectedTagIds = [];
+		tagsToCreate = [];
+		tagsSuggested = false;
+		proposedNewTags = [];
+	}
+
+	// Pide etiquetas a la IA. `key` identifica para qué se pidieron: si al
+	// llegar la respuesta el usuario ya está con otra película, se descarta.
+	let suggestionKey = '';
+	async function suggestTags(key: string, body: Record<string, unknown>) {
+		if (!hasAiKey) return;
+		suggestionKey = key;
+		suggestingTags = true;
+		try {
+			const res = await fetch('/api/movies/suggest-tags', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(body)
+			});
+			if (!res.ok || suggestionKey !== key) return;
+			const result: { tagIds: string[]; newTags?: string[] } = await res.json();
+			if (suggestionKey !== key) return;
+			proposedNewTags = result.newTags ?? [];
+			// Nunca pisa una elección que el usuario ya haya hecho.
+			if (selectedTagIds.length === 0 && tagsToCreate.length === 0 && result.tagIds.length > 0) {
+				selectedTagIds = result.tagIds;
+				tagsSuggested = true;
+			}
+		} catch {
+			// Best-effort: sin sugerencia, se eligen a mano.
+		} finally {
+			if (suggestionKey === key) suggestingTags = false;
+		}
+	}
+
+	function suggestManualTags() {
+		const title = manualTitle.trim();
+		if (!title) return;
+		suggestTags(`manual:${title}`, {
+			title,
+			directors: manualDirectors
+				.split(',')
+				.map((d) => d.trim())
+				.filter(Boolean),
+			overview: manualOverview.trim() || null
+		});
+	}
 
 	// ── Datos de la copia (comunes a las dos rutas) ───────────────────────────
 	let format = $state<MediaFormat>('bluray');
@@ -118,19 +180,26 @@
 		selected = movie;
 		duplicate = null;
 		errorMsg = '';
+		resetTags();
 		mode = 'confirm';
+		suggestTags(movie.id, { movieId: movie.id });
 	}
 
 	function enterManual() {
 		if (!manualTitle && query.trim()) manualTitle = query.trim();
 		duplicate = null;
 		errorMsg = '';
+		resetTags();
+		suggestionKey = '';
+		suggestingTags = false;
 		mode = 'manual';
 	}
 
 	function back() {
 		duplicate = null;
 		errorMsg = '';
+		suggestionKey = '';
+		suggestingTags = false;
 		mode = 'search';
 	}
 
@@ -146,7 +215,9 @@
 			edition: edition.trim() || undefined,
 			notes: notes.trim() || undefined,
 			libraryId: libraryId || undefined,
-			allowDuplicate
+			allowDuplicate,
+			tagsToAdd: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+			tagsToCreate: tagsToCreate.length > 0 ? tagsToCreate : undefined
 		};
 
 		let body: Record<string, unknown>;
@@ -268,6 +339,50 @@
 			</select>
 		</div>
 	{/if}
+
+	<div>
+		<span
+			class="flex items-center gap-2 text-xs font-medium tracking-widest text-ink-muted uppercase"
+		>
+			Tags <span class="tracking-normal normal-case">(optional)</span>
+			{#if suggestingTags}
+				<span class="flex items-center gap-1 tracking-normal text-ink-faint normal-case">
+					<Spinner size="sm" /> Suggesting…
+				</span>
+			{:else if tagsSuggested}
+				<span class="flex items-center gap-1 tracking-normal text-ink-faint normal-case">
+					<Sparkle size={12} /> Suggested by AI
+				</span>
+			{:else if mode === 'manual' && hasAiKey && manualTitle.trim()}
+				<button
+					type="button"
+					onclick={suggestManualTags}
+					class="flex items-center gap-1 tracking-normal text-ink-faint normal-case underline underline-offset-2 hover:text-ink"
+				>
+					<Sparkle size={12} /> Suggest
+				</button>
+			{/if}
+		</span>
+		<div class="mt-1.5">
+			<TagSelectorLocal availableTags={userTags} bind:selectedTagIds bind:tagsToCreate />
+		</div>
+		{#if pendingProposedTags.length > 0}
+			<div class="mt-2 flex flex-wrap items-center gap-2">
+				<span class="flex items-center gap-1 text-xs text-ink-faint">
+					<Sparkle size={12} /> New tag ideas:
+				</span>
+				{#each pendingProposedTags as name (name)}
+					<button
+						type="button"
+						onclick={() => (tagsToCreate = [...tagsToCreate, { name, color: null }])}
+						class="border border-dashed border-ink-faint px-2.5 py-0.5 text-xs text-ink-muted transition-colors hover:border-ink hover:text-ink"
+					>
+						+ {name}
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</div>
 
 	{#if duplicate}
 		<div class="flex items-start gap-2.5 border border-paper-border bg-paper-ui px-4 py-3">

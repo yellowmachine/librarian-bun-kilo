@@ -9,13 +9,14 @@ import {
 	removeMovieTag
 } from '$lib/server/movies';
 import { withRLS } from '$lib/server/db/rls';
+import { hasOpenRouterApiKey } from '$lib/server/openrouterKey';
 import { tags } from '$lib/server/db/schema';
 import { getUserLibraries } from '$lib/server/libraries';
 import { isMediaFormat } from '$lib/mediaFormat';
 
 export const load = async ({ locals, params }: RequestEvent) => {
 	const userId = locals.user!.id;
-	const [movie, userLibraries, userTags] = await Promise.all([
+	const [movie, userLibraries, userTags, hasAiKey] = await Promise.all([
 		getUserMovie(userId, params.id!),
 		getUserLibraries(userId),
 		withRLS(userId, (tx) =>
@@ -24,12 +25,13 @@ export const load = async ({ locals, params }: RequestEvent) => {
 				.from(tags)
 				.where(eq(tags.userId, userId))
 				.orderBy(tags.name)
-		)
+		),
+		hasOpenRouterApiKey(userId)
 	]);
 	// Las películas de otros (visibles por grupo) tendrán su ficha de solo
 	// lectura más adelante; de momento, aquí solo entra el dueño.
 	if (!movie || movie.ownerId !== userId) error(404, 'Movie not found in your library');
-	return { movie, userLibraries, userTags };
+	return { movie, userLibraries, userTags, hasAiKey };
 };
 
 function optionalText(data: FormData, name: string, max: number): string | null {
