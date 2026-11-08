@@ -64,6 +64,13 @@
       "when": 1794161475548,
       "tag": "0008_movie_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794162156860,
+      "tag": "0009_ai_usage_log",
+      "breakpoints": true
     }
   ]
 }

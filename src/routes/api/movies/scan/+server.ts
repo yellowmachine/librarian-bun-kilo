@@ -25,5 +25,10 @@ export async function POST({ locals, request }: RequestEvent) {
 		error(400, 'No OpenRouter key connected. Connect one in your account, then try again.');
 	}
 
-	return json({ movies: await scanMovies(apiKey, result.output.image) });
+	return json({
+		movies: await scanMovies(apiKey, result.output.image, {
+			userId: locals.user.id,
+			kind: 'movie_scan'
+		})
+	});
 }

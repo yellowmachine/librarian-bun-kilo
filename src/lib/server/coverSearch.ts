@@ -16,8 +16,9 @@
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { env } from '$env/dynamic/private';
+import { openRouterChat } from './openrouter';
+import type { AiLogContext } from './aiUsage';
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Mismo modelo barato que el escaneo de estanterías; la búsqueda web la hace
 // el plugin "web" de OpenRouter (Exa, ~0.007 $/petición), no el modelo.
 const COVER_MODEL = 'google/gemini-2.5-flash-lite';
@@ -341,65 +342,63 @@ function stringList(value: unknown, max: number): string[] {
 }
 
 /** Best-effort: cualquier fallo devuelve pistas vacías en vez de lanzar. */
-export async function askAiForCoverHints(apiKey: string, query: CoverQuery): Promise<AiCoverHints> {
+export async function askAiForCoverHints(
+	apiKey: string,
+	query: CoverQuery,
+	log?: AiLogContext
+): Promise<AiCoverHints> {
 	const empty: AiCoverHints = { isbns: [], pageUrls: [], imageUrls: [] };
-	try {
-		const res = await fetch(OPENROUTER_URL, {
-			method: 'POST',
-			signal: AbortSignal.timeout(AI_TIMEOUT_MS),
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				'Content-Type': 'application/json',
-				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.scholio.review',
-				'X-Title': 'Librarian'
-			},
-			body: JSON.stringify({
-				model: COVER_MODEL,
-				max_tokens: 1024,
-				// Exa cobra lo mismo hasta 10 resultados.
-				plugins: [{ id: 'web', engine: 'exa', max_results: 10 }],
-				messages: [
-					{ role: 'system', content: buildSystemPrompt(query) },
-					{ role: 'user', content: buildSearchQuery(query) }
-				]
-			})
-		});
+	const hints = await openRouterChat<AiCoverHints>(
+		apiKey,
+		{
+			model: COVER_MODEL,
+			max_tokens: 1024,
+			// Exa cobra lo mismo hasta 10 resultados.
+			plugins: [{ id: 'web', engine: 'exa', max_results: 10 }],
+			messages: [
+				{ role: 'system', content: buildSystemPrompt(query) },
+				{ role: 'user', content: buildSearchQuery(query) }
+			]
+		},
+		{
+			label: 'askAiForCoverHints',
+			timeoutMs: AI_TIMEOUT_MS,
+			log,
+			parse: (message) => {
+				// Las fuentes que citó la búsqueda web también son páginas candidatas,
+				// aunque el modelo no las haya copiado en pageUrls.
+				const citedPages: string[] = (message.annotations ?? [])
+					.map((a) => a.url_citation?.url)
+					.filter((u): u is string => typeof u === 'string');
 
-		if (!res.ok) {
-			const body = await res.text().catch(() => '');
-			console.error(`askAiForCoverHints: OpenRouter ${res.status}`, body.slice(0, 1000));
-			return empty;
-		}
+				// Si el JSON no se entiende, quedan las páginas citadas: no es un fallo.
+				let parsed: Record<string, unknown> = {};
+				const content = message.content;
+				if (content) {
+					try {
+						const value = JSON.parse(extractJson(content));
+						if (value && typeof value === 'object' && !Array.isArray(value)) parsed = value;
+					} catch {
+						console.error(
+							'askAiForCoverHints: could not parse model output',
+							content.slice(0, 1000)
+						);
+					}
+				}
 
-		const data = await res.json();
-		const message = data.choices?.[0]?.message;
-		const content: string | undefined = message?.content;
-
-		// Las fuentes que citó la búsqueda web también son páginas candidatas,
-		// aunque el modelo no las haya copiado en pageUrls.
-		const citedPages: string[] = (message?.annotations ?? [])
-			.map((a: { url_citation?: { url?: unknown } }) => a.url_citation?.url)
-			.filter((u: unknown): u is string => typeof u === 'string');
-
-		let parsed: Record<string, unknown> = {};
-		if (content) {
-			try {
-				const value = JSON.parse(extractJson(content));
-				if (value && typeof value === 'object' && !Array.isArray(value)) parsed = value;
-			} catch {
-				console.error('askAiForCoverHints: could not parse model output', content.slice(0, 1000));
+				const value = {
+					isbns: stringList(parsed.isbns, 6),
+					pageUrls: [...new Set([...stringList(parsed.pageUrls, 6), ...citedPages])],
+					imageUrls: stringList(parsed.imageUrls, 6)
+				};
+				return {
+					value,
+					resultCount: value.isbns.length + value.pageUrls.length + value.imageUrls.length
+				};
 			}
 		}
-
-		return {
-			isbns: stringList(parsed.isbns, 6),
-			pageUrls: [...new Set([...stringList(parsed.pageUrls, 6), ...citedPages])],
-			imageUrls: stringList(parsed.imageUrls, 6)
-		};
-	} catch (err) {
-		console.error('askAiForCoverHints: unexpected failure', err);
-		return empty;
-	}
+	);
+	return hints ?? empty;
 }
 
 // ─── Orquestación ─────────────────────────────────────────────────────────────
@@ -412,13 +411,14 @@ async function keepUsable(urls: string[]): Promise<string[]> {
 
 export async function findCoverCandidates(
 	query: CoverQuery,
-	apiKey: string | null
+	apiKey: string | null,
+	log?: AiLogContext
 ): Promise<CoverSearchResult> {
 	const userIsbn = query.isbn ? normalizeIsbn(query.isbn) : null;
 
 	const [googleUrls, hints] = await Promise.all([
 		googleBooksCovers(query, userIsbn),
-		apiKey ? askAiForCoverHints(apiKey, query) : Promise.resolve(null)
+		apiKey ? askAiForCoverHints(apiKey, query, log) : Promise.resolve(null)
 	]);
 
 	const aiIsbns = (hints?.isbns ?? []).map(normalizeIsbn).filter((i): i is string => i !== null);

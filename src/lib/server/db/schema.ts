@@ -11,7 +11,8 @@ import {
 	uniqueIndex,
 	index,
 	check,
-	customType
+	customType,
+	doublePrecision
 } from 'drizzle-orm/pg-core';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -46,6 +47,15 @@ export const loanStatusEnum = pgEnum('loan_status', [
 // enlace se pierde si el dueño borra la copia, y el historial debe seguir
 // sabiendo qué era.
 export const loanItemKindEnum = pgEnum('loan_item_kind', ['book', 'movie']);
+
+// Para qué se llamó a la IA (ai_usage_log.kind).
+export const aiCallKindEnum = pgEnum('ai_call_kind', [
+	'book_shelf_scan', // libros desde una foto de estantería
+	'movie_scan', // películas desde una foto de carátulas o lomos
+	'book_tags', // etiquetas sugeridas para un libro
+	'movie_tags', // etiquetas sugeridas para una película
+	'book_cover_search' // portada de un libro buscada en la web
+]);
 
 // Soporte físico de una copia de la videoteca (user_movies.format).
 export const mediaFormatEnum = pgEnum('media_format', ['dvd', 'bluray', 'uhd_bluray']);
@@ -956,6 +966,51 @@ export const userApiKeys = pgTable(
 			for: 'all',
 			to: appUser,
 			using: sql`${table.userId} = ${currentUserId}`,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
+// ─── AI usage log ─────────────────────────────────────────────────────────────
+// Una fila por llamada a OpenRouter con la clave del usuario, para que vea qué
+// ha gastado y en qué. El coste es el que devuelve OpenRouter en cada
+// respuesta (usage.cost, en dólares). Sin coste (null) si la llamada falló
+// antes de que OpenRouter lo informara.
+
+export const aiUsageLog = pgTable(
+	'ai_usage_log',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		kind: aiCallKindEnum('kind').notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull(),
+		// De qué iba: «Dune», «Blade Runner»… (null en las fotos)
+		subject: text('subject'),
+		// Qué salió: libros o películas reconocidos, etiquetas sugeridas, portadas…
+		resultCount: integer('result_count'),
+		success: boolean('success').notNull(),
+		// Si falló, por qué, corto: «HTTP 402», «timeout», «invalid response»…
+		error: text('error'),
+		model: text('model'),
+		promptTokens: integer('prompt_tokens'),
+		completionTokens: integer('completion_tokens'),
+		costUsd: doublePrecision('cost_usd'),
+		durationMs: integer('duration_ms'),
+		// Id de la generación en OpenRouter, para cuadrar con su panel de actividad
+		generationId: text('generation_id')
+	},
+	(table) => [
+		index('ai_usage_log_user_date_idx').on(table.userId, table.createdAt),
+		pgPolicy('ai_usage_log_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('ai_usage_log_insert', {
+			for: 'insert',
+			to: appUser,
 			withCheck: sql`${table.userId} = ${currentUserId}`
 		})
 	]

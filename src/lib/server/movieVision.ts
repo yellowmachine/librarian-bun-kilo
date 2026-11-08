@@ -5,6 +5,7 @@
 // que pone la caja y TMDB aporta la ficha. El usuario confirma cada una.
 import { askVisionModel, toConfidence } from './openrouterVision';
 import { searchMovies } from './tmdb';
+import type { AiLogContext } from './aiUsage';
 import { isMediaFormat, type MediaFormat } from '$lib/mediaFormat';
 import type { MovieSearchResult } from '$lib/types';
 
@@ -66,13 +67,20 @@ export function toBox(value: unknown): MovieCandidate['box'] {
 /** Best-effort: cualquier fallo devuelve []. */
 export async function identifyMoviesFromImage(
 	apiKey: string,
-	imageDataUrl: string
+	imageDataUrl: string,
+	log?: AiLogContext
 ): Promise<MovieCandidate[]> {
-	const parsed = await askVisionModel(apiKey, PROMPT, imageDataUrl, 'identifyMoviesFromImage');
-	if (!parsed) return [];
+	const candidates = await askVisionModel(apiKey, PROMPT, imageDataUrl, {
+		label: 'identifyMoviesFromImage',
+		log,
+		toResults: toCandidates
+	});
+	return candidates ?? [];
+}
 
+function toCandidates(items: unknown[]): MovieCandidate[] {
 	const candidates: MovieCandidate[] = [];
-	for (const item of parsed) {
+	for (const item of items) {
 		if (typeof item !== 'object' || item === null) continue;
 		const c = item as Record<string, unknown>;
 		const title = optionalString(c.title);
@@ -119,7 +127,11 @@ export async function matchWithTmdb(candidate: MovieCandidate): Promise<MovieSea
 	return [];
 }
 
-export async function scanMovies(apiKey: string, imageDataUrl: string): Promise<ScannedMovie[]> {
-	const candidates = await identifyMoviesFromImage(apiKey, imageDataUrl);
+export async function scanMovies(
+	apiKey: string,
+	imageDataUrl: string,
+	log?: AiLogContext
+): Promise<ScannedMovie[]> {
+	const candidates = await identifyMoviesFromImage(apiKey, imageDataUrl, log);
 	return Promise.all(candidates.map(async (c) => ({ ...c, matches: await matchWithTmdb(c) })));
 }

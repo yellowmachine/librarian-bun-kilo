@@ -75,7 +75,8 @@ export async function POST({ locals, request }: RequestEvent) {
 	const { existing, proposed } = await suggestTagsForBook(
 		apiKey,
 		movie,
-		userTags.map((t) => t.name)
+		userTags.map((t) => t.name),
+		{ userId, kind: 'movie_tags', subject: movie.title }
 	);
 	const tagIds = existing
 		.map((name) => userTags.find((t) => t.name === name)?.id)

@@ -2,10 +2,10 @@
 // unos pocos nuevos que merecería crear — vía OpenRouter con la clave del
 // usuario, mismo endpoint/modelo que el escaneo de estanterías
 // (openrouterVision.ts).
-import { env } from '$env/dynamic/private';
 import { extractJson, filterKnownTags } from './openrouterVision';
+import { openRouterChat } from './openrouter';
+import type { AiLogContext } from './aiUsage';
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const TAGS_MODEL = 'google/gemini-2.5-flash-lite';
 const TAGS_TIMEOUT_MS = 20_000;
 const MAX_DESCRIPTION_CHARS = 2000;
@@ -126,44 +126,26 @@ function parseSuggestions(content: string, availableTagNames: string[]): TagSugg
 export async function suggestTagsForBook(
 	apiKey: string,
 	book: TagSuggestionInput,
-	availableTagNames: string[]
+	availableTagNames: string[],
+	log?: AiLogContext
 ): Promise<TagSuggestions> {
-	const none: TagSuggestions = { existing: [], proposed: [] };
-	try {
-		const res = await fetch(OPENROUTER_URL, {
-			method: 'POST',
-			signal: AbortSignal.timeout(TAGS_TIMEOUT_MS),
-			headers: {
-				Authorization: `Bearer ${apiKey}`,
-				'Content-Type': 'application/json',
-				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.scholio.review',
-				'X-Title': 'Librarian'
-			},
-			body: JSON.stringify({
-				model: TAGS_MODEL,
-				max_tokens: 512,
-				messages: [{ role: 'user', content: buildPrompt(book, availableTagNames) }]
-			})
-		});
-
-		if (!res.ok) {
-			const body = await res.text().catch(() => '');
-			console.error(`suggestTagsForBook: OpenRouter ${res.status}`, body.slice(0, 1000));
-			return none;
+	const suggestions = await openRouterChat<TagSuggestions>(
+		apiKey,
+		{
+			model: TAGS_MODEL,
+			max_tokens: 512,
+			messages: [{ role: 'user', content: buildPrompt(book, availableTagNames) }]
+		},
+		{
+			label: 'suggestTagsForBook',
+			timeoutMs: TAGS_TIMEOUT_MS,
+			log,
+			parse: (message) => {
+				if (!message.content) throw new Error('empty content');
+				const value = parseSuggestions(message.content, availableTagNames);
+				return { value, resultCount: value.existing.length + value.proposed.length };
+			}
 		}
-
-		const data = await res.json();
-		const content: string | undefined = data.choices?.[0]?.message?.content;
-		if (!content) return none;
-
-		try {
-			return parseSuggestions(content, availableTagNames);
-		} catch {
-			console.error('suggestTagsForBook: could not parse model output', content.slice(0, 1000));
-			return none;
-		}
-	} catch (err) {
-		console.error('suggestTagsForBook: unexpected failure', err);
-		return none;
-	}
+	);
+	return suggestions ?? { existing: [], proposed: [] };
 }
