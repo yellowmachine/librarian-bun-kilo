@@ -58,6 +58,10 @@
 			}
 		}
 
+		if (path === '/account/ai-usage') {
+			return [{ label: 'Tu cuenta', href: '/account' }, { label: 'Consumo de IA' }];
+		}
+
 		if (path.startsWith('/tags')) {
 			return [{ label: 'Library', href: '/library' }, { label: 'Tags' }];
 		}
