@@ -12,7 +12,8 @@ import {
 	movieCoverPhotos,
 	tags,
 	userMovieTags,
-	user
+	user,
+	loans
 } from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
@@ -448,8 +449,24 @@ export async function getCoverPhoto(
 	});
 }
 
+export const OPEN_LOAN_ERROR = 'This movie has a loan in progress.';
+
+/**
+ * No con un préstamo en curso (la FK de loans es SET NULL, así que la base no
+ * lo impediría). Los terminados se quedan en el historial con su foto fija.
+ */
 export async function removeMovie(userId: string, userMovieId: string): Promise<void> {
 	await withRLS(userId, async (tx) => {
+		const open = await tx
+			.select({ id: loans.id })
+			.from(loans)
+			.where(
+				and(
+					eq(loans.userMovieId, userMovieId),
+					inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
+				)
+			);
+		if (open.length > 0) throw new Error(OPEN_LOAN_ERROR);
 		await tx.delete(userMovies).where(eq(userMovies.id, userMovieId));
 	});
 }

@@ -301,6 +301,8 @@ describe('RLS · películas en grupos', () => {
 		await tdb.asSuperuser((tx) =>
 			tx.insert(loans).values({
 				id: 'loan',
+				itemKind: 'movie',
+				itemTitle: 'Alien',
 				userMovieId: 'um-bob-shared',
 				borrowerId: CAROL,
 				ownerId: BOB
@@ -313,7 +315,7 @@ describe('RLS · películas en grupos', () => {
 		expect(await tdb.withRLS(CAROL, (tx) => tx.select().from(movieCoverPhotos))).toHaveLength(1);
 	});
 
-	it('un préstamo es de un libro o de una película, nunca de los dos ni de ninguno', async () => {
+	it('un préstamo enlaza como mucho a una copia, y del tipo que dice', async () => {
 		const CHECK_VIOLATION = '23514';
 		await tdb.asSuperuser(async (tx) => {
 			await tx.insert(books).values({ id: 'OL1', title: 'Dune' });
@@ -322,16 +324,20 @@ describe('RLS · películas en grupos', () => {
 				.values({ id: 'ub', userId: BOB, libraryId: 'lib-bob', bookId: 'OL1' });
 		});
 
-		for (const item of [
-			{ userBookId: null, userMovieId: null },
-			{ userBookId: 'ub', userMovieId: 'um-bob-shared' }
+		const base = { id: 'x', itemTitle: 'X', borrowerId: ALICE, ownerId: BOB };
+		for (const bad of [
+			{ itemKind: 'book' as const, userBookId: 'ub', userMovieId: 'um-bob-shared' },
+			{ itemKind: 'book' as const, userBookId: null, userMovieId: 'um-bob-shared' },
+			{ itemKind: 'movie' as const, userBookId: 'ub', userMovieId: null }
 		]) {
 			await expect(
-				tdb.asSuperuser((tx) =>
-					tx.insert(loans).values({ id: 'x', ...item, borrowerId: ALICE, ownerId: BOB })
-				)
+				tdb.asSuperuser((tx) => tx.insert(loans).values({ ...base, ...bad }))
 			).rejects.toMatchObject({ cause: { code: CHECK_VIOLATION } });
 		}
+		// Sin enlace sí vale: es un préstamo cuya copia ya se borró
+		await tdb.asSuperuser((tx) =>
+			tx.insert(loans).values({ ...base, itemKind: 'book', userBookId: null, userMovieId: null })
+		);
 	});
 
 	it('la etiqueta compartida es visible al grupo; quitarla deja de exponer la película', async () => {

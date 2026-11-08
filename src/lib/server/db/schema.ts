@@ -42,6 +42,11 @@ export const loanStatusEnum = pgEnum('loan_status', [
 	'cancelled'
 ]);
 
+// Qué se presta (loans.item_kind): se guarda aparte del enlace porque el
+// enlace se pierde si el dueño borra la copia, y el historial debe seguir
+// sabiendo qué era.
+export const loanItemKindEnum = pgEnum('loan_item_kind', ['book', 'movie']);
+
 // Soporte físico de una copia de la videoteca (user_movies.format).
 export const mediaFormatEnum = pgEnum('media_format', ['dvd', 'bluray', 'uhd_bluray']);
 
@@ -745,11 +750,17 @@ export const loans = pgTable(
 	'loans',
 	{
 		id: text('id').primaryKey(),
-		// Lo prestado: un libro O una película (loans_one_item exige exactamente uno)
-		userBookId: text('user_book_id').references(() => userBooks.id, { onDelete: 'restrict' }),
+		// Lo prestado: un libro O una película. Si el dueño borra la copia, el
+		// enlace queda a null y el préstamo sigue en el historial con la foto
+		// fija de abajo (item_*), tomada al pedirlo.
+		itemKind: loanItemKindEnum('item_kind').notNull(),
+		userBookId: text('user_book_id').references(() => userBooks.id, { onDelete: 'set null' }),
 		userMovieId: text('user_movie_id').references(() => userMovies.id, {
-			onDelete: 'restrict'
+			onDelete: 'set null'
 		}),
+		itemTitle: text('item_title').notNull(),
+		itemCreators: text('item_creators').array(), // autores o directores
+		itemCoverUrl: text('item_cover_url'), // solo URLs públicas (https)
 		borrowerId: text('borrower_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'restrict' }),
@@ -771,7 +782,12 @@ export const loans = pgTable(
 		index('loans_owner_idx').on(table.ownerId),
 		index('loans_user_book_idx').on(table.userBookId),
 		index('loans_user_movie_idx').on(table.userMovieId),
-		check('loans_one_item', sql`num_nonnulls(${table.userBookId}, ${table.userMovieId}) = 1`),
+		// Como mucho un enlace (ninguno si la copia se borró), y del tipo que toca
+		check(
+			'loans_item_matches_kind',
+			sql`(${table.itemKind} = 'book' and ${table.userMovieId} is null)
+				or (${table.itemKind} = 'movie' and ${table.userBookId} is null)`
+		),
 		index('loans_status_idx').on(table.status),
 		pgPolicy('loans_select', {
 			for: 'select',

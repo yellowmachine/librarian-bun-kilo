@@ -136,7 +136,11 @@
 		{/if}
 		<div class="min-w-0 space-y-2 pt-1">
 			<h1 class="font-serif text-2xl leading-tight font-normal text-ink">
-				<a href={loan.itemHref} class="hover:underline">{loan.title}</a>
+				{#if loan.itemHref}
+					<a href={loan.itemHref} class="hover:underline">{loan.title}</a>
+				{:else}
+					{loan.title}
+				{/if}
 			</h1>
 			{#if loan.authors.length > 0}
 				<p class="text-sm text-ink-muted">{loan.authors.join(', ')}</p>

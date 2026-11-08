@@ -20,31 +20,35 @@ import * as schema from './schema';
 
 const MIGRATIONS_DIR = resolve(process.cwd(), 'drizzle');
 
-function loadMigrations(): string[] {
+type Migration = { tag: string; statements: string[] };
+
+function loadMigrations(): Migration[] {
 	const fs = readFileSync(`${MIGRATIONS_DIR}/meta/_journal.json`, 'utf8');
 	const journal = JSON.parse(fs) as { entries: { tag: string }[] };
 
-	const statements: string[] = [];
-	for (const entry of journal.entries) {
-		const sqlFile = readFileSync(`${MIGRATIONS_DIR}/${entry.tag}.sql`, 'utf8');
-		const parts = sqlFile
+	return journal.entries.map((entry) => ({
+		tag: entry.tag,
+		statements: readFileSync(`${MIGRATIONS_DIR}/${entry.tag}.sql`, 'utf8')
 			.split('--> statement-breakpoint')
 			.map((s) => s.trim())
-			.filter(Boolean);
-		statements.push(...parts);
-	}
-	return statements;
+			.filter(Boolean)
+	}));
 }
 
-let cachedStatements: string[] | null = null;
-function getMigrationStatements(): string[] {
-	if (!cachedStatements) cachedStatements = loadMigrations();
-	return cachedStatements;
+let cachedMigrations: Migration[] | null = null;
+function getMigrations(): Migration[] {
+	if (!cachedMigrations) cachedMigrations = loadMigrations();
+	return cachedMigrations;
 }
 
 export type TestDb = Awaited<ReturnType<typeof createTestDb>>;
 
-export async function createTestDb() {
+/**
+ * Con `stopBefore` (un tag del journal, p.ej. '0007_loan_snapshots') se
+ * aplican solo las migraciones anteriores; `applyRemaining()` aplica el resto.
+ * Sirve para probar migraciones que transforman datos ya existentes.
+ */
+export async function createTestDb(options: { stopBefore?: string } = {}) {
 	const client = new PGlite();
 
 	// Replica scripts/init.sh: el rol de la app y sus privilegios por defecto.
@@ -59,8 +63,19 @@ export async function createTestDb() {
 
 	// Aplicar migraciones — crean las funciones SECURITY DEFINER, las tablas (las de
 	// Better Auth también), índices y RLS policies. Sin hardcode.
-	for (const stmt of getMigrationStatements()) {
-		await client.exec(stmt);
+	const migrations = getMigrations();
+	const cut = options.stopBefore
+		? migrations.findIndex((m) => m.tag === options.stopBefore)
+		: migrations.length;
+	if (cut < 0) throw new Error(`Unknown migration: ${options.stopBefore}`);
+	for (const m of migrations.slice(0, cut)) {
+		for (const stmt of m.statements) await client.exec(stmt);
+	}
+
+	async function applyRemaining() {
+		for (const m of migrations.slice(cut)) {
+			for (const stmt of m.statements) await client.exec(stmt);
+		}
 	}
 
 	const db = drizzle(client, { schema });
@@ -81,5 +96,5 @@ export async function createTestDb() {
 		await client.close();
 	}
 
-	return { db, withRLS, asSuperuser, cleanup };
+	return { db, withRLS, asSuperuser, cleanup, applyRemaining };
 }

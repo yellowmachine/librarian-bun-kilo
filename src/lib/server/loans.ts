@@ -11,15 +11,18 @@ const effectiveTitle = sql<string>`COALESCE(${userBooks.title}, ${books.title})`
 const effectiveAuthors = sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`;
 
 // Lo prestado es un libro o una película: con los cuatro LEFT JOIN, solo uno
-// de los dos lados trae datos y COALESCE se queda con ese.
-const itemTitle = sql<string | null>`COALESCE(
-	${userBooks.title}, ${books.title}, ${userMovies.title}, ${movies.title}
+// de los dos lados trae datos y COALESCE se queda con ese. Si el dueño ya
+// borró la copia, no trae ninguno y queda la foto fija del préstamo (item_*).
+const itemTitle = sql<string>`COALESCE(
+	${userBooks.title}, ${books.title}, ${userMovies.title}, ${movies.title}, ${loans.itemTitle}
 )`;
 const itemCreators = sql<string[] | null>`COALESCE(
-	${userBooks.authors}, ${books.authors}, ${userMovies.directors}, ${movies.directors}
+	${userBooks.authors}, ${books.authors}, ${userMovies.directors}, ${movies.directors},
+	${loans.itemCreators}
 )`;
 const itemCover = sql<string | null>`COALESCE(
-	${userBooks.coverUrl}, ${books.coverUrl}, ${userMovies.coverUrl}, ${movies.posterUrl}
+	${userBooks.coverUrl}, ${books.coverUrl}, ${userMovies.coverUrl}, ${movies.posterUrl},
+	${loans.itemCoverUrl}
 )`;
 
 const loanColumns = {
@@ -33,6 +36,7 @@ const loanColumns = {
 	dueDate: loans.dueDate,
 	notes: loans.notes,
 	ownerNotes: loans.ownerNotes,
+	itemKind: loans.itemKind,
 	userBookId: loans.userBookId,
 	userMovieId: loans.userMovieId,
 	bookId: userBooks.bookId,
@@ -56,13 +60,14 @@ function selectLoans(tx: typeof db) {
 
 type LoanRow = Awaited<ReturnType<ReturnType<typeof selectLoans>['where']>>[number];
 
-// Qué es y dónde está su ficha
+// Dónde está su ficha (null si el dueño ya borró la copia)
 function itemFields(row: LoanRow) {
-	const isMovie = row.userMovieId !== null;
 	return {
-		itemKind: (isMovie ? 'movie' : 'book') as 'book' | 'movie',
-		itemHref: isMovie ? `/movies/${row.userMovieId}` : `/library/${row.userBookId}`,
-		title: row.title ?? '?',
+		itemHref: row.userMovieId
+			? `/movies/${row.userMovieId}`
+			: row.userBookId
+				? `/library/${row.userBookId}`
+				: null,
 		authors: row.authors ?? []
 	};
 }
@@ -91,7 +96,8 @@ export type LoanWithDetails = {
 	ownerNotes: string | null;
 	// Lo prestado: un libro (userBookId) o una película (userMovieId)
 	itemKind: 'book' | 'movie';
-	itemHref: string;
+	/** null si el dueño borró la copia (el préstamo queda en el historial) */
+	itemHref: string | null;
 	userBookId: string | null;
 	userMovieId: string | null;
 	bookId: string | null;
@@ -128,7 +134,9 @@ export async function requestLoan(
 						.select({
 							ownerId: userBooks.userId,
 							isAvailable: userBooks.isAvailable,
-							title: effectiveTitle
+							title: effectiveTitle,
+							creators: effectiveAuthors,
+							coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`
 						})
 						.from(userBooks)
 						.leftJoin(books, eq(userBooks.bookId, books.id))
@@ -137,7 +145,11 @@ export async function requestLoan(
 						.select({
 							ownerId: userMovies.userId,
 							isAvailable: userMovies.isAvailable,
-							title: sql<string>`COALESCE(${userMovies.title}, ${movies.title})`
+							title: sql<string>`COALESCE(${userMovies.title}, ${movies.title})`,
+							creators: sql<
+								string[] | null
+							>`COALESCE(${userMovies.directors}, ${movies.directors})`,
+							coverUrl: sql<string | null>`COALESCE(${userMovies.coverUrl}, ${movies.posterUrl})`
 						})
 						.from(userMovies)
 						.leftJoin(movies, eq(userMovies.movieId, movies.id))
@@ -146,7 +158,7 @@ export async function requestLoan(
 		const noun = item.kind === 'book' ? 'book' : 'movie';
 		if (rows.length === 0)
 			throw new Error(item.kind === 'book' ? 'Book not found' : 'Movie not found');
-		const { ownerId, isAvailable, title } = rows[0];
+		const { ownerId, isAvailable, title, creators, coverUrl } = rows[0];
 
 		if (!isAvailable) throw new Error(`This ${noun} is not available.`);
 		if (ownerId === borrowerId) throw new Error(`You can't request your own ${noun}.`);
@@ -167,6 +179,12 @@ export async function requestLoan(
 		const id = nanoid();
 		await tx.insert(loans).values({
 			id,
+			itemKind: item.kind,
+			// Foto fija para el historial, por si el dueño borra la copia. La
+			// portada solo si es pública: la foto propia de una película se va con ella.
+			itemTitle: title ?? '?',
+			itemCreators: creators ?? null,
+			itemCoverUrl: coverUrl?.startsWith('https://') ? coverUrl : null,
 			userBookId: item.kind === 'book' ? item.userBookId : null,
 			userMovieId: item.kind === 'movie' ? item.userMovieId : null,
 			borrowerId,
@@ -501,24 +519,6 @@ export async function getMovieForBorrow(
 			existingLoanStatus: (existing[0]?.status as LoanStatus) ?? null
 		};
 	});
-}
-
-/** Préstamos de una copia (libro o película) que aún no han terminado. */
-export async function hasOpenLoans(userId: string, item: LoanItem): Promise<boolean> {
-	const rows = await withRLS(userId, (tx) =>
-		tx
-			.select({ id: loans.id })
-			.from(loans)
-			.where(
-				and(
-					item.kind === 'book'
-						? eq(loans.userBookId, item.userBookId)
-						: eq(loans.userMovieId, item.userMovieId),
-					inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
-				)
-			)
-	);
-	return rows.length > 0;
 }
 
 // ─── Contar préstamos pendientes de acción ────────────────────────────────────

@@ -1,6 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { nanoid } from 'nanoid';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import {
 	getUserBook,
@@ -8,10 +8,11 @@ import {
 	removeFromLibrary,
 	resolveBook,
 	upsertBook,
-	forBookViewer
+	forBookViewer,
+	OPEN_LOAN_ERROR
 } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
-import { tags, userBookTags, loans, userBooks, books } from '$lib/server/db/schema';
+import { tags, userBookTags, userBooks, books } from '$lib/server/db/schema';
 import { fetchWorkById } from '$lib/server/openlibrary';
 import { db } from '$lib/server/db/index';
 import {
@@ -452,28 +453,15 @@ export const actions = {
 
 	// Eliminar libro de la biblioteca
 	remove: async ({ locals, params }: RequestEvent) => {
-		// Verificar que no hay préstamos activos antes de eliminar
-		// (la FK onDelete:restrict lanzaría un error de DB sin este guard)
-		const activeLoans = await withRLS(locals.user!.id, (tx) =>
-			tx
-				.select({ id: loans.id })
-				.from(loans)
-				.where(
-					and(
-						eq(loans.userBookId, params.id!),
-						inArray(loans.status, ['requested', 'accepted', 'active', 'return_requested'])
-					)
-				)
-		);
-
-		if (activeLoans.length > 0) {
-			return fail(400, {
-				error: 'You can’t remove this book because it has an active loan.'
-			});
+		// removeFromLibrary se niega si hay un préstamo en curso; los terminados
+		// quedan en el historial con su foto fija (loans.item_*).
+		try {
+			await removeFromLibrary(locals.user!.id, params.id!);
+		} catch (e) {
+			if (e instanceof Error && e.message === OPEN_LOAN_ERROR)
+				return fail(400, { error: e.message });
+			throw e;
 		}
-
-		await removeFromLibrary(locals.user!.id, params.id!);
-		//return { removed: true };
 		redirect(303, '/library');
 	}
 };

@@ -43,6 +43,8 @@ async function seedBase(tdb: TestDb) {
 		await tx.insert(loans).values({
 			id: 'loan-1',
 			userBookId: 'ub-alice',
+			itemKind: 'book',
+			itemTitle: 'Libro',
 			borrowerId: BOB,
 			ownerId: ALICE,
 			status: 'requested',
@@ -110,6 +112,8 @@ describe('RLS · loans · inserción', () => {
 			tx.insert(loans).values({
 				id: 'loan-2',
 				userBookId: 'ub-alice-2',
+				itemKind: 'book',
+				itemTitle: 'Libro',
 				borrowerId: BOB,
 				ownerId: ALICE,
 				status: 'requested',
@@ -128,6 +132,8 @@ describe('RLS · loans · inserción', () => {
 				tx.insert(loans).values({
 					id: 'loan-fraud',
 					userBookId: 'ub-alice',
+					itemKind: 'book',
+					itemTitle: 'Libro',
 					borrowerId: CAROL, // alice intenta suplantar a carol
 					ownerId: ALICE,
 					status: 'requested',

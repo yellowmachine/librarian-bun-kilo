@@ -24,10 +24,11 @@ import {
 	getUserLoans,
 	getLoan,
 	getMovieForBorrow,
-	hasOpenLoans,
 	getPendingCount
 } from '../loans';
 import { sendLoanRequestEmail } from '../email';
+import { removeMovie, OPEN_LOAN_ERROR as MOVIE_OPEN_LOAN } from '../movies';
+import { removeFromLibrary, OPEN_LOAN_ERROR as BOOK_OPEN_LOAN } from '../books';
 
 const ALICE = 'user-alice';
 const BOB = 'user-bob';
@@ -89,7 +90,6 @@ describe('préstamos de películas', () => {
 			borrowerName: 'Alice'
 		});
 		expect(await getPendingCount(BOB)).toBe(1);
-		expect(await hasOpenLoans(BOB, MOVIE)).toBe(true);
 
 		expect(await transitionLoan(BOB, loanId, 'accepted')).toEqual({ success: true });
 		expect(await transitionLoan(BOB, loanId, 'active')).toEqual({ success: true });
@@ -98,7 +98,6 @@ describe('préstamos de películas', () => {
 		expect(await transitionLoan(ALICE, loanId, 'return_requested')).toEqual({ success: true });
 		expect(await transitionLoan(BOB, loanId, 'returned')).toEqual({ success: true });
 		expect(await isMovieAvailable()).toBe(true);
-		expect(await hasOpenLoans(BOB, MOVIE)).toBe(false);
 	});
 
 	it('quien la pidió sigue viéndola en sus préstamos', async () => {
@@ -158,5 +157,66 @@ describe('préstamos de libros (sin cambios)', () => {
 		expect((res.rows[0] as { is_available: boolean }).is_available).toBe(false);
 		// La película no se toca
 		expect(await isMovieAvailable()).toBe(true);
+	});
+});
+
+describe('borrar una copia que se ha prestado', () => {
+	async function finishLoan(loanId: string) {
+		await transitionLoan(BOB, loanId, 'accepted');
+		await transitionLoan(BOB, loanId, 'active');
+		await transitionLoan(ALICE, loanId, 'return_requested');
+		await transitionLoan(BOB, loanId, 'returned');
+	}
+
+	it('no se puede con el préstamo en curso', async () => {
+		const movieLoan = await requestLoan(ALICE, MOVIE);
+		const bookLoan = await requestLoan(ALICE, BOOK);
+		await expect(removeMovie(BOB, 'um-bob')).rejects.toThrow(MOVIE_OPEN_LOAN);
+		await expect(removeFromLibrary(BOB, 'ub-bob')).rejects.toThrow(BOOK_OPEN_LOAN);
+
+		await transitionLoan(BOB, movieLoan, 'accepted');
+		await transitionLoan(BOB, movieLoan, 'active');
+		await expect(removeMovie(BOB, 'um-bob')).rejects.toThrow(MOVIE_OPEN_LOAN);
+		expect(await getLoan(BOB, bookLoan)).not.toBeNull();
+	});
+
+	it('terminado, se borra y el préstamo queda en el historial de los dos', async () => {
+		const movieLoan = await requestLoan(ALICE, MOVIE);
+		const bookLoan = await requestLoan(ALICE, BOOK);
+		await finishLoan(movieLoan);
+		await finishLoan(bookLoan);
+
+		await removeMovie(BOB, 'um-bob');
+		await removeFromLibrary(BOB, 'ub-bob');
+
+		for (const viewer of [ALICE, BOB]) {
+			const movie = await getLoan(viewer, movieLoan);
+			expect(movie).toMatchObject({
+				status: 'returned',
+				itemKind: 'movie',
+				itemHref: null,
+				userMovieId: null,
+				title: 'Blade Runner',
+				authors: ['Ridley Scott'],
+				coverUrl: 'https://image.tmdb.org/t/p/w500/a.jpg'
+			});
+			const book = await getLoan(viewer, bookLoan);
+			expect(book).toMatchObject({
+				itemKind: 'book',
+				itemHref: null,
+				title: 'Dune',
+				authors: ['Frank Herbert']
+			});
+		}
+		const { asBorrower } = await getUserLoans(ALICE);
+		expect(asBorrower.map((l) => l.title).sort()).toEqual(['Blade Runner', 'Dune']);
+	});
+
+	it('mientras la copia existe, se ven sus datos actuales, no los del momento del préstamo', async () => {
+		const loanId = await requestLoan(ALICE, BOOK);
+		await holder.tdb.asSuperuser((tx) =>
+			tx.execute(`UPDATE user_books SET title = 'Dune (corregido)' WHERE id = 'ub-bob'` as string)
+		);
+		expect((await getLoan(BOB, loanId))?.title).toBe('Dune (corregido)');
 	});
 });
