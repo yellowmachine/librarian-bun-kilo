@@ -11,17 +11,31 @@
 	--font-serif: 'Source Serif 4', Georgia, serif;
 
 	/* Paleta light — warm paper */
-	--color-paper: #f9f7f4;
-	--color-paper-ui: #f0ede8;
-	--color-paper-border: #e8e2da;
+	--color-paper: #fbf7f0;
+	--color-paper-ui: #f5eee4;
+	--color-paper-border: #e9ded1;
 
 	--color-ink: #1c1917;
 	--color-ink-muted: #57534e;
-	--color-ink-faint: #a8a29e;
+	--color-ink-faint: #716a65;
 
 	--color-accent: #7c5c3e;
 	--color-accent-hover: #6b4f35;
 	--color-accent-light: #e8d9c8;
+
+	/* Marrón del icono, para las acciones (botones, enlaces, foco, seleccionado). El 700 es el
+	   marrón de static/icons/icon.svg; hecha en OKLCH, los claros van hacia el crema del trazo. */
+	--color-brown-50: #fcf6ed;
+	--color-brown-100: #f7ebdc;
+	--color-brown-200: #ebd5c1;
+	--color-brown-300: #d6b7a2;
+	--color-brown-400: #b79280;
+	--color-brown-500: #977264;
+	--color-brown-600: #78584e;
+	--color-brown-700: #57403a;
+	--color-brown-800: #43302c;
+	--color-brown-900: #2f231f;
+	--color-brown-950: #1d1714;
 
 	/* Paleta dark */
 	--color-dark-paper: #1a1917;
@@ -45,6 +59,68 @@ html {
 html.dark {
 	background-color: var(--color-dark-paper-ui);
 	color: var(--color-dark-ink);
+}
+
+/* El foco con el teclado, en el marrón de las acciones. En la capa base, para que los campos
+   sigan sin contorno (@tailwindcss/forms): su foco es el borde. */
+@layer base {
+	:focus-visible {
+		outline-color: var(--color-brown-600);
+	}
+}
+
+/* Los placeholders, en la tinta tenue: sin esto, el gris azulado de @tailwindcss/forms. */
+::placeholder {
+	color: var(--color-ink-faint);
+	opacity: 1;
+}
+
+/* Las acciones, en el marrón del icono. El tamaño (padding, texto) y el `border` van en cada
+   botón; aquí solo los colores. */
+@utility btn-primary {
+	border-color: var(--color-brown-700);
+	background-color: var(--color-brown-700);
+	color: var(--color-brown-50);
+	transition-property: color, background-color, border-color;
+	transition-duration: 150ms;
+	&:hover:not(:disabled) {
+		border-color: var(--color-brown-800);
+		background-color: var(--color-brown-800);
+	}
+}
+
+@utility btn-secondary {
+	border-color: var(--color-brown-300);
+	color: var(--color-brown-700);
+	transition-property: color, background-color, border-color;
+	transition-duration: 150ms;
+	&:hover:not(:disabled) {
+		border-color: var(--color-brown-400);
+		background-color: var(--color-brown-100);
+	}
+}
+
+/* Acciones pequeñas de texto, sin subrayar (Edit, Suggest with AI, Find cover…). Las de cancelar
+   o descartar siguen en gris. */
+@utility action-text {
+	color: var(--color-brown-600);
+	transition-property: color;
+	transition-duration: 150ms;
+	&:hover:not(:disabled) {
+		color: var(--color-brown-800);
+	}
+}
+
+/* Enlaces y botones de texto. */
+@utility link-action {
+	color: var(--color-brown-600);
+	text-decoration-line: underline;
+	text-underline-offset: 2px;
+	transition-property: color;
+	transition-duration: 150ms;
+	&:hover {
+		color: var(--color-brown-800);
+	}
 }
 
 /* Safe area para PWA en iOS (home indicator) */

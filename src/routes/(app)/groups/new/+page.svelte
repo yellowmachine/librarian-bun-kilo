@@ -28,7 +28,7 @@
 				required
 				maxlength="60"
 				autofocus
-				class="mt-1.5 block w-full border-0 border-b border-paper-border bg-transparent px-0 py-2 text-sm text-ink placeholder-ink-faint focus:border-ink focus:ring-0"
+				class="mt-1.5 block w-full border-0 border-b border-paper-border bg-transparent px-0 py-2 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:ring-0"
 				placeholder="Club de lectura..."
 			/>
 		</div>
@@ -43,17 +43,12 @@
 				id="description"
 				name="description"
 				rows="2"
-				class="mt-1.5 w-full border-0 border-b border-paper-border bg-transparent px-0 py-2 text-sm text-ink placeholder-ink-faint focus:border-ink focus:ring-0"
+				class="mt-1.5 w-full border-0 border-b border-paper-border bg-transparent px-0 py-2 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:ring-0"
 				placeholder="A brief description..."
 			></textarea>
 		</div>
 		<div class="pt-2">
-			<button
-				type="submit"
-				class="w-full border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90"
-			>
-				Create group
-			</button>
+			<button type="submit" class="w-full border btn-primary py-2.5 text-sm"> Create group </button>
 		</div>
 	</form>
 </div>

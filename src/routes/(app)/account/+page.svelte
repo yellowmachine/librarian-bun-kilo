@@ -54,11 +54,7 @@
 				<label for="email" class={label}>Email</label>
 				<input id="email" name="email" type="email" required class={input} />
 			</div>
-			<button
-				type="submit"
-				class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-				>Invitar</button
-			>
+			<button type="submit" class="border btn-primary px-4 py-2 text-sm">Invitar</button>
 		</form>
 
 		{#if data.invitations.length > 0}
@@ -102,7 +98,7 @@
 					href="https://openrouter.ai/keys"
 					target="_blank"
 					rel="noopener noreferrer"
-					class="underline underline-offset-2 hover:text-ink">OpenRouter</a
+					class="link-action">OpenRouter</a
 				>. Se guarda cifrada.
 			</p>
 		</div>
@@ -115,7 +111,7 @@
 				Consumo de IA este mes:
 				<strong class="font-medium text-ink">{formatUsd(data.monthCostUsd)}</strong>
 			</span>
-			<span class="text-xs text-ink-faint">Ver detalle →</span>
+			<span class="text-xs text-brown-600">Ver detalle →</span>
 		</a>
 
 		{#if form?.key?.message}

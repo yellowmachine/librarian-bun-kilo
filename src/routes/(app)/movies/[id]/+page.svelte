@@ -95,7 +95,7 @@
 
 	const labelClass = 'block text-xs font-medium tracking-widest text-ink-muted uppercase';
 	const inputClass =
-		'mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0';
+		'mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0';
 </script>
 
 <div class="mx-auto max-w-xl space-y-8">
@@ -150,7 +150,7 @@
 							class="border px-3 py-1 text-xs"
 							style={tag.color
 								? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-								: 'border-color: #e8e2da; color: #3d3d3d'}
+								: 'border-color: var(--color-paper-border); color: #3d3d3d'}
 						>
 							{tag.name}
 						</span>
@@ -172,7 +172,7 @@
 					</p>
 					<a
 						href={`/loans/${borrowInfo.existingLoanId}`}
-						class="block w-full border border-paper-border py-2.5 text-center text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+						class="block w-full border btn-secondary py-2.5 text-center text-sm"
 					>
 						View loan →
 					</a>
@@ -185,12 +185,9 @@
 							maxlength="1000"
 							placeholder="Message to {movie.ownerName} (optional)"
 							rows="3"
-							class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+							class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 						></textarea>
-						<button
-							type="submit"
-							class="w-full border border-ink bg-ink py-2.5 text-sm text-paper transition-colors hover:bg-ink/90"
-						>
+						<button type="submit" class="w-full border btn-primary py-2.5 text-sm">
 							Ask to borrow
 						</button>
 					</form>
@@ -244,12 +241,7 @@
 				Available (not lent out)
 			</label>
 			<div class="flex items-center gap-3">
-				<button
-					type="submit"
-					class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-				>
-					Save
-				</button>
+				<button type="submit" class="border btn-primary px-4 py-2 text-sm"> Save </button>
 				{#if form?.success}<span class="text-xs text-ink-faint">Saved.</span>{/if}
 			</div>
 		</form>
@@ -263,7 +255,7 @@
 						type="button"
 						onclick={suggestTags}
 						disabled={suggesting}
-						class="flex items-center gap-1 text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
+						class="flex items-center gap-1 text-xs link-action"
 					>
 						<Sparkle size={12} />
 						Suggest
@@ -295,7 +287,7 @@
 							<input type="hidden" name="newTag" value={name} />
 							<span class="text-xs text-ink-muted">+ {name}</span>
 						{/each}
-						<button type="submit" class="ml-auto text-xs text-ink hover:underline">Add all</button>
+						<button type="submit" class="ml-auto text-xs action-text">Add all</button>
 						<button
 							type="button"
 							onclick={() => (suggestion = null)}
@@ -315,10 +307,10 @@
 							<button
 								type="submit"
 								title="Remove tag"
-								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-500"
+								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-700"
 								style={tag.color
 									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: #e8e2da; color: #3d3d3d'}
+									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
 							>
 								{tag.name}
 								<span class="opacity-0 group-hover:opacity-100">×</span>
@@ -345,12 +337,7 @@
 						{/each}
 					</select>
 				</div>
-				<button
-					type="submit"
-					class="border border-paper-border px-4 py-2 text-sm text-ink-muted hover:border-ink-faint hover:text-ink"
-				>
-					Move
-				</button>
+				<button type="submit" class="border btn-secondary px-4 py-2 text-sm"> Move </button>
 			</form>
 		{/if}
 
@@ -374,13 +361,9 @@
 						required
 						pattern="https://.*"
 						placeholder="https://..."
-						class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
-					<button
-						type="submit"
-						class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-						>Save</button
-					>
+					<button type="submit" class="border btn-primary px-4 py-2 text-sm">Save</button>
 				</form>
 			{/if}
 			<input
@@ -397,25 +380,18 @@
 					type="button"
 					onclick={() => photoInput?.click()}
 					disabled={uploadingPhoto}
-					class="flex items-center gap-1.5 text-ink-muted underline underline-offset-2 hover:text-ink"
+					class="flex items-center gap-1.5 link-action"
 				>
 					Photo of my copy
 				</button>
 				{#if uploadingPhoto}<Espera>Uploading photo…</Espera>{/if}
-				<button
-					type="button"
-					onclick={() => (editingCover = !editingCover)}
-					class="text-ink-muted underline underline-offset-2 hover:text-ink"
-				>
+				<button type="button" onclick={() => (editingCover = !editingCover)} class="link-action">
 					{editingCover ? 'Cancel' : 'Image from a URL'}
 				</button>
 				{#if movie.coverOverridden}
 					<form method="POST" action="?/setCover" use:enhance>
 						<input type="hidden" name="coverUrl" value="" />
-						<button
-							type="submit"
-							class="text-ink-muted underline underline-offset-2 hover:text-ink"
-						>
+						<button type="submit" class="link-action">
 							{movie.movieId ? 'Back to the TMDB poster' : 'Remove cover'}
 						</button>
 					</form>

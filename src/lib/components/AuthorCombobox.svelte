@@ -135,7 +135,7 @@
 		oninput={handleInput}
 		onfocus={() => (open = true)}
 		onkeydown={handleKeydown}
-		class="w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+		class="w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 	/>
 
 	{#if loading}

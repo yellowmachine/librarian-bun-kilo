@@ -33,7 +33,7 @@
 		});
 
 	const selectClass =
-		'border border-paper-border bg-paper px-3 py-1.5 text-sm text-ink-muted focus:border-ink focus:ring-0';
+		'border border-paper-border bg-paper px-3 py-1.5 text-sm text-ink-muted focus:border-brown-600 focus:ring-0';
 </script>
 
 <svelte:head><title>Consumo de IA · Librarian</title></svelte:head>
@@ -48,7 +48,7 @@
 				href="https://openrouter.ai/activity"
 				target="_blank"
 				rel="noopener noreferrer"
-				class="underline underline-offset-2 hover:text-ink">su panel de actividad</a
+				class="link-action">su panel de actividad</a
 			>.
 		</p>
 	</div>

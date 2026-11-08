@@ -119,12 +119,7 @@
 				title="Elige un color"
 				class="h-8 w-8 cursor-pointer rounded-none border border-paper-border p-0.5"
 			/>
-			<button
-				type="submit"
-				class="border border-ink bg-ink px-3 py-1.5 text-xs text-paper hover:bg-ink/90"
-			>
-				Create
-			</button>
+			<button type="submit" class="border btn-primary px-3 py-1.5 text-xs"> Create </button>
 			<button
 				type="button"
 				onclick={cancelCreate}
@@ -144,7 +139,7 @@
 			autocomplete="off"
 			onfocus={openDropdown}
 			oninput={openDropdown}
-			class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-ink focus:ring-0"
+			class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
 		/>
 
 		<!-- Dropdown -->

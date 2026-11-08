@@ -245,36 +245,28 @@
 			{/if}
 			{#if isOwner && book.bookId && !book.coverUrl}
 				<form method="POST" action="?/refreshCover" use:enhance class="mt-2">
-					<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
+					<button type="submit" class="text-xs action-text">
 						↻ Fetch cover from OpenLibrary
 					</button>
 				</form>
 				{#if form?.coverError && !coverOpen}
-					<p class="mt-1 text-xs text-red-600">{form.coverError}</p>
+					<p class="mt-1 text-xs text-red-700">{form.coverError}</p>
 				{/if}
 			{/if}
 			{#if isOwner}
-				<button
-					type="button"
-					onclick={toggleCover}
-					class="mt-2 text-xs text-ink-faint hover:text-ink-muted"
-				>
+				<button type="button" onclick={toggleCover} class="mt-2 text-xs action-text">
 					{coverOpen ? 'Cancel' : book.coverUrl ? 'Change cover' : '✦ Find cover'}
 				</button>
 			{/if}
 			{#if isOwner && book.bookId && book.coverOverridden && !coverOpen}
 				<form method="POST" action="?/setCover" use:enhance class="mt-2">
 					<input type="hidden" name="coverUrl" value="" />
-					<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
-						↻ Reset to catalog cover
-					</button>
+					<button type="submit" class="text-xs action-text"> ↻ Reset to catalog cover </button>
 				</form>
 			{/if}
 			{#if isOwner && book.bookId && book.titleOverridden}
 				<form method="POST" action="?/resetTitleAuthor" use:enhance class="mt-2">
-					<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
-						↻ Reset to catalog title
-					</button>
+					<button type="submit" class="text-xs action-text"> ↻ Reset to catalog title </button>
 				</form>
 			{/if}
 		</div>
@@ -283,16 +275,12 @@
 				<button
 					type="button"
 					onclick={() => (editOpen = !editOpen)}
-					class="flex items-center gap-1 text-xs text-ink-faint hover:text-ink"
+					class="flex items-center gap-1 text-xs action-text"
 				>
 					<PencilSimple size={13} />
 					{editOpen ? 'Cancel' : 'Edit'}
 				</button>
-				<button
-					type="button"
-					onclick={toggleLinkSearch}
-					class="text-xs text-ink-faint hover:text-ink"
-				>
+				<button type="button" onclick={toggleLinkSearch} class="text-xs action-text">
 					{linkSearchOpen ? 'Cancel' : 'Search OpenLibrary'}
 				</button>
 			</div>
@@ -302,7 +290,7 @@
 				<button
 					type="button"
 					onclick={() => (correctOpen = !correctOpen)}
-					class="flex items-center gap-1 text-xs text-ink-faint hover:text-ink"
+					class="flex items-center gap-1 text-xs action-text"
 				>
 					<PencilSimple size={13} />
 					{correctOpen ? 'Cancel' : 'Edit'}
@@ -324,7 +312,7 @@
 			class="space-y-4 border border-paper-border p-4"
 		>
 			{#if form?.coverError}
-				<p class="text-xs text-red-600">{form.coverError}</p>
+				<p class="text-xs text-red-700">{form.coverError}</p>
 			{/if}
 			<CoverPicker
 				bind:value={coverValue}
@@ -337,7 +325,7 @@
 			<button
 				type="submit"
 				disabled={coverValue === (book.coverUrl ?? '')}
-				class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90 disabled:opacity-40"
+				class="border btn-primary px-5 py-2 text-sm disabled:opacity-40"
 			>
 				Save cover
 			</button>
@@ -353,7 +341,7 @@
 			class="space-y-4 border border-paper-border p-4"
 		>
 			{#if form?.correctError}
-				<p class="text-xs text-red-600">{form.correctError}</p>
+				<p class="text-xs text-red-700">{form.correctError}</p>
 			{/if}
 			<div>
 				<label
@@ -366,7 +354,7 @@
 					type="text"
 					required
 					bind:value={correctTitle}
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 			<div>
@@ -375,12 +363,7 @@
 				</span>
 				<AuthorListInput bind:authors={correctAuthors} name="authors" />
 			</div>
-			<button
-				type="submit"
-				class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90"
-			>
-				Save changes
-			</button>
+			<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Save changes </button>
 		</form>
 	{/if}
 
@@ -388,21 +371,16 @@
 	{#if isOwner && linkSearchOpen && !book.bookId}
 		<div class="space-y-4 border border-paper-border p-4">
 			{#if form?.linkError}
-				<p class="text-xs text-red-600">{form.linkError}</p>
+				<p class="text-xs text-red-700">{form.linkError}</p>
 			{/if}
 			<form onsubmit={searchToLink} class="flex gap-2">
 				<input
 					type="text"
 					bind:value={linkQuery}
 					placeholder="Title, author or ISBN..."
-					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
-				<button
-					type="submit"
-					class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-				>
-					Search
-				</button>
+				<button type="submit" class="border btn-primary px-4 py-2 text-sm"> Search </button>
 			</form>
 			{#if linkSearching}
 				<div class="flex justify-center py-8">
@@ -436,7 +414,7 @@
 			class="space-y-4 border border-paper-border p-4"
 		>
 			{#if form?.editError}
-				<p class="text-xs text-red-600">{form.editError}</p>
+				<p class="text-xs text-red-700">{form.editError}</p>
 			{/if}
 			<div>
 				<label
@@ -449,7 +427,7 @@
 					type="text"
 					required
 					bind:value={editTitle}
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 			<div>
@@ -469,7 +447,7 @@
 						name="isbn"
 						type="text"
 						bind:value={editIsbn}
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 				<div>
@@ -484,7 +462,7 @@
 						min="0"
 						max="9999"
 						bind:value={editPublishYear}
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 			</div>
@@ -499,15 +477,10 @@
 					name="description"
 					rows="4"
 					bind:value={editDescription}
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
-			<button
-				type="submit"
-				class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90"
-			>
-				Save changes
-			</button>
+			<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Save changes </button>
 		</form>
 	{/if}
 
@@ -518,9 +491,7 @@
 				<span class="text-xs font-medium tracking-widest text-ink-muted uppercase">Synopsis</span>
 				{#if book.bookId}
 					<form method="POST" action="?/updateDescription" use:enhance>
-						<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
-							↻ Update from OpenLibrary
-						</button>
+						<button type="submit" class="text-xs action-text"> ↻ Update from OpenLibrary </button>
 					</form>
 				{/if}
 			</div>
@@ -531,7 +502,7 @@
 				<button
 					type="button"
 					onclick={() => (descriptionExpanded = !descriptionExpanded)}
-					class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink-muted"
+					class="text-xs link-action"
 				>
 					{descriptionExpanded ? 'Leer menos' : 'Leer más'}
 				</button>
@@ -541,9 +512,7 @@
 		<div class="flex items-center justify-between">
 			<span class="text-xs text-ink-faint">No synopsis available.</span>
 			<form method="POST" action="?/updateDescription" use:enhance>
-				<button type="submit" class="text-xs text-ink-faint hover:text-ink-muted">
-					↻ Fetch from OpenLibrary
-				</button>
+				<button type="submit" class="text-xs action-text"> ↻ Fetch from OpenLibrary </button>
 			</form>
 		</div>
 	{/if}
@@ -554,7 +523,7 @@
 			href="https://openlibrary.org/works/{book.bookId}"
 			target="_blank"
 			rel="noopener noreferrer"
-			class="inline-flex items-center gap-1 text-xs text-ink-faint underline underline-offset-2 hover:text-ink-muted"
+			class="inline-flex items-center gap-1 text-xs link-action"
 		>
 			View on Open Library ↗
 		</a>
@@ -583,7 +552,7 @@
 					id="library-id"
 					name="libraryId"
 					bind:value={selectedLibraryId}
-					class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				>
 					{#each userLibraries as library (library.id)}
 						<option value={library.id}>{library.name}</option>
@@ -592,7 +561,7 @@
 				<button
 					type="submit"
 					disabled={selectedLibraryId === book.libraryId}
-					class="shrink-0 border border-paper-border px-4 py-2 text-sm text-ink-muted transition-colors hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+					class="shrink-0 border btn-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					Move
 				</button>
@@ -628,7 +597,7 @@
 					bind:value={notes}
 					rows="3"
 					placeholder="Edition, book condition..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -643,7 +612,7 @@
 					/>
 					<div
 						class="h-5 w-9 rounded-full border-2 transition-colors
-					{isAvailable ? 'border-ink bg-ink' : 'border-paper-border bg-paper'}"
+					{isAvailable ? 'border-brown-700 bg-brown-700' : 'border-paper-border bg-paper'}"
 					>
 						<div
 							class="h-3 w-3 translate-x-0.5 translate-y-0.5 rounded-full transition-transform
@@ -655,12 +624,7 @@
 			</label>
 
 			<div class="flex items-center gap-3">
-				<button
-					type="submit"
-					class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90"
-				>
-					Save
-				</button>
+				<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Save </button>
 				{#if savedOk}
 					<span class="text-xs text-ink-faint">Saved</span>
 				{/if}
@@ -676,7 +640,7 @@
 					type="button"
 					onclick={suggestTags}
 					disabled={suggestingTags}
-					class="ml-auto flex items-center gap-1 text-xs text-ink-faint hover:text-ink disabled:opacity-60"
+					class="ml-auto flex items-center gap-1 text-xs action-text disabled:opacity-60"
 				>
 					<Sparkle size={12} /> Suggest with AI
 				</button>
@@ -697,7 +661,7 @@
 									class="border px-3 py-1 text-xs transition-colors hover:border-ink-faint"
 									style={tag.color
 										? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-										: 'border-color: #e8e2da; color: #3d3d3d'}
+										: 'border-color: var(--color-paper-border); color: #3d3d3d'}
 								>
 									+ {tag.name}
 								</button>
@@ -752,14 +716,14 @@
 							<input type="hidden" name="tagId" value={tag.id} />
 							<button
 								type="submit"
-								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-500 {unsuggestedAssigned.has(
+								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-700 {unsuggestedAssigned.has(
 									tag.id
 								)
 									? 'border-dashed'
 									: ''}"
 								style={tag.color
 									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: #e8e2da; color: #3d3d3d'}
+									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
 							>
 								{tag.name}
 								<span class="opacity-0 group-hover:opacity-100">×</span>
@@ -800,7 +764,7 @@
 				</p>
 				<a
 					href={`/loans/${borrowInfo.existingLoanId}`}
-					class="block w-full border border-paper-border py-2.5 text-center text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+					class="block w-full border btn-secondary py-2.5 text-center text-sm"
 				>
 					View loan →
 				</a>
@@ -817,12 +781,9 @@
 						name="notes"
 						placeholder="Message to the owner (optional)"
 						rows="3"
-						class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+						class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 					></textarea>
-					<button
-						type="submit"
-						class="w-full border border-ink bg-ink py-2.5 text-sm text-paper transition-colors hover:bg-ink/90"
-					>
+					<button type="submit" class="w-full border btn-primary py-2.5 text-sm">
 						Request loan
 					</button>
 				</form>
@@ -862,7 +823,7 @@
 			>
 				<button
 					type="submit"
-					class="flex items-center gap-1.5 text-sm text-ink-faint hover:text-red-500"
+					class="flex items-center gap-1.5 text-sm text-ink-faint hover:text-red-700"
 				>
 					<Trash size={14} /> Remove from my library
 				</button>

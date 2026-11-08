@@ -279,18 +279,12 @@
 			<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{currentLibraryName}</h1>
 		</div>
 		<div class="flex shrink-0 items-center gap-2">
-			<a
-				href="/libraries"
-				class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
-			>
+			<a href="/libraries" class="flex items-center gap-1.5 border btn-secondary px-3 py-2 text-sm">
 				<BookOpen size={15} />
 				<span class="hidden sm:inline">Libraries</span>
 			</a>
 
-			<a
-				href="/tags"
-				class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
-			>
+			<a href="/tags" class="flex items-center gap-1.5 border btn-secondary px-3 py-2 text-sm">
 				<Tag size={15} />
 				<span class="hidden sm:inline">Tags</span>
 			</a>
@@ -299,7 +293,7 @@
 			<div class="relative">
 				<button
 					onclick={() => (exportOpen = !exportOpen)}
-					class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+					class="flex items-center gap-1.5 border btn-secondary px-3 py-2 text-sm"
 				>
 					<Export size={15} />
 					<span class="hidden sm:inline">Export</span>
@@ -333,7 +327,7 @@
 
 			<a
 				href={libraryId ? `/library/add?libraryId=${libraryId}` : '/library/add'}
-				class="flex items-center gap-1.5 border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
+				class="flex items-center gap-1.5 border btn-primary px-3 py-2 text-sm"
 			>
 				<Plus size={15} weight="bold" />
 				<span class="hidden sm:inline">Add</span>
@@ -347,7 +341,7 @@
 			onclick={() => (activeTab = 'mine')}
 			class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
 			{activeTab === 'mine'
-				? 'border-ink font-medium text-ink'
+				? 'border-brown-700 font-medium text-ink'
 				: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 		>
 			My books
@@ -362,7 +356,7 @@
 			}}
 			class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
 			{activeTab === 'others'
-				? 'border-ink font-medium text-ink'
+				? 'border-brown-700 font-medium text-ink'
 				: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 		>
 			From others
@@ -375,7 +369,7 @@
 				}}
 				class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
 				{activeTab === 'contacts'
-					? 'border-ink font-medium text-ink'
+					? 'border-brown-700 font-medium text-ink'
 					: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 			>
 				Contacts
@@ -397,10 +391,10 @@
 							style={active
 								? tag.color
 									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-									: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+									: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
 								: tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
-									: 'border-color: #e8e2da; color: #b0aaa4'}
+									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
+									: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
 						>
 							{tag.name}
 						</button>
@@ -422,7 +416,9 @@
 					<button
 						onclick={() => toggleBy('title')}
 						class="border-b-2 pb-2 text-xs font-medium transition-colors
-						{by === 'title' ? 'border-ink text-ink' : 'border-transparent text-ink-faint hover:text-ink-muted'}"
+						{by === 'title'
+							? 'border-brown-700 text-ink'
+							: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 					>
 						By title
 					</button>
@@ -430,7 +426,7 @@
 						onclick={() => toggleBy('author')}
 						class="ml-4 border-b-2 pb-2 text-xs font-medium transition-colors
 						{by === 'author'
-							? 'border-ink text-ink'
+							? 'border-brown-700 text-ink'
 							: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 					>
 						By author
@@ -441,7 +437,7 @@
 					<button
 						onclick={() => (activeLetter = null)}
 						class="flex h-7 w-7 items-center justify-center text-xs transition-colors
-						{activeLetter === null ? 'bg-ink text-paper' : 'text-ink-muted hover:text-ink'}"
+						{activeLetter === null ? 'bg-brown-700 text-brown-50' : 'text-ink-muted hover:text-ink'}"
 					>
 						All
 					</button>
@@ -452,7 +448,7 @@
 							<button
 								onclick={() => toggleLetter(l)}
 								class="flex h-7 w-7 items-center justify-center text-xs font-medium transition-colors
-								{active ? 'bg-ink text-paper' : 'text-ink hover:bg-paper-ui'}"
+								{active ? 'bg-brown-700 text-brown-50' : 'text-ink hover:bg-paper-ui'}"
 							>
 								{l}
 							</button>
@@ -476,7 +472,7 @@
 						type="search"
 						bind:value={search}
 						placeholder="Search by title or author..."
-						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
+						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 					/>
 				</div>
 				<button
@@ -484,7 +480,7 @@
 					onclick={() => (selectionMode ? exitSelectionMode() : (selectionMode = true))}
 					class="flex shrink-0 items-center gap-1.5 border px-3 py-2 text-sm transition-colors
 					{selectionMode
-						? 'border-ink bg-ink text-paper'
+						? 'border-brown-700 bg-brown-700 text-brown-50'
 						: 'border-paper-border text-ink-muted hover:border-ink-faint hover:text-ink'}"
 				>
 					<CheckSquare size={15} />
@@ -496,11 +492,7 @@
 				<div
 					class="flex flex-wrap items-center gap-3 border border-paper-border bg-paper-ui px-4 py-3"
 				>
-					<button
-						type="button"
-						onclick={toggleSelectAll}
-						class="text-sm text-ink-muted underline underline-offset-2 hover:text-ink"
-					>
+					<button type="button" onclick={toggleSelectAll} class="text-sm link-action">
 						{allFilteredSelected ? 'Deselect all' : 'Select all'}
 					</button>
 					<span class="text-sm text-ink-faint">{selectedIds.size} selected</span>
@@ -508,7 +500,7 @@
 					{#if selectedIds.size > 0}
 						<select
 							bind:value={moveTargetLibraryId}
-							class="border border-paper-border bg-paper px-3 py-1.5 text-sm focus:border-ink focus:ring-0"
+							class="border border-paper-border bg-paper px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
 						>
 							<option value="">Move to…</option>
 							{#each userLibraries as lib (lib.id)}
@@ -519,12 +511,12 @@
 							type="button"
 							onclick={moveSelected}
 							disabled={!moveTargetLibraryId || moving}
-							class="border border-ink bg-ink px-4 py-1.5 text-sm text-paper hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+							class="border btn-primary px-4 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
 						>
 							{moving ? 'Moving…' : 'Move'}
 						</button>
 						{#if moveError}
-							<span class="text-xs text-red-600">{moveError}</span>
+							<span class="text-xs text-red-700">{moveError}</span>
 						{/if}
 					{/if}
 				</div>
@@ -553,9 +545,7 @@
 			<div class="flex flex-col items-center justify-center py-24 text-center">
 				<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
 				<p class="text-sm text-ink-faint">Your library is empty.</p>
-				<a href="/library/add" class="mt-4 text-sm text-ink underline underline-offset-2">
-					Add your first book
-				</a>
+				<a href="/library/add" class="mt-4 text-sm link-action"> Add your first book </a>
 			</div>
 		{/if}
 
@@ -572,10 +562,10 @@
 						style={active
 							? tag.color
 								? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-								: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+								: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
 							: tag.color
-								? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
-								: 'border-color: #e8e2da; color: #b0aaa4'}
+								? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
+								: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
 					>
 						{tag.name}
 					</button>
@@ -616,13 +606,13 @@
 					name="query"
 					value={othersQuery}
 					placeholder="Title, author, ISBN, tag or person..."
-					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
+					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 				/>
 			</div>
 			<button
 				type="submit"
 				disabled={othersSearching}
-				class="border border-ink bg-ink px-4 py-2 text-sm text-paper transition-colors hover:bg-ink/90 disabled:opacity-50"
+				class="border btn-primary px-4 py-2 text-sm disabled:opacity-50"
 			>
 				{#if othersSearching}
 					<Spinner size="sm" />
@@ -671,7 +661,7 @@
 			<select
 				name="contactId"
 				onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}
-				class="w-full border border-paper-border bg-paper-ui px-3 py-2 text-sm text-ink focus:border-ink focus:bg-paper focus:ring-0"
+				class="w-full border border-paper-border bg-paper-ui px-3 py-2 text-sm text-ink focus:border-brown-600 focus:bg-paper focus:ring-0"
 			>
 				<option value="">Select a contact…</option>
 				{#each contacts as c (c.userId)}
@@ -699,10 +689,10 @@
 								style={active
 									? tag.color
 										? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-										: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+										: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
 									: tag.color
-										? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
-										: 'border-color: #e8e2da; color: #b0aaa4'}
+										? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
+										: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
 							>
 								{tag.name}
 							</button>
@@ -727,7 +717,7 @@
 						type="search"
 						bind:value={contactSearch}
 						placeholder="Search by title or author..."
-						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
+						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 					/>
 				</div>
 				{#if filteredContactBooks().length === 0}

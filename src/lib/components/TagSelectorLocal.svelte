@@ -174,11 +174,7 @@
 				title="Choose a color"
 				class="h-8 w-8 cursor-pointer rounded-none border border-paper-border p-0.5"
 			/>
-			<button
-				type="button"
-				onclick={confirmCreate}
-				class="border border-ink bg-ink px-3 py-1.5 text-xs text-paper hover:bg-ink/90"
-			>
+			<button type="button" onclick={confirmCreate} class="border btn-primary px-3 py-1.5 text-xs">
 				Create
 			</button>
 			<button
@@ -201,7 +197,7 @@
 				autocomplete="off"
 				onfocus={() => (open = true)}
 				oninput={() => (open = true)}
-				class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-ink focus:ring-0"
+				class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
 			/>
 
 			{#if open && (filtered.length > 0 || showCreate)}

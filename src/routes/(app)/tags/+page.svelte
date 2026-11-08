@@ -118,10 +118,7 @@
 			</button>
 		</form>
 	{:else}
-		<button
-			onclick={() => (creating = true)}
-			class="flex items-center gap-2 text-sm text-ink-faint hover:text-ink"
-		>
+		<button onclick={() => (creating = true)} class="flex items-center gap-2 text-sm action-text">
 			<Plus size={16} /> New tag
 		</button>
 	{/if}
@@ -178,7 +175,7 @@
 								class="border px-3 py-0.5 text-xs"
 								style={tag.color
 									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: #e8e2da; color: #3d3d3d'}
+									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
 							>
 								{tag.name}
 							</span>
@@ -199,10 +196,7 @@
 									}}
 							>
 								<input type="hidden" name="id" value={tag.id} />
-								<button
-									type="submit"
-									class="border border-ink bg-ink px-3 py-1 text-xs text-paper hover:bg-ink/90"
-								>
+								<button type="submit" class="border btn-primary px-3 py-1 text-xs">
 									Confirm
 								</button>
 							</form>
@@ -222,7 +216,7 @@
 								class="border px-3 py-0.5 text-xs"
 								style={tag.color
 									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: #e8e2da; color: #3d3d3d'}
+									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
 							>
 								{tag.name}
 							</span>

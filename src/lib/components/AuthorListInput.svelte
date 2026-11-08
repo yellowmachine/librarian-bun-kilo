@@ -43,7 +43,7 @@
 	<button
 		type="button"
 		onclick={addAuthorField}
-		class="flex items-center gap-1.5 text-xs text-ink-faint hover:text-ink-muted"
+		class="flex items-center gap-1.5 text-xs action-text"
 	>
 		<Plus size={12} /> Add author
 	</button>

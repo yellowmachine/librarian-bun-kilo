@@ -101,7 +101,7 @@
 						const id = e.currentTarget.value;
 						goto(id ? `/movies?libraryId=${id}` : '/movies');
 					}}
-					class="border border-paper-border bg-paper px-3 py-2 text-sm text-ink-muted focus:border-ink focus:ring-0"
+					class="border border-paper-border bg-paper px-3 py-2 text-sm text-ink-muted focus:border-brown-600 focus:ring-0"
 				>
 					<option value="">All libraries</option>
 					{#each userLibraries as lib (lib.id)}
@@ -111,7 +111,7 @@
 			{/if}
 			<a
 				href={libraryId ? `/movies/add?libraryId=${libraryId}` : '/movies/add'}
-				class="flex items-center gap-1.5 border border-ink bg-ink px-3 py-2 text-sm text-paper transition-colors hover:bg-ink/90"
+				class="flex items-center gap-1.5 border btn-primary px-3 py-2 text-sm"
 			>
 				<Plus size={15} weight="bold" />
 				<span class="hidden sm:inline">Add</span>
@@ -125,7 +125,7 @@
 				onclick={() => switchTab(tab.key as 'mine' | 'others')}
 				class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
 				{activeTab === tab.key
-					? 'border-ink font-medium text-ink'
+					? 'border-brown-700 font-medium text-ink'
 					: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 			>
 				{tab.label}
@@ -142,7 +142,7 @@
 				<select
 					aria-label="Owner"
 					bind:value={ownerFilter}
-					class="border border-paper-border bg-paper px-3 py-1.5 text-sm text-ink-muted focus:border-ink focus:ring-0"
+					class="border border-paper-border bg-paper px-3 py-1.5 text-sm text-ink-muted focus:border-brown-600 focus:ring-0"
 				>
 					<option value="">Everyone</option>
 					{#each owners as owner (owner.id)}
@@ -162,10 +162,10 @@
 							style={active
 								? tag.color
 									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-									: 'background-color: #e8e2da; border-color: #8a8480; color: #3a3430'
+									: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
 								: tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}88`
-									: 'border-color: #e8e2da; color: #b0aaa4'}
+									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
+									: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
 						>
 							{tag.name}
 						</button>
@@ -187,7 +187,7 @@
 						onclick={() => (activeFormat = null)}
 						class="rounded-full border px-2.5 py-0.5 text-xs transition-colors
 						{activeFormat === null
-							? 'border-ink bg-ink text-paper'
+							? 'border-brown-700 bg-brown-700 text-brown-50'
 							: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
 					>
 						All
@@ -197,7 +197,7 @@
 							onclick={() => (activeFormat = activeFormat === f ? null : f)}
 							class="rounded-full border px-2.5 py-0.5 text-xs transition-colors
 							{activeFormat === f
-								? 'border-ink bg-ink text-paper'
+								? 'border-brown-700 bg-brown-700 text-brown-50'
 								: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
 						>
 							{MEDIA_FORMAT_LABELS[f]}
@@ -217,7 +217,7 @@
 					placeholder={activeTab === 'mine'
 						? 'Search by title or director...'
 						: 'Search by title, director or owner...'}
-					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-ink focus:bg-paper focus:ring-0"
+					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 				/>
 			</div>
 		</div>
@@ -248,7 +248,7 @@
 				Nobody has shared movies with you yet. They show up here when someone in one of your groups
 				shares a tag their movies carry.
 			</p>
-			<a href="/groups" class="mt-4 text-sm text-ink underline underline-offset-2">Your groups</a>
+			<a href="/groups" class="mt-4 text-sm link-action">Your groups</a>
 		</div>
 	{:else}
 		<div class="flex flex-col items-center justify-center py-24 text-center">
@@ -256,9 +256,7 @@
 			<p class="text-sm text-ink-faint">
 				{libraryId ? 'No movies in this library yet.' : 'Your video library is empty.'}
 			</p>
-			<a href="/movies/add" class="mt-4 text-sm text-ink underline underline-offset-2">
-				Add your first movie
-			</a>
+			<a href="/movies/add" class="mt-4 text-sm link-action"> Add your first movie </a>
 		</div>
 	{/if}
 

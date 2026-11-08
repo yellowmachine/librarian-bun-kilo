@@ -74,7 +74,7 @@
 				type="button"
 				onclick={findCover}
 				disabled={!title.trim() || searching}
-				class="flex items-center gap-1.5 border border-paper-border px-3 py-2 text-sm text-ink-muted hover:border-ink-faint hover:text-ink disabled:opacity-40"
+				class="flex items-center gap-1.5 border btn-secondary px-3 py-2 text-sm disabled:opacity-40"
 			>
 				{#if searching}
 					<Spinner size="sm" /> Searching…
@@ -86,7 +86,7 @@
 				type="url"
 				bind:value
 				placeholder="…or paste an image URL (https://)"
-				class="w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				class="w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			/>
 		</div>
 	</div>

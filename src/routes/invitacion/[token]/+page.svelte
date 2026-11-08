@@ -93,10 +93,8 @@
 
 		{#if data.seilide}
 			<p class="mt-8 text-center text-xs text-ink-faint">
-				¿Tienes cuenta en Seilide? <a
-					href="/login"
-					class="underline underline-offset-2 hover:text-ink">Entra con ella</a
-				> y no necesitas contraseña.
+				¿Tienes cuenta en Seilide? <a href="/login" class="link-action">Entra con ella</a> y no necesitas
+				contraseña.
 			</p>
 		{/if}
 	{/if}

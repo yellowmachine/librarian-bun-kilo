@@ -783,9 +783,7 @@
 				<span class="text-ink-muted"
 					><span class="font-medium text-ink">{lastAddedTitle}</span> added to your library.</span
 				>
-				<a href="/library" class="ml-4 shrink-0 text-xs text-ink underline underline-offset-2"
-					>View library</a
-				>
+				<a href="/library" class="ml-4 shrink-0 text-xs link-action">View library</a>
 			</div>
 		{/if}
 		{#if shelfSummary}
@@ -865,14 +863,9 @@
 				bind:value={manualQuery}
 				placeholder="Title, author or ISBN..."
 				autofocus
-				class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+				class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			/>
-			<button
-				type="submit"
-				class="border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
-			>
-				Search
-			</button>
+			<button type="submit" class="border btn-primary px-4 py-2 text-sm"> Search </button>
 		</form>
 
 		<!-- Resultados -->
@@ -880,12 +873,7 @@
 		<div>
 			<div class="mb-4 flex items-center justify-between">
 				<span class="text-xs tracking-widest text-ink-faint uppercase">Results</span>
-				<button
-					onclick={() => goTo('manual')}
-					class="text-xs text-ink underline underline-offset-2"
-				>
-					New search
-				</button>
+				<button onclick={() => goTo('manual')} class="text-xs link-action"> New search </button>
 			</div>
 			{#if translatedQuery}
 				<p class="mb-4 text-xs text-ink-faint">
@@ -945,10 +933,7 @@
 								: 'a book with the same title and author'} in
 							<strong>{duplicateLibraryName}</strong>.
 						{/if}
-						<a
-							href="/library/{duplicateMatch.userBookId}"
-							class="underline underline-offset-2 hover:text-ink">View it</a
-						>
+						<a href="/library/{duplicateMatch.userBookId}" class="link-action">View it</a>
 					</p>
 				</div>
 			{/if}
@@ -970,7 +955,7 @@
 						<button
 							type="button"
 							onclick={() => (descriptionExpanded = !descriptionExpanded)}
-							class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink-muted"
+							class="text-xs link-action"
 						>
 							{descriptionExpanded ? 'Less' : 'More'}
 						</button>
@@ -1007,7 +992,7 @@
 					bind:value={notes}
 					rows="2"
 					placeholder="Edition, book condition..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -1022,7 +1007,7 @@
 					<select
 						id="confirm-library"
 						bind:value={selectedLibraryId}
-						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					>
 						{#each availableLibraries as lib (lib.id)}
 							<option value={lib.id}>{lib.name}</option>
@@ -1053,16 +1038,10 @@
 			</div>
 
 			<div class="flex gap-3">
-				<button
-					onclick={() => history.back()}
-					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
-				>
+				<button onclick={() => history.back()} class="flex-1 border btn-secondary py-2.5 text-sm">
 					Cancel
 				</button>
-				<button
-					onclick={handleAddClick}
-					class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90"
-				>
+				<button onclick={handleAddClick} class="flex-1 border btn-primary py-2.5 text-sm">
 					Add to my library
 				</button>
 			</div>
@@ -1085,7 +1064,7 @@
 					required
 					autofocus
 					placeholder="Book title"
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -1101,10 +1080,7 @@
 								: 'a book with the same title and author'} in
 							<strong>{duplicateLibraryName}</strong>.
 						{/if}
-						<a
-							href="/library/{duplicateMatch.userBookId}"
-							class="underline underline-offset-2 hover:text-ink">View it</a
-						>
+						<a href="/library/{duplicateMatch.userBookId}" class="link-action">View it</a>
 					</p>
 				</div>
 			{/if}
@@ -1128,7 +1104,7 @@
 					type="text"
 					bind:value={formAlternateTitle}
 					placeholder="Title in another language..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -1145,7 +1121,7 @@
 						type="text"
 						bind:value={formIsbn}
 						placeholder="9780000000000"
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 				<div>
@@ -1162,7 +1138,7 @@
 						placeholder="2024"
 						min="0"
 						max="9999"
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 			</div>
@@ -1194,7 +1170,7 @@
 					bind:value={formDescription}
 					rows="3"
 					placeholder="Synopsis or notes about the book..."
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -1210,7 +1186,7 @@
 					bind:value={notes}
 					rows="2"
 					placeholder="Edition, condition..."
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -1225,7 +1201,7 @@
 					<select
 						id="form-library"
 						bind:value={selectedLibraryId}
-						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-ink focus:ring-0"
+						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					>
 						{#each availableLibraries as lib (lib.id)}
 							<option value={lib.id}>{lib.name}</option>
@@ -1244,7 +1220,7 @@
 							type="button"
 							onclick={suggestFormTags}
 							disabled={suggestingTags}
-							class="ml-auto flex items-center gap-1 text-xs text-ink-faint hover:text-ink disabled:opacity-60"
+							class="ml-auto flex items-center gap-1 text-xs action-text disabled:opacity-60"
 						>
 							<Sparkle size={12} /> Suggest with AI
 						</button>
@@ -1268,14 +1244,14 @@
 				<button
 					type="button"
 					onclick={backToChoose}
-					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
+					class="flex-1 border btn-secondary py-2.5 text-sm"
 				>
 					Cancel
 				</button>
 				<button
 					type="submit"
 					disabled={!formTitle.trim()}
-					class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90 disabled:opacity-40"
+					class="flex-1 border btn-primary py-2.5 text-sm disabled:opacity-40"
 				>
 					Add to my library
 				</button>
@@ -1307,10 +1283,7 @@
 					{shelfCandidates.length}
 					{shelfCandidates.length === 1 ? 'book' : 'books'} detected
 				</span>
-				<button
-					onclick={toggleShelfSelectAll}
-					class="text-xs text-ink underline underline-offset-2"
-				>
+				<button onclick={toggleShelfSelectAll} class="text-xs link-action">
 					{allShelfSelected ? 'Deselect all' : 'Select all'}
 				</button>
 			</div>
@@ -1325,7 +1298,7 @@
 								onclick={() => toggleShelfSelect(i)}
 								aria-label={checked ? 'Deselect' : 'Select'}
 								class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors
-								{checked ? 'border-ink bg-ink text-paper' : 'border-paper-border text-transparent'}"
+								{checked ? 'border-brown-700 bg-brown-700 text-brown-50' : 'border-paper-border text-transparent'}"
 							>
 								<Check size={12} weight="bold" />
 							</button>
@@ -1364,14 +1337,14 @@
 						shelfImagePreview = null;
 						backToChoose();
 					}}
-					class="flex-1 border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
+					class="flex-1 border btn-secondary py-2.5 text-sm"
 				>
 					Cancel
 				</button>
 				<button
 					onclick={addSelectedShelfBooks}
 					disabled={selectedShelfIndices.size === 0}
-					class="flex-1 border border-ink bg-ink py-2.5 text-sm text-paper hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+					class="flex-1 border btn-primary py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					Add {selectedShelfIndices.size || ''}
 					{selectedShelfIndices.size === 1 ? 'book' : 'books'}

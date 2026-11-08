@@ -78,8 +78,9 @@ function hslToHex(h: number, s: number, l: number): string {
 	return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
-// Luminancia máxima admitida para el texto: el fondo "paper" (#f9f7f4) tiene
-// luminancia ≈ 0.93, así que 0.168 sería el límite exacto para 4.5:1 (AA).
+// Luminancia máxima admitida para el texto: el fondo "paper" (#fbf7f0) tiene
+// luminancia ≈ 0.93, así que 0.168 sería el límite exacto para 4.5:1 (AA); sobre
+// "paper-ui" (#f5eee4, ≈ 0.86), 0.152. Con 0.14 queda 4.8:1 en el peor de los dos.
 // Se deja algo de margen porque la búsqueda avanza en pasos de L, no es exacta.
 const MAX_TEXT_LUMINANCE = 0.14;
 const MIN_LIGHTNESS_FLOOR = 8;

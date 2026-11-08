@@ -52,7 +52,7 @@
 		</div>
 		<button
 			onclick={() => (showCreateForm = !showCreateForm)}
-			class="flex items-center gap-1.5 border border-ink bg-ink px-4 py-2 text-sm text-paper hover:bg-ink/90"
+			class="flex items-center gap-1.5 border btn-primary px-4 py-2 text-sm"
 		>
 			<Plus size={16} weight="bold" /> New
 		</button>
@@ -80,17 +80,12 @@
 					placeholder="Office"
 					autofocus
 					maxlength="100"
-					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
-				<button
-					type="submit"
-					class="border border-ink bg-ink px-5 py-2 text-sm text-paper hover:bg-ink/90"
-				>
-					Create
-				</button>
+				<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Create </button>
 			</form>
 			{#if form?.createError}
-				<p class="mt-2 text-sm text-red-500">{form.createError}</p>
+				<p class="mt-2 text-sm text-red-700">{form.createError}</p>
 			{/if}
 		</div>
 	{/if}
@@ -123,12 +118,9 @@
 							bind:value={editName}
 							autofocus
 							maxlength="100"
-							class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+							class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 						/>
-						<button
-							type="submit"
-							class="shrink-0 border border-ink bg-ink px-3 py-2 text-sm text-paper hover:bg-ink/90"
-						>
+						<button type="submit" class="shrink-0 border btn-primary px-3 py-2 text-sm">
 							Save
 						</button>
 						<button
@@ -204,7 +196,7 @@
 							<button
 								type="submit"
 								title="Delete"
-								class="shrink-0 p-2 text-ink-faint hover:text-red-500"
+								class="shrink-0 p-2 text-ink-faint hover:text-red-700"
 							>
 								<Trash size={15} />
 							</button>

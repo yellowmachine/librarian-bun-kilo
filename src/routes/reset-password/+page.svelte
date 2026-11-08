@@ -12,7 +12,7 @@
 	{#if data.invalid || !data.token}
 		<p class="text-center text-sm text-ink-muted">
 			Este enlace ya no vale: caducó o ya se usó.
-			<a href="/forgot-password" class="text-ink underline underline-offset-2">Pide otro</a>.
+			<a href="/forgot-password" class="link-action">Pide otro</a>.
 		</p>
 	{:else}
 		<form method="POST" use:enhance class="space-y-5">

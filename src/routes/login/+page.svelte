@@ -75,11 +75,7 @@
 		</form>
 
 		<p class="text-center text-sm">
-			<a
-				href="/forgot-password"
-				class="text-ink-faint underline-offset-2 hover:text-ink hover:underline"
-				>He olvidado mi contraseña</a
-			>
+			<a href="/forgot-password" class="link-action">He olvidado mi contraseña</a>
 		</p>
 		<p class="text-center text-xs text-ink-faint">
 			Librarian funciona por invitación: pídesela a alguien que ya esté dentro.

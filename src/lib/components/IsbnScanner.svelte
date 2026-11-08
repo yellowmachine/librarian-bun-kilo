@@ -174,7 +174,7 @@
 				stop();
 				onCancel?.();
 			}}
-			class="w-full border border-paper-border py-2.5 text-sm text-ink-muted hover:border-ink-faint"
+			class="w-full border btn-secondary py-2.5 text-sm"
 		>
 			Cancel
 		</button>

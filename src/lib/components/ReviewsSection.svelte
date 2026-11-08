@@ -72,26 +72,20 @@
 				</div>
 			{/if}
 			{#if allHref}
-				<a href={allHref} class="text-xs text-ink-faint underline underline-offset-2 hover:text-ink"
-					>See all →</a
-				>
+				<a href={allHref} class="text-xs link-action">See all →</a>
 			{/if}
 		</div>
 	</div>
 
 	{#if !writing && !myReview}
-		<button
-			type="button"
-			onclick={() => (writing = true)}
-			class="text-sm text-ink-faint underline underline-offset-2 hover:text-ink"
-		>
+		<button type="button" onclick={() => (writing = true)} class="text-sm link-action">
 			Write a review
 		</button>
 	{:else}
 		<div class="space-y-3 border border-paper-border p-4">
 			<p class="text-xs font-medium tracking-widest text-ink-muted uppercase">Your review</p>
 			{#if form?.reviewError}
-				<p class="text-xs text-red-600">{form.reviewError}</p>
+				<p class="text-xs text-red-700">{form.reviewError}</p>
 			{/if}
 			<form
 				method="POST"
@@ -109,13 +103,13 @@
 					rows="3"
 					maxlength="5000"
 					placeholder="What did you think? (optional)"
-					class="w-full border border-paper-border px-3 py-2 text-sm focus:border-ink focus:ring-0"
+					class="w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 				<div class="flex items-center gap-3">
 					<button
 						type="submit"
 						disabled={rating === 0}
-						class="border border-ink bg-ink px-4 py-1.5 text-sm text-paper hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+						class="border btn-primary px-4 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
 					>
 						{myReview ? 'Update' : 'Publish'}
 					</button>
@@ -148,7 +142,7 @@
 					<button
 						type="button"
 						onclick={() => (confirmingDelete = true)}
-						class="text-xs text-ink-faint hover:text-red-500"
+						class="text-xs text-ink-faint hover:text-red-700"
 					>
 						Remove review
 					</button>
