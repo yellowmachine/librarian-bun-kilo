@@ -268,7 +268,8 @@ export const movies = pgTable(
 // ─── User Movies ──────────────────────────────────────────────────────────────
 // Cada fila es una copia física (DVD, Blu-ray…) de un usuario. Comparte las
 // bibliotecas con los libros: «Casa» u «Oficina» son sitios, no tipos de cosa.
-// La ve su dueño y, si lleva una etiqueta compartida, los miembros de ese grupo.
+// La ve su dueño, los miembros de un grupo con el que comparte una de sus
+// etiquetas, y quien la ha pedido prestada.
 
 export const userMovies = pgTable(
 	'user_movies',
@@ -326,6 +327,16 @@ export const userMovies = pgTable(
 				join group_members gm on gm.group_id = st.group_id
 				where umt.user_movie_id = ${table.id}
 				  and gm.user_id = ${currentUserId}
+			)`
+		}),
+		// Quien la pide prestada la ve (como user_books_select_on_loan)
+		pgPolicy('user_movies_select_on_loan', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (
+				select 1 from loans l
+				where l.user_movie_id = ${table.id}
+				  and l.borrower_id = ${currentUserId}
 			)`
 		}),
 		pgPolicy('user_movies_insert', {
@@ -734,9 +745,11 @@ export const loans = pgTable(
 	'loans',
 	{
 		id: text('id').primaryKey(),
-		userBookId: text('user_book_id')
-			.notNull()
-			.references(() => userBooks.id, { onDelete: 'restrict' }),
+		// Lo prestado: un libro O una película (loans_one_item exige exactamente uno)
+		userBookId: text('user_book_id').references(() => userBooks.id, { onDelete: 'restrict' }),
+		userMovieId: text('user_movie_id').references(() => userMovies.id, {
+			onDelete: 'restrict'
+		}),
 		borrowerId: text('borrower_id')
 			.notNull()
 			.references(() => user.id, { onDelete: 'restrict' }),
@@ -757,6 +770,8 @@ export const loans = pgTable(
 		index('loans_borrower_idx').on(table.borrowerId),
 		index('loans_owner_idx').on(table.ownerId),
 		index('loans_user_book_idx').on(table.userBookId),
+		index('loans_user_movie_idx').on(table.userMovieId),
+		check('loans_one_item', sql`num_nonnulls(${table.userBookId}, ${table.userMovieId}) = 1`),
 		index('loans_status_idx').on(table.status),
 		pgPolicy('loans_select', {
 			for: 'select',
@@ -919,6 +934,7 @@ export const moviesRelations = relations(movies, ({ many }) => ({
 
 export const userMoviesRelations = relations(userMovies, ({ one, many }) => ({
 	tags: many(userMovieTags),
+	loans: many(loans),
 	user: one(user, { fields: [userMovies.userId], references: [user.id] }),
 	library: one(libraries, { fields: [userMovies.libraryId], references: [libraries.id] }),
 	movie: one(movies, { fields: [userMovies.movieId], references: [movies.id] })
@@ -965,6 +981,7 @@ export const sharedTagsRelations = relations(sharedTags, ({ one }) => ({
 
 export const loansRelations = relations(loans, ({ one }) => ({
 	userBook: one(userBooks, { fields: [loans.userBookId], references: [userBooks.id] }),
+	userMovie: one(userMovies, { fields: [loans.userMovieId], references: [userMovies.id] }),
 	borrower: one(user, { fields: [loans.borrowerId], references: [user.id] }),
 	owner: one(user, { fields: [loans.ownerId], references: [user.id] })
 }));

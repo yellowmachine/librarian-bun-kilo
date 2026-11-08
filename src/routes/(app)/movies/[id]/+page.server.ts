@@ -11,6 +11,7 @@ import {
 } from '$lib/server/movies';
 import { withRLS } from '$lib/server/db/rls';
 import { hasOpenRouterApiKey } from '$lib/server/openrouterKey';
+import { getMovieForBorrow, hasOpenLoans, requestLoan } from '$lib/server/loans';
 import { tags } from '$lib/server/db/schema';
 import { getUserLibraries } from '$lib/server/libraries';
 import { isMediaFormat } from '$lib/mediaFormat';
@@ -34,6 +35,8 @@ export const load = async ({ locals, params }: RequestEvent) => {
 	if (!movie) error(404, 'Movie not found');
 	const isOwner = movie.ownerId === userId;
 	return {
+		// Para «Pedir prestada»: disponibilidad y petición propia abierta
+		borrowInfo: isOwner ? null : await getMovieForBorrow(userId, movie.userMovieId),
 		movie: forViewer(movie, userId),
 		isOwner,
 		userLibraries: isOwner ? userLibraries : [],
@@ -126,8 +129,40 @@ export const actions = {
 		return tagAction(() => removeMovieTag(locals.user!.id, params.id!, tagId));
 	},
 
+	// Pedirla prestada (solo quien no es el dueño)
+	request: async ({ locals, params, request }: RequestEvent) => {
+		const notes = ((await request.formData()).get('notes') as string | null)?.trim() || undefined;
+		let loanId: string;
+		try {
+			loanId = await requestLoan(
+				locals.user!.id,
+				{ kind: 'movie', userMovieId: params.id! },
+				notes?.slice(0, 1000)
+			);
+		} catch (e) {
+			return fail(400, { error: e instanceof Error ? e.message : 'Error sending request.' });
+		}
+		redirect(302, `/loans/${loanId}`);
+	},
+
 	remove: async ({ locals, params }: RequestEvent) => {
-		await removeMovie(locals.user!.id, params.id!);
+		const item = { kind: 'movie' as const, userMovieId: params.id! };
+		if (await hasOpenLoans(locals.user!.id, item)) {
+			return fail(400, { error: 'You can’t remove this movie while it has a loan in progress.' });
+		}
+		try {
+			await removeMovie(locals.user!.id, params.id!);
+		} catch (e) {
+			// Préstamos ya terminados la siguen referenciando (FK restrict): es el
+			// historial de quien la pidió y no se borra.
+			if (isForeignKeyViolation(e)) {
+				return fail(400, {
+					error:
+						'This movie has been lent before, and its loans keep it in their history, so it can’t be removed. You can mark it as not available instead.'
+				});
+			}
+			throw e;
+		}
 		redirect(303, '/movies');
 	}
 };
@@ -141,4 +176,10 @@ async function tagAction(run: () => Promise<unknown>) {
 		throw e;
 	}
 	return { tagsUpdated: true };
+}
+
+function isForeignKeyViolation(e: unknown): boolean {
+	const code = (e as { code?: string; cause?: { code?: string } } | null)?.code;
+	const causeCode = (e as { cause?: { code?: string } } | null)?.cause?.code;
+	return code === '23503' || causeCode === '23503';
 }

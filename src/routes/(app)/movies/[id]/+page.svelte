@@ -12,7 +12,7 @@
 	import { MEDIA_FORMATS, MEDIA_FORMAT_LABELS, formatLine } from '$lib/mediaFormat';
 
 	let { data, form } = $props();
-	const { movie, isOwner, userLibraries, userTags, hasAiKey } = $derived(data);
+	const { movie, isOwner, borrowInfo, userLibraries, userTags, hasAiKey } = $derived(data);
 
 	// ── Etiquetas ─────────────────────────────────────────────────────────────
 	const assignedTagIds = $derived(new Set(movie.tags.map((t) => t.id)));
@@ -155,6 +155,45 @@
 						</span>
 					{/each}
 				</div>
+			</div>
+		{/if}
+
+		<!-- ── Pedirla prestada ─────────────────────────────────────────────── -->
+		{#if borrowInfo}
+			<div class="space-y-3 border-t border-paper-border pt-6">
+				{#if borrowInfo.existingLoanId}
+					<p class="text-sm text-ink-muted">
+						You already have {borrowInfo.existingLoanStatus === 'requested'
+							? 'a pending request'
+							: borrowInfo.existingLoanStatus === 'accepted'
+								? 'an accepted loan'
+								: 'an active loan'} for this movie.
+					</p>
+					<a
+						href={`/loans/${borrowInfo.existingLoanId}`}
+						class="block w-full border border-paper-border py-2.5 text-center text-sm text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+					>
+						View loan →
+					</a>
+				{:else if !borrowInfo.isAvailable}
+					<p class="text-sm text-ink-faint">This movie is lent out right now.</p>
+				{:else}
+					<form method="POST" action="?/request" use:enhance class="space-y-3">
+						<textarea
+							name="notes"
+							maxlength="1000"
+							placeholder="Message to {movie.ownerName} (optional)"
+							rows="3"
+							class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-ink focus:ring-0 focus:outline-none"
+						></textarea>
+						<button
+							type="submit"
+							class="w-full border border-ink bg-ink py-2.5 text-sm text-paper transition-colors hover:bg-ink/90"
+						>
+							Ask to borrow
+						</button>
+					</form>
+				{/if}
 			</div>
 		{/if}
 	{:else}

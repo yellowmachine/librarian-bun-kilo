@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { LoanWithDetails } from '$lib/server/loans';
-	import { ArrowsLeftRight } from 'phosphor-svelte';
+	import { ArrowsLeftRight, FilmSlate } from 'phosphor-svelte';
 	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
 
 	let { data } = $props();
@@ -74,7 +74,7 @@
 	<!-- Tabs -->
 	<div class="border-b border-paper-border">
 		<nav class="flex gap-6">
-			{#each [{ key: 'borrower', label: 'Books I request', count: pendingBorrower }, { key: 'owner', label: 'Books I lend', count: pendingOwner }] as tab (tab.key)}
+			{#each [{ key: 'borrower', label: 'I borrow', count: pendingBorrower }, { key: 'owner', label: 'I lend', count: pendingOwner }] as tab (tab.key)}
 				<button
 					onclick={() => (activeTab = tab.key as 'borrower' | 'owner')}
 					class="flex items-center gap-2 border-b-2 pb-3 text-sm transition-colors
@@ -104,7 +104,7 @@
 						? 'No loans match your search.'
 						: role === 'borrower'
 							? 'You have not applied for any loan.'
-							: 'No one has asked you for any books.'}
+							: 'No one has asked to borrow anything from you.'}
 				</p>
 			</div>
 		{:else}
@@ -129,7 +129,12 @@
 								</div>
 							{/if}
 							<div class="min-w-0 flex-1">
-								<p class="truncate font-medium text-ink">{loan.title}</p>
+								<p class="flex items-center gap-1.5 truncate font-medium text-ink">
+									{#if loan.itemKind === 'movie'}
+										<FilmSlate size={13} class="shrink-0 text-ink-faint" aria-label="Movie" />
+									{/if}
+									<span class="truncate">{loan.title}</span>
+								</p>
 								<p class="truncate text-xs text-ink-faint">
 									{role === 'borrower' ? loan.ownerName : loan.borrowerName}
 								</p>

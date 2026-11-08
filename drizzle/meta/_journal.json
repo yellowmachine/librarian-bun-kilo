@@ -43,6 +43,13 @@
       "when": 1794160066848,
       "tag": "0005_book_tags_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794160773840,
+      "tag": "0006_movie_loans",
+      "breakpoints": true
     }
   ]
 }

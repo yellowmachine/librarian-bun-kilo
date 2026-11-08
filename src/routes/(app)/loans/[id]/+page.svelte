@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance, applyAction, deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, BookOpen } from 'phosphor-svelte';
+	import { ArrowLeft, BookOpen, FilmSlate } from 'phosphor-svelte';
 	import type { LoanWithDetails } from '$lib/server/loans';
 	import LoanStatusBadge from '$lib/components/LoanStatusBadge.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -127,11 +127,17 @@
 			/>
 		{:else}
 			<div class="flex h-32 w-22 flex-shrink-0 items-center justify-center bg-paper-ui">
-				<BookOpen size={28} weight="thin" class="text-ink-faint" />
+				{#if loan.itemKind === 'movie'}
+					<FilmSlate size={28} weight="thin" class="text-ink-faint" />
+				{:else}
+					<BookOpen size={28} weight="thin" class="text-ink-faint" />
+				{/if}
 			</div>
 		{/if}
 		<div class="min-w-0 space-y-2 pt-1">
-			<h1 class="font-serif text-2xl leading-tight font-normal text-ink">{loan.title}</h1>
+			<h1 class="font-serif text-2xl leading-tight font-normal text-ink">
+				<a href={loan.itemHref} class="hover:underline">{loan.title}</a>
+			</h1>
 			{#if loan.authors.length > 0}
 				<p class="text-sm text-ink-muted">{loan.authors.join(', ')}</p>
 			{/if}

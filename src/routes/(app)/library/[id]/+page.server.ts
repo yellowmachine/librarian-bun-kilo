@@ -443,7 +443,7 @@ export const actions = {
 
 		let loanId: string;
 		try {
-			loanId = await requestLoan(locals.user!.id, params.id!, notes);
+			loanId = await requestLoan(locals.user!.id, { kind: 'book', userBookId: params.id! }, notes);
 		} catch (e) {
 			return fail(400, { error: e instanceof Error ? e.message : 'Error sending request.' });
 		}

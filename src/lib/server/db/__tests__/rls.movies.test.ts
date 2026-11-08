@@ -9,7 +9,10 @@ import {
 	groups,
 	groupMembers,
 	sharedTags,
-	movieCoverPhotos
+	movieCoverPhotos,
+	loans,
+	books,
+	userBooks
 } from '../schema';
 import { eq } from 'drizzle-orm';
 
@@ -286,6 +289,49 @@ describe('RLS · películas en grupos', () => {
 			tx.select({ id: userMovies.id }).from(userMovies).where(eq(userMovies.userId, BOB))
 		);
 		expect(rows.map((r) => r.id).sort()).toEqual(['um-bob-private', 'um-bob-shared']);
+	});
+
+	it('quien la tiene prestada la ve, con su foto, aunque no esté en el grupo', async () => {
+		expect(
+			await tdb.withRLS(CAROL, (tx) =>
+				tx.select().from(userMovies).where(eq(userMovies.id, 'um-bob-shared'))
+			)
+		).toEqual([]);
+
+		await tdb.asSuperuser((tx) =>
+			tx.insert(loans).values({
+				id: 'loan',
+				userMovieId: 'um-bob-shared',
+				borrowerId: CAROL,
+				ownerId: BOB
+			})
+		);
+		const movie = await tdb.withRLS(CAROL, (tx) =>
+			tx.select({ id: userMovies.id }).from(userMovies).where(eq(userMovies.userId, BOB))
+		);
+		expect(movie.map((m) => m.id)).toEqual(['um-bob-shared']);
+		expect(await tdb.withRLS(CAROL, (tx) => tx.select().from(movieCoverPhotos))).toHaveLength(1);
+	});
+
+	it('un préstamo es de un libro o de una película, nunca de los dos ni de ninguno', async () => {
+		const CHECK_VIOLATION = '23514';
+		await tdb.asSuperuser(async (tx) => {
+			await tx.insert(books).values({ id: 'OL1', title: 'Dune' });
+			await tx
+				.insert(userBooks)
+				.values({ id: 'ub', userId: BOB, libraryId: 'lib-bob', bookId: 'OL1' });
+		});
+
+		for (const item of [
+			{ userBookId: null, userMovieId: null },
+			{ userBookId: 'ub', userMovieId: 'um-bob-shared' }
+		]) {
+			await expect(
+				tdb.asSuperuser((tx) =>
+					tx.insert(loans).values({ id: 'x', ...item, borrowerId: ALICE, ownerId: BOB })
+				)
+			).rejects.toMatchObject({ cause: { code: CHECK_VIOLATION } });
+		}
 	});
 
 	it('la etiqueta compartida es visible al grupo; quitarla deja de exponer la película', async () => {
