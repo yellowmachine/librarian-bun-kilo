@@ -7,7 +7,8 @@ import {
 	updateUserBook,
 	removeFromLibrary,
 	resolveBook,
-	upsertBook
+	upsertBook,
+	forBookViewer
 } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
 import { tags, userBookTags, loans, userBooks, books } from '$lib/server/db/schema';
@@ -42,7 +43,17 @@ export const load = async ({ locals, params }: RequestEvent) => {
 		isOwner ? getUserLibraries(locals.user!.id) : Promise.resolve([])
 	]);
 
-	return { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries };
+	return {
+		// Sin las notas ni la biblioteca del dueño si quien mira es otro
+		book: forBookViewer(book, locals.user!.id),
+		isOwner,
+		userTags,
+		myReview,
+		reviews,
+		reviewStats,
+		borrowInfo,
+		userLibraries
+	};
 };
 
 export const actions = {

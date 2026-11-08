@@ -342,6 +342,17 @@ export async function searchUserAuthors(
 	);
 }
 
+// ─── Lo que ve quien no es el dueño ───────────────────────────────────────────
+// La RLS deja leer la fila entera de un libro compartido, pero las notas y la
+// biblioteca son del dueño: no se mandan al navegador de nadie más (no basta
+// con no pintarlas, irían en los datos de la página).
+
+export function forBookViewer<
+	T extends { ownerId: string; notes: string | null; libraryId: string }
+>(book: T, viewerId: string): T {
+	return book.ownerId === viewerId ? book : { ...book, notes: null, libraryId: '' };
+}
+
 // ─── Libros de un contacto (RLS del viewer) ───────────────────────────────────
 
 export async function getContactBooks(
@@ -392,11 +403,12 @@ export async function getContactBooks(
 			tagsByBook.set(tag.userBookId, list);
 		}
 
-		return rows.map((row) => ({
-			...row,
-			authors: row.authors ?? [],
-			tags: tagsByBook.get(row.userBookId) ?? []
-		}));
+		return rows.map((row) =>
+			forBookViewer(
+				{ ...row, authors: row.authors ?? [], tags: tagsByBook.get(row.userBookId) ?? [] },
+				viewerId
+			)
+		);
 	});
 }
 

@@ -14,7 +14,7 @@ vi.mock('../db/rls', () => ({
 		holder.tdb.withRLS(userId, cb as never)
 }));
 
-import { addBookToLibrary } from '../books';
+import { addBookToLibrary, getContactBooks, getUserBook, forBookViewer } from '../books';
 
 const ALICE = 'user-alice';
 const BOB = 'user-bob';
@@ -26,7 +26,7 @@ beforeEach(async () => {
 		`INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at) VALUES ('${ALICE}', 'Alice', 'alice@test.com', true, now(), now()), ('${BOB}', 'Bob', 'bob@test.com', true, now(), now())`,
 		`INSERT INTO books (id, title, authors) VALUES ('OL1', 'Dune', '{}')`,
 		`INSERT INTO libraries (id, user_id, name, is_default) VALUES ('lib-bob', '${BOB}', 'Default', true)`,
-		`INSERT INTO user_books (id, user_id, library_id, book_id) VALUES ('ub-bob', '${BOB}', 'lib-bob', 'OL1')`,
+		`INSERT INTO user_books (id, user_id, library_id, book_id, notes) VALUES ('ub-bob', '${BOB}', 'lib-bob', 'OL1', 'Se lo dejé a mi hermana')`,
 		`INSERT INTO tags (id, user_id, name) VALUES ('tag-bob', '${BOB}', 'Club')`,
 		`INSERT INTO user_book_tags (user_book_id, tag_id) VALUES ('ub-bob', 'tag-bob')`,
 		`INSERT INTO groups (id, name, created_by) VALUES ('grp', 'Club', '${BOB}')`,
@@ -53,5 +53,24 @@ describe('addBookToLibrary', () => {
 	it('sí reutiliza la copia propia si ya la tiene', async () => {
 		const first = await addBookToLibrary(ALICE, { bookId: 'OL1' });
 		expect(await addBookToLibrary(ALICE, { bookId: 'OL1' })).toBe(first);
+	});
+});
+
+describe('lo que ve quien no es el dueño', () => {
+	it('los libros de un contacto llegan sin notas ni biblioteca', async () => {
+		const books = await getContactBooks(ALICE, BOB);
+		expect(books.map((b) => b.userBookId)).toEqual(['ub-bob']);
+		expect(books[0]).toMatchObject({ notes: null, libraryId: '' });
+	});
+
+	it('la ficha de otro, sin lo privado; la propia, entera', async () => {
+		const asAlice = await getUserBook(ALICE, 'ub-bob');
+		expect(forBookViewer(asAlice!, ALICE)).toMatchObject({ notes: null, libraryId: '' });
+
+		const asBob = await getUserBook(BOB, 'ub-bob');
+		expect(forBookViewer(asBob!, BOB)).toMatchObject({
+			notes: 'Se lo dejé a mi hermana',
+			libraryId: 'lib-bob'
+		});
 	});
 });
