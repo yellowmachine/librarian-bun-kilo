@@ -280,7 +280,15 @@
 						>
 							<div class="aspect-[2/3] w-full overflow-hidden bg-paper-ui">
 								{#if option.src}
-									<img src={option.src} alt={option.label} class="h-full w-full object-cover" />
+									<!-- La foto propia se ve entera: con object-cover, una foto
+									     apaisada se recortaría otra vez al centro -->
+									<img
+										src={option.src}
+										alt={option.label}
+										class="h-full w-full {option.key === 'photo'
+											? 'object-contain'
+											: 'object-cover'}"
+									/>
 								{/if}
 							</div>
 							{option.label}
