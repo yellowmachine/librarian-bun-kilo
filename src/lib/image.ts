@@ -40,24 +40,46 @@ export async function resizeImageFile(file: File, maxDim = 1600, quality = 0.85)
 	}
 }
 
+type Box = [number, number, number, number];
+
+/**
+ * La caja de la IA solo se usa si parece una carátula entera: en una foto de
+ * una sola película la carátula ocupa buena parte del encuadre y tiene forma
+ * de caja. A veces el modelo devuelve la caja de un trozo (p. ej. una letra
+ * del título en un steelbook); entonces mejor la foto entera.
+ */
+export function plausibleCoverBox(box: Box | null, width: number, height: number): Box | null {
+	if (!box || width <= 0 || height <= 0) return null;
+	const [top, left, bottom, right] = box;
+	const area = (bottom - top) * (right - left);
+	if (area < 0.15) return null;
+	// Proporción ancho/alto en píxeles: DVD ≈ 0,7, Blu-ray ≈ 0,8; los cofres
+	// pueden ser apaisados. Fuera de esto, la caja no es una carátula.
+	const aspect = ((right - left) * width) / ((bottom - top) * height);
+	if (aspect < 0.4 || aspect > 1.6) return null;
+	return box;
+}
+
 /**
  * Recorta de una foto (data URL) la caja [top, left, bottom, right] en
  * fracciones 0–1, con un pequeño margen, y la reduce para usarla de portada.
- * Sin caja, usa la foto entera.
+ * Sin caja, o si la caja no parece una carátula, usa la foto entera.
  */
 export async function cropImage(
 	dataUrl: string,
-	box: [number, number, number, number] | null,
+	rawBox: Box | null,
 	maxDim = 800,
 	quality = 0.82
 ): Promise<string> {
 	const img = await loadImage(dataUrl);
 	const w = img.naturalWidth;
 	const h = img.naturalHeight;
+	const box = plausibleCoverBox(rawBox, w, h);
 	if (!box) return toJpeg(img, 0, 0, w, h, maxDim, quality);
 
 	const [top, left, bottom, right] = box;
-	const pad = 0.01;
+	// Margen generoso: las cajas del modelo tienden a quedarse cortas.
+	const pad = 0.03;
 	const x0 = Math.max(0, (left - pad) * w);
 	const y0 = Math.max(0, (top - pad) * h);
 	const x1 = Math.min(w, (right + pad) * w);
