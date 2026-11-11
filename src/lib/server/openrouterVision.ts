@@ -108,7 +108,13 @@ export async function askVisionModel<T>(
 	apiKey: string,
 	prompt: string,
 	images: VisionImages,
-	options: { label: string; log?: AiLogContext; toResults: (items: unknown[]) => T[] }
+	options: {
+		label: string;
+		log?: AiLogContext;
+		toResults: (items: unknown[]) => T[];
+		/** Lo que se apunta como resultCount en el consumo de IA; por defecto, cuántos hay. */
+		countResults?: (results: T[]) => number;
+	}
 ): Promise<T[] | null> {
 	return openRouterChat<T[]>(
 		apiKey,
@@ -131,7 +137,8 @@ export async function askVisionModel<T>(
 				const parsed: unknown = JSON.parse(extractJson(message.content));
 				if (!Array.isArray(parsed)) throw new Error('model output is not an array');
 				const results = options.toResults(parsed);
-				return { value: results, resultCount: results.length };
+				const resultCount = options.countResults?.(results) ?? results.length;
+				return { value: results, resultCount };
 			}
 		}
 	);

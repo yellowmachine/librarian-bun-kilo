@@ -14,7 +14,7 @@
 	import { pushState } from '$app/navigation';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import IsbnScanner from '$lib/components/IsbnScanner.svelte';
+	import IsbnScanner, { scannerReleased } from '$lib/components/IsbnScanner.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import Espera from '$lib/components/Espera.svelte';
 	import BookCard from '$lib/components/BookCard.svelte';
@@ -23,6 +23,7 @@
 	import AuthorListInput from '$lib/components/AuthorListInput.svelte';
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import { cropImage, resizeImageFile } from '$lib/image';
+	import { decodeIsbnFromPhoto } from '$lib/isbnPhoto';
 	import type {
 		BookCoverMatch,
 		BookCoverReading,
@@ -56,7 +57,8 @@
 		| 'shelf-analyzing'
 		| 'shelf-review'
 		| 'shelf-adding'
-		| 'cover-analyzing';
+		| 'cover-analyzing'
+		| 'isbn-photo-analyzing';
 
 	interface Tag {
 		id: string;
@@ -693,6 +695,50 @@
 		}
 	}
 
+	// ── Foto del ISBN ─────────────────────────────────────────────────────────
+	// Plan B cuando el lector en vivo no lee el código (libro arrugado, brillos…):
+	// primero un lector gratis sobre la foto y, si tampoco puede, la IA lee las
+	// cifras impresas. En ambos casos solo vale un ISBN con su dígito de control.
+	let isbnPhotoPreview = $state<string | null>(null);
+
+	async function onIsbnPhoto(file: File) {
+		errorMsg = '';
+		isbnPhotoPreview = null;
+		mode = 'isbn-photo-analyzing';
+		try {
+			const dataUrl = await resizeImageFile(file);
+			isbnPhotoPreview = dataUrl;
+			// Quagga sobre la foto comparte eventos con el lector en vivo.
+			await scannerReleased();
+			let isbn = await decodeIsbnFromPhoto(dataUrl);
+			if (!isbn) {
+				const res = await fetch('/api/books/scan-isbn', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ image: dataUrl })
+				});
+				const body = await res.json().catch(() => null);
+				if (!res.ok) {
+					errorMsg = body?.message ?? 'Could not analyze the photo.';
+					mode = 'scan';
+					return;
+				}
+				isbn = body?.isbn ?? null;
+				if (!isbn) {
+					errorMsg = body?.read?.length
+						? `Read ${body.read[0]}, but that is not a valid ISBN. Try a sharper photo, or type it in Search.`
+						: 'No ISBN found in the photo. Try again closer to the barcode, or type it in Search.';
+					mode = 'scan';
+					return;
+				}
+			}
+			await onIsbnDetected(isbn);
+		} catch {
+			errorMsg = 'Could not analyze the photo. Check your connection.';
+			mode = 'scan';
+		}
+	}
+
 	async function onManualSearch(e: SubmitEvent) {
 		e.preventDefault();
 		if (!manualQuery.trim()) return;
@@ -1002,6 +1048,7 @@
 	{:else if mode === 'scan'}
 		<IsbnScanner
 			onDetected={onIsbnDetected}
+			onPhoto={onIsbnPhoto}
 			onCancel={backToChoose}
 			onError={(e) => {
 				errorMsg = e;
@@ -1482,6 +1529,19 @@
 				/>
 			{/if}
 			<Espera>Looking for your book…</Espera>
+		</div>
+
+		<!-- Leyendo el ISBN de la foto -->
+	{:else if mode === 'isbn-photo-analyzing'}
+		<div class="flex flex-col items-center gap-4 py-16">
+			{#if isbnPhotoPreview}
+				<img
+					src={isbnPhotoPreview}
+					alt="Barcode preview"
+					class="max-h-48 border border-paper-border object-contain"
+				/>
+			{/if}
+			<Espera>Reading the ISBN…</Espera>
 		</div>
 
 		<!-- Revisar libros detectados -->

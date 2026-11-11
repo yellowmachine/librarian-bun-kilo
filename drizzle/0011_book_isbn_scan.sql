@@ -1,0 +1,1 @@
+ALTER TYPE "public"."ai_call_kind" ADD VALUE 'book_isbn_scan';

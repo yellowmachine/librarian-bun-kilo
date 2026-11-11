@@ -3,6 +3,11 @@
 	// vuelve a escanear antes de que termine, el nuevo init compite con esa
 	// liberación y falla. Se comparte entre instancias para esperarla.
 	let releasing: Promise<void> | null = null;
+
+	/** Resuelve cuando la cámara del lector en vivo está liberada (p. ej. antes de usar Quagga sobre una foto). */
+	export function scannerReleased(): Promise<void> {
+		return releasing ?? Promise.resolve();
+	}
 </script>
 
 <script lang="ts">
@@ -13,9 +18,35 @@
 		onDetected: (isbn: string) => void;
 		onError?: (msg: string) => void;
 		onCancel?: () => void;
+		/** Si se pasa, se ofrece hacer una foto cuando el lector en vivo no lo lee. */
+		onPhoto?: (file: File) => void;
 	}
 
-	let { onDetected, onError, onCancel }: Props = $props();
+	let { onDetected, onError, onCancel, onPhoto }: Props = $props();
+
+	let photoInput = $state<HTMLInputElement | null>(null);
+
+	// La cámara del sistema no debe competir con la del lector en vivo: se
+	// para antes de abrirla y, si el usuario cancela la foto, se vuelve a arrancar.
+	function takePhoto() {
+		stop();
+		photoInput?.click();
+	}
+
+	function restart() {
+		finished = false;
+		lastCode = '';
+		detectionCount = 0;
+		start();
+	}
+
+	function onPhotoSelected(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (file && onPhoto) onPhoto(file);
+		else restart();
+	}
 
 	let viewportEl: HTMLDivElement;
 	let running = $state(false);
@@ -168,6 +199,11 @@
 
 	{#if running}
 		<p class="text-center text-xs text-ink-faint">Centra el código de barras en el marco</p>
+		{#if onPhoto}
+			<button type="button" onclick={takePhoto} class="w-full border btn-secondary py-2.5 text-sm">
+				Can't read it? Take a photo
+			</button>
+		{/if}
 		<button
 			type="button"
 			onclick={() => {
@@ -178,6 +214,18 @@
 		>
 			Cancel
 		</button>
+	{/if}
+
+	{#if onPhoto}
+		<input
+			bind:this={photoInput}
+			type="file"
+			accept="image/*"
+			capture="environment"
+			class="hidden"
+			onchange={onPhotoSelected}
+			oncancel={restart}
+		/>
 	{/if}
 </div>
 

@@ -78,6 +78,13 @@
       "when": 1794379603862,
       "tag": "0010_book_cover_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794380190108,
+      "tag": "0011_book_isbn_scan",
+      "breakpoints": true
     }
   ]
 }
