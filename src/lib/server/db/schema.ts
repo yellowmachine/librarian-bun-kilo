@@ -54,7 +54,9 @@ export const aiCallKindEnum = pgEnum('ai_call_kind', [
 	'movie_scan', // películas desde una foto de carátulas o lomos
 	'book_tags', // etiquetas sugeridas para un libro
 	'movie_tags', // etiquetas sugeridas para una película
-	'book_cover_search' // portada de un libro buscada en la web
+	'book_cover_search', // portada de un libro buscada en la web
+	'book_cover_scan', // un libro desde una foto de su portada (leerla)
+	'book_cover_compare' // esa foto comparada con las portadas de las obras candidatas
 ]);
 
 // Soporte físico de una copia de la videoteca (user_movies.format).
@@ -417,6 +419,50 @@ export const movieCoverPhotos = pgTable(
 			using: sql`${table.userId} = ${currentUserId}`
 		}),
 		pgPolicy('movie_cover_photos_delete', {
+			for: 'delete',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		})
+	]
+);
+
+// ─── Book cover photos ────────────────────────────────────────────────────────
+// Lo mismo para libros: la foto que el usuario hizo a la portada de SU
+// ejemplar al darlo de alta. user_books.cover_url apunta a
+// /api/books/<id>/cover, que la sirve.
+
+export const bookCoverPhotos = pgTable(
+	'book_cover_photos',
+	{
+		userBookId: text('user_book_id')
+			.primaryKey()
+			.references(() => userBooks.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		contentType: text('content_type').notNull(),
+		data: bytea('data').notNull(),
+		createdAt: timestamp('created_at').defaultNow().notNull()
+	},
+	(table) => [
+		// La ve quien pueda ver el libro (la subconsulta pasa por la RLS de
+		// user_books); solo su dueño la cambia o la borra.
+		pgPolicy('book_cover_photos_select', {
+			for: 'select',
+			to: appUser,
+			using: sql`exists (select 1 from user_books ub where ub.id = ${table.userBookId})`
+		}),
+		pgPolicy('book_cover_photos_insert', {
+			for: 'insert',
+			to: appUser,
+			withCheck: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('book_cover_photos_update', {
+			for: 'update',
+			to: appUser,
+			using: sql`${table.userId} = ${currentUserId}`
+		}),
+		pgPolicy('book_cover_photos_delete', {
 			for: 'delete',
 			to: appUser,
 			using: sql`${table.userId} = ${currentUserId}`

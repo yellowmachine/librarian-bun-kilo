@@ -3,7 +3,7 @@
 //
 // Como con las portadas de libros, la IA no es la fuente de verdad: lee lo
 // que pone la caja y TMDB aporta la ficha. El usuario confirma cada una.
-import { askVisionModel, toConfidence } from './openrouterVision';
+import { askVisionModel, toBox, toConfidence } from './openrouterVision';
 import { searchMovies } from './tmdb';
 import type { AiLogContext } from './aiUsage';
 import { isMediaFormat, type MediaFormat } from '$lib/mediaFormat';
@@ -50,18 +50,6 @@ function toYear(value: unknown): number | null {
 	return typeof year === 'number' && Number.isInteger(year) && year >= 1880 && year <= 2999
 		? year
 		: null;
-}
-
-// box_2d de Gemini: [ymin, xmin, ymax, xmax] en 0–1000. Se descarta si no
-// tiene sentido (fuera de rango, invertido o diminuto).
-export function toBox(value: unknown): MovieCandidate['box'] {
-	if (!Array.isArray(value) || value.length !== 4) return null;
-	if (!value.every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
-	const [top, left, bottom, right] = (value as number[]).map(
-		(n) => Math.min(1000, Math.max(0, n)) / 1000
-	);
-	if (bottom - top < 0.05 || right - left < 0.05) return null;
-	return [top, left, bottom, right];
 }
 
 /** Best-effort: cualquier fallo devuelve []. */

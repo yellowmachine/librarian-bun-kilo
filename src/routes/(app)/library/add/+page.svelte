@@ -7,7 +7,8 @@
 		Info,
 		Camera,
 		Check,
-		Sparkle
+		Sparkle,
+		Book
 	} from 'phosphor-svelte';
 	import { page } from '$app/state';
 	import { pushState } from '$app/navigation';
@@ -21,7 +22,13 @@
 	import DuplicateBookDialog from '$lib/components/DuplicateBookDialog.svelte';
 	import AuthorListInput from '$lib/components/AuthorListInput.svelte';
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
-	import type { BookSearchResult } from '$lib/types';
+	import { cropImage, resizeImageFile } from '$lib/image';
+	import type {
+		BookCoverMatch,
+		BookCoverReading,
+		BookCoverScan,
+		BookSearchResult
+	} from '$lib/types';
 
 	interface Library {
 		id: string;
@@ -48,7 +55,8 @@
 		| 'adding'
 		| 'shelf-analyzing'
 		| 'shelf-review'
-		| 'shelf-adding';
+		| 'shelf-adding'
+		| 'cover-analyzing';
 
 	interface Tag {
 		id: string;
@@ -167,27 +175,6 @@
 		else shelfCandidates.forEach((_, i) => selectedShelfIndices.add(i));
 	}
 
-	// Redimensiona/comprime en cliente antes de mandarla — una foto de móvil sin
-	// comprimir son varios MB, y no hace falta esa resolución para leer lomos.
-	function resizeImage(file: File, maxDim = 1600): Promise<string> {
-		return new Promise((resolve, reject) => {
-			const img = new window.Image();
-			img.onload = () => {
-				const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-				const canvas = document.createElement('canvas');
-				canvas.width = Math.round(img.width * scale);
-				canvas.height = Math.round(img.height * scale);
-				const ctx = canvas.getContext('2d');
-				if (!ctx) return reject(new Error('canvas unavailable'));
-				ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-				resolve(canvas.toDataURL('image/jpeg', 0.85));
-				URL.revokeObjectURL(img.src);
-			};
-			img.onerror = () => reject(new Error('Could not read image'));
-			img.src = URL.createObjectURL(file);
-		});
-	}
-
 	async function onShelfPhotoSelected(e: Event) {
 		const file = (e.currentTarget as HTMLInputElement).files?.[0];
 		if (!file) return;
@@ -198,7 +185,9 @@
 		shelfCandidateNewTags = [];
 		mode = 'shelf-analyzing';
 		try {
-			const dataUrl = await resizeImage(file);
+			// Comprimida en cliente: una foto de móvil son varios MB, y no hace
+			// falta esa resolución para leer lomos.
+			const dataUrl = await resizeImageFile(file);
 			shelfImagePreview = dataUrl;
 			const [res] = await Promise.all([
 				fetch('/api/books/scan-shelf', {
@@ -319,6 +308,105 @@
 		backToChoose();
 	}
 
+	// ── Foto de la portada ────────────────────────────────────────────────────
+	// Un solo libro: la IA lee la portada, el servidor busca obras candidatas y
+	// las ordena comparando portadas. El usuario elige en la lista de
+	// resultados, como en una búsqueda normal, y puede quedarse su foto (ya
+	// recortada) como portada del ejemplar.
+
+	let coverFileInput = $state<HTMLInputElement | null>(null);
+	let coverPhotoPreview = $state<string | null>(null);
+	let coverPhoto = $state<string | null>(null);
+	let coverReading = $state<BookCoverReading | null>(null);
+	let coverMatches = $state<Record<string, BookCoverMatch>>({});
+	let usePhotoAsCover = $state(false);
+
+	function clearCoverPhoto() {
+		coverPhoto = null;
+		coverPhotoPreview = null;
+		coverReading = null;
+		coverMatches = {};
+		usePhotoAsCover = false;
+	}
+
+	async function onCoverPhotoSelected(e: Event) {
+		const file = (e.currentTarget as HTMLInputElement).files?.[0];
+		if (!file) return;
+		clearCoverPhoto();
+		errorMsg = '';
+		shelfSummary = null;
+		selectedBook = null;
+		mode = 'cover-analyzing';
+		try {
+			const dataUrl = await resizeImageFile(file);
+			coverPhotoPreview = dataUrl;
+			const res = await fetch('/api/books/scan-cover', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ image: dataUrl })
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				errorMsg = body?.message ?? 'Could not analyze the photo.';
+				clearCoverPhoto();
+				mode = 'choose';
+				return;
+			}
+			const scan: BookCoverScan = await res.json();
+			if (!scan.reading) {
+				errorMsg = 'Could not read the cover. Try a sharper, straighter photo.';
+				clearCoverPhoto();
+				mode = 'choose';
+				return;
+			}
+			coverReading = scan.reading;
+			// Recorte de la portada para guardarla; sin caja fiable, la foto entera.
+			coverPhoto = await cropImage(dataUrl, scan.reading.box).catch(() => null);
+			coverMatches = Object.fromEntries(scan.candidates.map((c) => [c.id, c.match]));
+
+			if (scan.candidates.length === 0) {
+				// No está en OpenLibrary: alta manual con lo que se leyó.
+				enterFormFromCover();
+				return;
+			}
+			searchSeq++;
+			searching = false;
+			translatedQuery = null;
+			searchResults = scan.candidates;
+			goTo('results');
+		} catch {
+			errorMsg = 'Could not analyze the photo. Check your connection.';
+			clearCoverPhoto();
+			mode = 'choose';
+		} finally {
+			if (coverFileInput) coverFileInput.value = '';
+		}
+	}
+
+	async function enterFormFromCover() {
+		const reading = coverReading;
+		resetFormFields();
+		if (reading) {
+			formTitle = reading.subtitle ? `${reading.title}: ${reading.subtitle}` : reading.title;
+			formAuthors = reading.authors.length > 0 ? [...reading.authors] : [''];
+			if (reading.originalTitle) formAlternateTitle = reading.originalTitle;
+		}
+		usePhotoAsCover = coverPhoto !== null;
+		await Promise.all([fetchUserTags(), fetchUserLibraries()]);
+		goTo('form');
+	}
+
+	// Best-effort: si falla, el libro queda añadido con la portada del catálogo.
+	async function savePhotoCover(userBookId: string | undefined) {
+		if (!userBookId || !coverPhoto || !usePhotoAsCover) return;
+		const res = await fetch(`/api/books/${userBookId}/cover`, {
+			method: 'PUT',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ image: coverPhoto })
+		}).catch(() => null);
+		if (!res?.ok) errorMsg = 'The book was added, but your photo could not be saved as its cover.';
+	}
+
 	// ── Manual form state ─────────────────────────────────────────────────────
 	let formTitle = $state('');
 	let formAuthors = $state<string[]>(['']);
@@ -346,6 +434,7 @@
 	}
 
 	async function enterFormMode() {
+		clearCoverPhoto();
 		resetFormFields();
 		await Promise.all([fetchUserTags(), fetchUserLibraries()]);
 		goTo('form');
@@ -534,6 +623,8 @@
 		tagsSuggested = false;
 		proposedNewTags = [];
 		confirmCoverUrl = '';
+		// Con foto: por defecto la foto, salvo que el catálogo tenga la misma portada.
+		usePhotoAsCover = coverPhoto !== null && (!book.coverUrl || coverMatches[book.id] !== 'cover');
 		duplicateMatch = null;
 		loadingDescription = true;
 		goTo('confirm');
@@ -578,6 +669,7 @@
 	let searchSeq = 0;
 
 	async function onIsbnDetected(isbn: string) {
+		clearCoverPhoto();
 		const seq = ++searchSeq;
 		selectedBook = null;
 		goTo('results');
@@ -604,6 +696,7 @@
 	async function onManualSearch(e: SubmitEvent) {
 		e.preventDefault();
 		if (!manualQuery.trim()) return;
+		clearCoverPhoto();
 		const seq = ++searchSeq;
 		goTo('results');
 		searching = true;
@@ -645,7 +738,8 @@
 				body: JSON.stringify({
 					workId: selectedBook.id,
 					isbn: selectedBook.isbn ?? undefined,
-					coverUrl: (!selectedBook.coverUrl && confirmCoverUrl.trim()) || undefined,
+					coverUrl:
+						(!usePhotoAsCover && !selectedBook.coverUrl && confirmCoverUrl.trim()) || undefined,
 					notes: notes || undefined,
 					libraryId: selectedLibraryId || undefined,
 					allowDuplicate: allowDuplicate || undefined,
@@ -661,6 +755,8 @@
 			}
 			const data = await res.json();
 			lastAddedTitle = data.title ?? selectedBook.title;
+			await savePhotoCover(data.userBookId);
+			clearCoverPhoto();
 			backToChoose();
 		} catch {
 			errorMsg = 'Network error.';
@@ -707,7 +803,7 @@
 					publishYear: year && !isNaN(year) ? year : undefined,
 					description: formDescription.trim() || undefined,
 					alternateTitle: formAlternateTitle.trim() || undefined,
-					coverUrl: formCoverUrl.trim() || undefined,
+					coverUrl: (!usePhotoAsCover && formCoverUrl.trim()) || undefined,
 					notes: notes.trim() || undefined,
 					libraryId: selectedLibraryId || undefined,
 					allowDuplicate: allowDuplicate || undefined,
@@ -724,6 +820,8 @@
 			const data = await res.json();
 			lastAddedTitle = data.title ?? formTitle;
 			resetFormFields();
+			await savePhotoCover(data.userBookId);
+			clearCoverPhoto();
 			backToChoose();
 		} catch {
 			errorMsg = 'Network error.';
@@ -750,6 +848,43 @@
 			{/each}
 		</div>
 	{/if}
+{/snippet}
+
+<!-- Portada del catálogo o la foto propia (solo tras una foto de portada). -->
+{#snippet photoCoverChoice(catalogSrc: string | null, catalogLabel: string)}
+	<div class="space-y-2">
+		<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">Cover</span>
+		<div class="grid grid-cols-2 gap-3">
+			{#each [{ photo: false, label: catalogLabel, src: catalogSrc }, { photo: true, label: 'My photo', src: coverPhoto }] as option (option.photo)}
+				<button
+					type="button"
+					onclick={() => (usePhotoAsCover = option.photo)}
+					aria-pressed={usePhotoAsCover === option.photo}
+					class="space-y-1.5 border p-2 text-xs transition-colors
+					{usePhotoAsCover === option.photo
+						? 'border-brown-700 text-ink'
+						: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
+				>
+					<div
+						class="flex aspect-[2/3] w-full items-center justify-center overflow-hidden bg-paper-ui"
+					>
+						{#if option.src}
+							<!-- La foto propia se ve entera: con object-cover, una foto
+							     apaisada se recortaría otra vez al centro -->
+							<img
+								src={option.src}
+								alt={option.label}
+								class="h-full w-full {option.photo ? 'object-contain' : 'object-cover'}"
+							/>
+						{:else}
+							<span class="px-2 text-ink-faint">No cover</span>
+						{/if}
+					</div>
+					{option.label}
+				</button>
+			{/each}
+		</div>
+	</div>
 {/snippet}
 
 <div class="mx-auto max-w-md space-y-8">
@@ -817,11 +952,15 @@
 				<span class="text-xs text-ink-muted">Search</span>
 			</button>
 			<button
-				onclick={enterFormMode}
+				onclick={() => {
+					errorMsg = '';
+					shelfSummary = null;
+					coverFileInput?.click();
+				}}
 				class="group flex flex-col items-center gap-4 border border-paper-border p-6 transition-colors hover:border-ink"
 			>
-				<Plus size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
-				<span class="text-xs text-ink-muted">Enter manually</span>
+				<Book size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
+				<span class="text-xs text-ink-muted">Cover photo</span>
 			</button>
 			<button
 				onclick={() => {
@@ -834,7 +973,22 @@
 				<Camera size={36} weight="thin" class="text-ink-faint group-hover:text-ink" />
 				<span class="text-xs text-ink-muted">Scan shelf</span>
 			</button>
+			<button
+				onclick={enterFormMode}
+				class="group col-span-2 flex items-center justify-center gap-3 border border-paper-border p-4 transition-colors hover:border-ink"
+			>
+				<Plus size={24} weight="thin" class="text-ink-faint group-hover:text-ink" />
+				<span class="text-xs text-ink-muted">Enter manually</span>
+			</button>
 		</div>
+		<input
+			bind:this={coverFileInput}
+			type="file"
+			accept="image/*"
+			capture="environment"
+			class="hidden"
+			onchange={onCoverPhotoSelected}
+		/>
 		<input
 			bind:this={shelfFileInput}
 			type="file"
@@ -875,6 +1029,25 @@
 				<span class="text-xs tracking-widest text-ink-faint uppercase">Results</span>
 				<button onclick={() => goTo('manual')} class="text-xs link-action"> New search </button>
 			</div>
+			{#if coverReading}
+				<div class="mb-4 flex items-start gap-3">
+					{#if coverPhoto}
+						<img
+							src={coverPhoto}
+							alt="Your cover"
+							class="h-16 w-12 shrink-0 border border-paper-border object-contain"
+						/>
+					{/if}
+					<p class="text-xs text-ink-faint">
+						Read on the cover: <strong class="text-ink-muted">{coverReading.title}</strong
+						>{#if coverReading.authors.length > 0}, {coverReading.authors.join(', ')}{/if}. Pick
+						your book, or
+						<button type="button" onclick={enterFormFromCover} class="link-action"
+							>enter it manually</button
+						>.
+					</p>
+				</div>
+			{/if}
 			{#if translatedQuery}
 				<p class="mb-4 text-xs text-ink-faint">
 					Also showing results for <strong class="text-ink-muted">"{translatedQuery}"</strong>.
@@ -887,7 +1060,13 @@
 			{:else}
 				<ul class="grid grid-cols-1 divide-paper-border sm:grid-cols-2 sm:gap-2">
 					{#each searchResults as book (book.id)}
-						<li class="border-b border-paper-border sm:border sm:border-paper-border">
+						{@const match = coverMatches[book.id]}
+						<li
+							class="border-b border-paper-border sm:border sm:border-paper-border {match ===
+							'other'
+								? 'opacity-50'
+								: ''}"
+						>
 							<BookCard
 								title={book.title}
 								authors={book.authors}
@@ -896,6 +1075,12 @@
 								variant="list"
 								onclick={() => selectBook(book)}
 							/>
+							{#if match === 'cover' || match === 'work'}
+								<p class="flex items-center gap-1 px-3 pb-2 text-xs text-ink-faint">
+									<Sparkle size={12} />
+									{match === 'cover' ? 'Same cover as your photo' : 'Same book, another cover'}
+								</p>
+							{/if}
 						</li>
 					{/each}
 				</ul>
@@ -909,7 +1094,7 @@
 				<BookCard
 					title={selectedBook.title}
 					authors={selectedBook.authors}
-					coverUrl={selectedBook.coverUrl}
+					coverUrl={usePhotoAsCover && coverPhoto ? coverPhoto : selectedBook.coverUrl}
 					publishYear={selectedBook.publishYear}
 					variant="detail"
 				/>
@@ -963,7 +1148,11 @@
 				</div>
 			{/if}
 
-			{#if !selectedBook.coverUrl}
+			{#if coverPhoto}
+				{@render photoCoverChoice(selectedBook.coverUrl, 'OpenLibrary')}
+			{/if}
+
+			{#if !selectedBook.coverUrl && !usePhotoAsCover}
 				<div>
 					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
 						Cover <span class="tracking-normal normal-case">(not on OpenLibrary)</span>
@@ -1143,20 +1332,27 @@
 				</div>
 			</div>
 
-			<div>
-				<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
-					Cover <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
-				</span>
-				<div class="mt-1.5">
-					<CoverPicker
-						bind:value={formCoverUrl}
-						title={formTitle}
-						authors={formAuthors}
-						isbn={formIsbn}
-						publishYear={formPublishYear ? parseInt(formPublishYear, 10) || null : null}
-					/>
+			{#if coverPhoto}
+				{@render photoCoverChoice(formCoverUrl.trim() || null, 'Other cover')}
+			{/if}
+
+			{#if !usePhotoAsCover}
+				<div>
+					<span class="block text-xs font-medium tracking-widest text-ink-muted uppercase">
+						{coverPhoto ? 'Other cover' : 'Cover'}
+						<span class="tracking-normal text-ink-faint normal-case">(optional)</span>
+					</span>
+					<div class="mt-1.5">
+						<CoverPicker
+							bind:value={formCoverUrl}
+							title={formTitle}
+							authors={formAuthors}
+							isbn={formIsbn}
+							publishYear={formPublishYear ? parseInt(formPublishYear, 10) || null : null}
+						/>
+					</div>
 				</div>
-			</div>
+			{/if}
 
 			<div>
 				<label
@@ -1273,6 +1469,19 @@
 				/>
 			{/if}
 			<Espera>Analyzing photo…</Espera>
+		</div>
+
+		<!-- Analizando la foto de la portada -->
+	{:else if mode === 'cover-analyzing'}
+		<div class="flex flex-col items-center gap-4 py-16">
+			{#if coverPhotoPreview}
+				<img
+					src={coverPhotoPreview}
+					alt="Cover preview"
+					class="max-h-48 border border-paper-border object-contain"
+				/>
+			{/if}
+			<Espera>Looking for your book…</Espera>
 		</div>
 
 		<!-- Revisar libros detectados -->

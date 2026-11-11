@@ -12,7 +12,7 @@ import {
 	OPEN_LOAN_ERROR
 } from '$lib/server/books';
 import { withRLS } from '$lib/server/db/rls';
-import { tags, userBookTags, userBooks, books } from '$lib/server/db/schema';
+import { tags, userBookTags, userBooks, books, bookCoverPhotos } from '$lib/server/db/schema';
 import { fetchWorkById } from '$lib/server/openlibrary';
 import { db } from '$lib/server/db/index';
 import {
@@ -337,8 +337,10 @@ export const actions = {
 					publishYear: null,
 					alternateTitle: null,
 					// La portada propia solo se conserva si el catálogo no trae
-					// ninguna; si no, el COALESCE la seguiría anteponiendo.
-					coverUrl: bookData.coverUrl ? null : book.coverUrl,
+					// ninguna (si no, el COALESCE la seguiría anteponiendo), salvo
+					// que sea la foto del ejemplar: esa la eligió el usuario.
+					coverUrl:
+						bookData.coverUrl && !book.coverUrl?.startsWith('/api/books/') ? null : book.coverUrl,
 					updatedAt: new Date()
 				})
 				.where(eq(userBooks.id, params.id!));
@@ -363,12 +365,14 @@ export const actions = {
 			return fail(400, { coverError: 'The cover must be an https:// image URL.' });
 		}
 
-		await withRLS(locals.user!.id, (tx) =>
-			tx
+		await withRLS(locals.user!.id, async (tx) => {
+			await tx
 				.update(userBooks)
 				.set({ coverUrl, updatedAt: new Date() })
-				.where(eq(userBooks.id, params.id!))
-		);
+				.where(eq(userBooks.id, params.id!));
+			// Otra portada (o la del catálogo): la foto guardada deja de usarse.
+			await tx.delete(bookCoverPhotos).where(eq(bookCoverPhotos.userBookId, params.id!));
+		});
 
 		return { coverSaved: true };
 	},

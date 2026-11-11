@@ -16,6 +16,8 @@ describe('textos del consumo de IA', () => {
 	it('explica resultados y errores', () => {
 		expect(resultLabel('movie_scan', 1)).toBe('1 película reconocida');
 		expect(resultLabel('book_tags', 3)).toBe('3 etiquetas sugeridas');
+		expect(resultLabel('book_cover_scan', 1)).toBe('1 libro reconocido');
+		expect(resultLabel('book_cover_compare', 4)).toBe('4 candidatas comparadas');
 		expect(errorLabel('HTTP 402')).toBe('Sin saldo en OpenRouter');
 		expect(errorLabel('HTTP 500')).toBe('HTTP 500');
 	});

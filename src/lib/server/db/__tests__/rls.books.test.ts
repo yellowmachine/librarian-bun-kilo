@@ -8,7 +8,8 @@ import {
 	userBookTags,
 	groups,
 	groupMembers,
-	sharedTags
+	sharedTags,
+	bookCoverPhotos
 } from '../schema';
 import { eq } from 'drizzle-orm';
 
@@ -291,5 +292,66 @@ describe('RLS · user_book_tags', () => {
 			tx.select().from(userBookTags).where(eq(userBookTags.userBookId, 'ub-alice'))
 		);
 		expect(rows).toEqual([{ userBookId: 'ub-alice', tagId: 'tag-alice' }]);
+	});
+
+	describe('foto de la portada', () => {
+		const JPEG = Uint8Array.from([0xff, 0xd8, 0xff]);
+
+		beforeEach(async () => {
+			await tdb.asSuperuser((tx) =>
+				tx.insert(bookCoverPhotos).values([
+					{ userBookId: 'ub-bob', userId: BOB, contentType: 'image/jpeg', data: JPEG },
+					{ userBookId: 'ub-alice', userId: ALICE, contentType: 'image/jpeg', data: JPEG }
+				])
+			);
+		});
+
+		it('la ve quien ve el libro, y solo esa', async () => {
+			const asAlice = await tdb.withRLS(ALICE, (tx) =>
+				tx.select({ id: bookCoverPhotos.userBookId }).from(bookCoverPhotos)
+			);
+			expect(asAlice.map((r) => r.id).sort()).toEqual(['ub-alice', 'ub-bob']);
+			// El libro de alice no está en ningún grupo de bob.
+			const asBob = await tdb.withRLS(BOB, (tx) =>
+				tx.select({ id: bookCoverPhotos.userBookId }).from(bookCoverPhotos)
+			);
+			expect(asBob.map((r) => r.id)).toEqual(['ub-bob']);
+		});
+
+		it('pero solo el dueño la cambia o la borra', async () => {
+			await tdb.withRLS(ALICE, async (tx) => {
+				await tx
+					.update(bookCoverPhotos)
+					.set({ contentType: 'image/png' })
+					.where(eq(bookCoverPhotos.userBookId, 'ub-bob'));
+				await tx.delete(bookCoverPhotos).where(eq(bookCoverPhotos.userBookId, 'ub-bob'));
+			});
+			const rows = await tdb.asSuperuser((tx) =>
+				tx.select().from(bookCoverPhotos).where(eq(bookCoverPhotos.userBookId, 'ub-bob'))
+			);
+			expect(rows).toHaveLength(1);
+			expect(rows[0].contentType).toBe('image/jpeg');
+		});
+
+		it('nadie pone una foto a nombre de otro', async () => {
+			await tdb.asSuperuser((tx) =>
+				tx.delete(bookCoverPhotos).where(eq(bookCoverPhotos.userBookId, 'ub-bob'))
+			);
+			await expect(
+				tdb.withRLS(ALICE, (tx) =>
+					tx
+						.insert(bookCoverPhotos)
+						.values({ userBookId: 'ub-bob', userId: BOB, contentType: 'image/jpeg', data: JPEG })
+				)
+			).rejects.toMatchObject({ cause: { code: RLS_VIOLATION } });
+		});
+
+		it('se borra con el libro', async () => {
+			await tdb.withRLS(ALICE, (tx) => tx.delete(userBooks).where(eq(userBooks.id, 'ub-alice')));
+			const rows = await tdb.asSuperuser((tx) =>
+				tx.select().from(bookCoverPhotos).where(eq(bookCoverPhotos.userBookId, 'ub-alice'))
+			);
+			expect(rows).toEqual([]);
+		});
 	});
 });
