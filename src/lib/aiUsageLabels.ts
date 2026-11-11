@@ -8,7 +8,8 @@ export const AI_KIND_LABELS: Record<string, string> = {
 	movie_tags: 'Etiquetas de película',
 	book_cover_search: 'Búsqueda de portada',
 	book_cover_scan: 'Foto de portada',
-	book_cover_compare: 'Comparación de portadas'
+	book_cover_compare: 'Comparación de portadas',
+	book_isbn_scan: 'Foto de ISBN'
 };
 
 // Qué cuenta resultCount en cada tipo
@@ -28,6 +29,8 @@ export function resultLabel(kind: string, n: number): string {
 			return `${n} ${one ? 'libro reconocido' : 'libros reconocidos'}`;
 		case 'book_cover_compare':
 			return `${n} ${one ? 'candidata comparada' : 'candidatas comparadas'}`;
+		case 'book_isbn_scan':
+			return `${n} ISBN ${one ? 'válido' : 'válidos'}`;
 		default:
 			return String(n);
 	}

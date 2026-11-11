@@ -56,7 +56,8 @@ export const aiCallKindEnum = pgEnum('ai_call_kind', [
 	'movie_tags', // etiquetas sugeridas para una película
 	'book_cover_search', // portada de un libro buscada en la web
 	'book_cover_scan', // un libro desde una foto de su portada (leerla)
-	'book_cover_compare' // esa foto comparada con las portadas de las obras candidatas
+	'book_cover_compare', // esa foto comparada con las portadas de las obras candidatas
+	'book_isbn_scan' // el ISBN leído de una foto, cuando el lector de códigos no puede
 ]);
 
 // Soporte físico de una copia de la videoteca (user_movies.format).
