@@ -135,7 +135,8 @@ function serializeLibraryYaml(entries: BookExport[]): string {
 		lines.push(`  - title: ${yamlStr(b.title)}`);
 		lines.push(`    authors: [${b.authors.map(yamlStr).join(', ')}]`);
 		if (b.isbn) lines.push(`    isbn: ${yamlStr(b.isbn)}`);
-		if (b.coverUrl) lines.push(`    cover_url: ${yamlStr(b.coverUrl)}`);
+		// La foto propia (/api/books/…/cover) solo se ve con sesión: no se exporta.
+		if (b.coverUrl?.startsWith('https://')) lines.push(`    cover_url: ${yamlStr(b.coverUrl)}`);
 		if (b.publishYear !== null) lines.push(`    publish_year: ${b.publishYear}`);
 		if (b.rating !== null) lines.push(`    rating: ${b.rating}`);
 		if (b.notes) lines.push(`    notes: ${yamlStr(b.notes)}`);

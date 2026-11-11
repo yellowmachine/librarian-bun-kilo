@@ -62,6 +62,21 @@ export function filterKnownTags(value: unknown, availableTagNames: string[]): st
 	return result;
 }
 
+/** Una caja en la foto, en fracciones 0–1: [top, left, bottom, right]. */
+export type CoverBox = [number, number, number, number];
+
+// box_2d de Gemini: [ymin, xmin, ymax, xmax] en 0–1000. Se descarta si no
+// tiene sentido (fuera de rango, invertido o diminuto).
+export function toBox(value: unknown): CoverBox | null {
+	if (!Array.isArray(value) || value.length !== 4) return null;
+	if (!value.every((n) => typeof n === 'number' && Number.isFinite(n))) return null;
+	const [top, left, bottom, right] = (value as number[]).map(
+		(n) => Math.min(1000, Math.max(0, n)) / 1000
+	);
+	if (bottom - top < 0.05 || right - left < 0.05) return null;
+	return [top, left, bottom, right];
+}
+
 export function extractJson(content: string): string {
 	const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
 	return (fenced ? fenced[1] : content).trim();
@@ -72,13 +87,27 @@ export function extractJson(content: string): string {
  * array JSON; `toResults` lo convierte en resultados (descartando lo que no
  * valga). Devuelve null si algo falla (red, HTTP, respuesta vacía, JSON
  * inválido o que no es un array); nunca lanza. Queda registrado en el consumo
- * de IA del usuario si se pasa `log`. Lo usan el escaneo de estanterías y el
- * de carátulas (movieVision.ts).
+ * de IA del usuario si se pasa `log`. Lo usan el escaneo de estanterías, el
+ * de carátulas (movieVision.ts) y el de portadas (bookCoverVision.ts).
  */
+/**
+ * Una imagen suelta, o varias con un texto delante de cada una («Candidate 1:»…).
+ * Una entrada sin url va solo como texto.
+ */
+export type VisionImages = string | { caption: string; url?: string | null }[];
+
+function imageContent(images: VisionImages): unknown[] {
+	if (typeof images === 'string') return [{ type: 'image_url', image_url: { url: images } }];
+	return images.flatMap((img) => [
+		{ type: 'text', text: img.caption },
+		...(img.url ? [{ type: 'image_url', image_url: { url: img.url } }] : [])
+	]);
+}
+
 export async function askVisionModel<T>(
 	apiKey: string,
 	prompt: string,
-	imageDataUrl: string,
+	images: VisionImages,
 	options: { label: string; log?: AiLogContext; toResults: (items: unknown[]) => T[] }
 ): Promise<T[] | null> {
 	return openRouterChat<T[]>(
@@ -89,10 +118,7 @@ export async function askVisionModel<T>(
 			messages: [
 				{
 					role: 'user',
-					content: [
-						{ type: 'text', text: prompt },
-						{ type: 'image_url', image_url: { url: imageDataUrl } }
-					]
+					content: [{ type: 'text', text: prompt }, ...imageContent(images)]
 				}
 			]
 		},

@@ -2,7 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../tmdb', () => ({ searchMovies: vi.fn() }));
 
-import { identifyMoviesFromImage, matchWithTmdb, toBox, type MovieCandidate } from '../movieVision';
+import { identifyMoviesFromImage, matchWithTmdb, type MovieCandidate } from '../movieVision';
+import { toBox } from '../openrouterVision';
 import { searchMovies } from '../tmdb';
 
 const searchMock = vi.mocked(searchMovies);

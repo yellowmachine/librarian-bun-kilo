@@ -71,6 +71,13 @@
       "when": 1794162156860,
       "tag": "0009_ai_usage_log",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794379603862,
+      "tag": "0010_book_cover_photos",
+      "breakpoints": true
     }
   ]
 }

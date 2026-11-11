@@ -1,7 +1,16 @@
 import { nanoid } from 'nanoid';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import { db } from './db/index';
-import { books, userBooks, tags, userBookTags, libraries, loans } from './db/schema';
+import {
+	books,
+	userBooks,
+	tags,
+	userBookTags,
+	libraries,
+	loans,
+	bookCoverPhotos
+} from './db/schema';
+import type { DecodedImage } from './imageData';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
 import { searchByIsbn, getWorkById, type OpenLibraryBook } from './openlibrary';
@@ -493,6 +502,52 @@ export async function updateUserBook(
 			.update(userBooks)
 			.set({ ...data, updatedAt: new Date() })
 			.where(eq(userBooks.id, userBookId));
+	});
+}
+
+// ─── Foto propia de la portada ────────────────────────────────────────────────
+
+export function bookCoverPhotoUrl(userBookId: string): string {
+	// El parámetro cambia con cada foto nueva, así el navegador (que la cachea
+	// como inmutable) nunca enseña la anterior.
+	return `/api/books/${userBookId}/cover?v=${nanoid(8)}`;
+}
+
+/** Guarda (o reemplaza) la foto y la pone de portada. false si la copia no es del usuario. */
+export async function saveBookCoverPhoto(
+	userId: string,
+	userBookId: string,
+	image: DecodedImage
+): Promise<boolean> {
+	return withRLS(userId, async (tx) => {
+		const updated = await tx
+			.update(userBooks)
+			.set({ coverUrl: bookCoverPhotoUrl(userBookId), updatedAt: new Date() })
+			.where(and(eq(userBooks.id, userBookId), eq(userBooks.userId, userId)))
+			.returning({ id: userBooks.id });
+		if (updated.length === 0) return false;
+
+		await tx
+			.insert(bookCoverPhotos)
+			.values({ userBookId, userId, contentType: image.contentType, data: image.bytes })
+			.onConflictDoUpdate({
+				target: bookCoverPhotos.userBookId,
+				set: { contentType: image.contentType, data: image.bytes, createdAt: new Date() }
+			});
+		return true;
+	});
+}
+
+export async function getBookCoverPhoto(
+	userId: string,
+	userBookId: string
+): Promise<{ contentType: string; data: Uint8Array } | null> {
+	return withRLS(userId, async (tx) => {
+		const rows = await tx
+			.select({ contentType: bookCoverPhotos.contentType, data: bookCoverPhotos.data })
+			.from(bookCoverPhotos)
+			.where(eq(bookCoverPhotos.userBookId, userBookId));
+		return rows[0] ?? null;
 	});
 }
 
