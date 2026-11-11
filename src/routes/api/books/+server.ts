@@ -30,7 +30,8 @@ const AddBookSchema = v.pipe(
 			v.array(
 				v.object({
 					name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(50)),
-					color: v.optional(v.pipe(v.string(), v.trim()))
+					// null: las etiquetas nuevas que propone la IA llegan sin color
+					color: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(20))))
 				})
 			)
 		)
