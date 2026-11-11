@@ -45,12 +45,28 @@
 		const file = input.files?.[0];
 		input.value = '';
 		if (file && onPhoto) onPhoto(file);
-		else restart();
+		else onPhotoCancelled();
+	}
+
+	// Sin cámara en vivo no hay nada que rearrancar: se queda la opción de foto.
+	function onPhotoCancelled() {
+		if (!cameraFailed) restart();
+	}
+
+	// Si la cámara en vivo no arranca (permiso denegado, navegador sin soporte…)
+	// y hay opción de foto, se ofrece en vez de salir: la cámara del sistema
+	// suele funcionar igual.
+	function failCamera(msg: string) {
+		errorMsg = msg;
+		cameraFailed = true;
+		stop();
+		if (!onPhoto) onError?.(msg);
 	}
 
 	let viewportEl: HTMLDivElement;
 	let running = $state(false);
 	let errorMsg = $state('');
+	let cameraFailed = $state(false);
 	let lastCode = '';
 	let detectionCount = 0;
 	// Una vez confirmado un código (o desmontado el componente) se ignora todo
@@ -119,9 +135,7 @@
 					if (finished) return;
 					if (err) {
 						const msg = err instanceof Error ? err.message : String(err);
-						errorMsg = `Could not access the camera: ${msg}`;
-						stop();
-						onError?.(errorMsg);
+						failCamera(`Could not access the camera: ${msg}`);
 						return;
 					}
 					QuaggaInstance!.start();
@@ -131,9 +145,7 @@
 		} catch (e) {
 			if (finished) return;
 			const msg = e instanceof Error ? e.message : String(e);
-			errorMsg = `Error starting scanner: ${msg}`;
-			stop();
-			onError?.(errorMsg);
+			failCamera(`Error starting scanner: ${msg}`);
 		}
 	}
 
@@ -169,6 +181,7 @@
 	<div
 		bind:this={viewportEl}
 		class="relative overflow-hidden bg-ink"
+		class:hidden={cameraFailed}
 		style="aspect-ratio: 4/3; max-height: 70svh;"
 	>
 		{#if !running && !errorMsg}
@@ -197,11 +210,17 @@
 		{/if}
 	</div>
 
-	{#if running}
-		<p class="text-center text-xs text-ink-faint">Centra el código de barras en el marco</p>
+	{#if running || (cameraFailed && onPhoto)}
+		{#if running}
+			<p class="text-center text-xs text-ink-faint">Centra el código de barras en el marco</p>
+		{/if}
 		{#if onPhoto}
-			<button type="button" onclick={takePhoto} class="w-full border btn-secondary py-2.5 text-sm">
-				Can't read it? Take a photo
+			<button
+				type="button"
+				onclick={takePhoto}
+				class="w-full border py-2.5 text-sm {cameraFailed ? 'btn-primary' : 'btn-secondary'}"
+			>
+				{cameraFailed ? 'Take a photo of the barcode instead' : "Can't read it? Take a photo"}
 			</button>
 		{/if}
 		<button
@@ -224,7 +243,7 @@
 			capture="environment"
 			class="hidden"
 			onchange={onPhotoSelected}
-			oncancel={restart}
+			oncancel={onPhotoCancelled}
 		/>
 	{/if}
 </div>
