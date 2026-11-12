@@ -267,6 +267,9 @@ export const movies = pgTable(
 		originalTitle: text('original_title'),
 		releaseYear: integer('release_year'),
 		directors: text('directors').array(),
+		// Reparto principal, en el orden de los créditos. null = aún no se ha
+		// pedido a TMDB (películas dadas de alta antes de guardarlo).
+		cast: text('cast').array(),
 		runtime: integer('runtime'), // minutos
 		genres: text('genres').array(),
 		overview: text('overview'),

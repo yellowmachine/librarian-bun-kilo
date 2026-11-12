@@ -16,6 +16,7 @@ vi.mock('../db/rls', () => ({
 
 import {
 	upsertMovie,
+	setMovieCast,
 	addMovieToLibrary,
 	getUserMovies,
 	getUserMovie,
@@ -42,6 +43,7 @@ const BLADE_RUNNER: TmdbMovie = {
 	originalTitle: null,
 	releaseYear: 1982,
 	directors: ['Ridley Scott'],
+	cast: ['Harrison Ford', 'Rutger Hauer'],
 	runtime: 117,
 	genres: ['Ciencia ficción'],
 	overview: 'Los Ángeles, 2019.',
@@ -71,6 +73,7 @@ describe('videoteca', () => {
 		expect(movie).toMatchObject({
 			title: 'Blade Runner',
 			directors: ['Ridley Scott'],
+			cast: ['Harrison Ford', 'Rutger Hauer'],
 			releaseYear: 1982,
 			runtime: 117,
 			format: 'bluray',
@@ -78,6 +81,22 @@ describe('videoteca', () => {
 			coverOverridden: false
 		});
 		expect(await getUserMovie(BOB, id)).toBeNull();
+	});
+
+	it('completa el reparto de las fichas guardadas antes de tenerlo, sin pisarlo después', async () => {
+		const movieId = await upsertMovie({ ...BLADE_RUNNER, cast: [] });
+		await holder.tdb.asSuperuser((tx) =>
+			tx.execute(`UPDATE movies SET "cast" = NULL WHERE id = '${movieId}'` as string)
+		);
+		const id = await addMovieToLibrary(ALICE, { movieId }, { format: 'dvd' });
+		expect((await getUserMovie(ALICE, id))?.cast).toBeNull();
+
+		await setMovieCast(movieId, ['Harrison Ford']);
+		expect((await getUserMovie(ALICE, id))?.cast).toEqual(['Harrison Ford']);
+
+		await setMovieCast(movieId, ['Otro']);
+		await upsertMovie({ ...BLADE_RUNNER, cast: ['Otro'] });
+		expect((await getUserMovie(ALICE, id))?.cast).toEqual(['Harrison Ford']);
 	});
 
 	it('alta manual y portada propia que tapa el póster', async () => {

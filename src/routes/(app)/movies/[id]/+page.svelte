@@ -125,6 +125,13 @@
 		</div>
 	{/if}
 
+	{#if movie.cast && movie.cast.length > 0}
+		<div class="space-y-2">
+			<span class={labelClass}>Cast</span>
+			<p class="text-sm leading-relaxed text-ink-muted">{movie.cast.join(', ')}</p>
+		</div>
+	{/if}
+
 	{#if form?.error}
 		<p class="border border-ink bg-paper-ui px-4 py-2.5 text-sm text-ink">{form.error}</p>
 	{/if}

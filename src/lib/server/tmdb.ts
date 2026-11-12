@@ -20,6 +20,8 @@ const TMDB_TIMEOUT_MS = 10_000;
 // si no hay traducción, pero deja la sinopsis vacía (ver fetchMovie).
 const LANGUAGE = 'es-ES';
 const FALLBACK_LANGUAGE = 'en-US';
+// Cuántos actores se guardan: los protagonistas, no los cientos de extras.
+export const CAST_LIMIT = 12;
 
 // ─── TMDB API response shapes ─────────────────────────────────────────────────
 
@@ -36,6 +38,11 @@ interface TmdbCrewMember {
 	job: string;
 }
 
+interface TmdbCastMember {
+	name: string;
+	order?: number;
+}
+
 interface TmdbMovieDetails {
 	id: number;
 	title: string;
@@ -45,7 +52,7 @@ interface TmdbMovieDetails {
 	genres?: { id: number; name: string }[];
 	overview?: string;
 	poster_path?: string | null;
-	credits?: { crew?: TmdbCrewMember[] };
+	credits?: { cast?: TmdbCastMember[]; crew?: TmdbCrewMember[] };
 }
 
 export interface TmdbMovie {
@@ -54,6 +61,7 @@ export interface TmdbMovie {
 	originalTitle: string | null;
 	releaseYear: number | null;
 	directors: string[];
+	cast: string[]; // reparto principal (CAST_LIMIT), en orden de créditos
 	runtime: number | null;
 	genres: string[];
 	overview: string | null;
@@ -215,7 +223,9 @@ async function fetchMovie(tmdbId: number): Promise<TmdbMovie | null> {
 		...new Set((details.credits?.crew ?? []).filter((c) => c.job === 'Director').map((c) => c.name))
 	];
 
-	// El reparto completo (credits) puede ocupar cientos de KB: no se guarda.
+	const cast = topCast(details.credits?.cast);
+
+	// Los créditos completos pueden ocupar cientos de KB: en tmdbData no van.
 	const { credits: _credits, ...raw } = details;
 
 	return {
@@ -224,10 +234,36 @@ async function fetchMovie(tmdbId: number): Promise<TmdbMovie | null> {
 		originalTitle: distinctOriginal(details.title, details.original_title),
 		releaseYear: yearOf(details.release_date),
 		directors,
+		cast,
 		runtime: details.runtime || null,
 		genres: (details.genres ?? []).map((g) => g.name),
 		overview,
 		posterUrl: imageUrl(details.poster_path, 'w500'),
 		tmdbData: JSON.stringify(raw)
 	};
+}
+
+function topCast(members: TmdbCastMember[] | undefined): string[] {
+	return [
+		...new Set(
+			[...(members ?? [])]
+				.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity))
+				.map((c) => c.name?.trim())
+				.filter((name): name is string => Boolean(name))
+		)
+	].slice(0, CAST_LIMIT);
+}
+
+// ─── Solo el reparto ──────────────────────────────────────────────────────────
+// Para completar fichas guardadas antes de tener el reparto. A diferencia de
+// getMovie, distingue «no existe en TMDB» (404 → [], para no volver a
+// preguntar) de un fallo puntual (null, se reintentará).
+
+export async function getMovieCast(tmdbId: number): Promise<string[] | null> {
+	if (!isTmdbConfigured()) return null;
+	const res = await fetchTmdb(`/movie/${tmdbId}/credits`, {});
+	if (res.status === 404) return [];
+	if (!res.ok) return null;
+	const credits = (await res.json()) as { cast?: TmdbCastMember[] };
+	return topCast(credits.cast);
 }
