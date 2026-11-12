@@ -8,8 +8,10 @@ import {
 	applyMovieTags,
 	removeMovieTag,
 	forViewer,
+	setMovieCast,
 	OPEN_LOAN_ERROR
 } from '$lib/server/movies';
+import { getMovieCast, parseMovieId } from '$lib/server/tmdb';
 import { withRLS } from '$lib/server/db/rls';
 import { hasOpenRouterApiKey } from '$lib/server/openrouterKey';
 import { getMovieForBorrow, requestLoan } from '$lib/server/loans';
@@ -35,6 +37,7 @@ export const load = async ({ locals, params }: RequestEvent) => {
 	// También entra quien la ve por un grupo: ficha de solo lectura, sin lo
 	// privado del dueño (notas, biblioteca). La RLS decide quién la ve.
 	if (!movie) error(404, 'Movie not found');
+	if (movie.movieId && movie.cast === null) movie.cast = await fillCast(movie.movieId);
 	const isOwner = movie.ownerId === userId;
 	return {
 		// Para «Pedir prestada»: disponibilidad y petición propia abierta
@@ -48,6 +51,23 @@ export const load = async ({ locals, params }: RequestEvent) => {
 		hasAiKey: isOwner && hasAiKey
 	};
 };
+
+// Películas dadas de alta antes de guardar el reparto: se pide a TMDB la
+// primera vez que alguien abre la ficha y se queda en el catálogo (vacío si
+// TMDB ya no la tiene). Si TMDB falla, la ficha sale sin reparto y se
+// reintenta la próxima vez.
+async function fillCast(movieId: string): Promise<string[] | null> {
+	const tmdbId = parseMovieId(movieId);
+	if (tmdbId === null) return null;
+	try {
+		const cast = await getMovieCast(tmdbId);
+		if (cast === null) return null;
+		await setMovieCast(movieId, cast);
+		return cast;
+	} catch {
+		return null;
+	}
+}
 
 function optionalText(data: FormData, name: string, max: number): string | null {
 	const value = (data.get(name) as string | null)?.trim() ?? '';

@@ -6,10 +6,12 @@ vi.mock('$env/dynamic/private', () => ({ env: mockEnv }));
 import {
 	searchMovies,
 	getMovie,
+	getMovieCast,
 	clearMovieCache,
 	parseMovieId,
 	toMovieId,
-	isTmdbConfigured
+	isTmdbConfigured,
+	CAST_LIMIT
 } from '../tmdb';
 
 function jsonResponse(body: unknown, ok = true): Response {
@@ -29,6 +31,11 @@ const BLADE_RUNNER = {
 	overview: 'Los Ángeles, 2019. Rick Deckard…',
 	poster_path: '/abc.jpg',
 	credits: {
+		cast: [
+			{ name: 'Rutger Hauer', order: 1 },
+			{ name: 'Harrison Ford', order: 0 },
+			{ name: 'Sean Young', order: 2 }
+		],
 		crew: [
 			{ name: 'Ridley Scott', job: 'Director' },
 			{ name: 'Hampton Fancher', job: 'Screenplay' },
@@ -150,6 +157,7 @@ describe('getMovie', () => {
 			originalTitle: null,
 			releaseYear: 1982,
 			directors: ['Ridley Scott'],
+			cast: ['Harrison Ford', 'Rutger Hauer', 'Sean Young'],
 			runtime: 117,
 			genres: ['Ciencia ficción', 'Drama'],
 			overview: 'Los Ángeles, 2019. Rick Deckard…',
@@ -157,6 +165,21 @@ describe('getMovie', () => {
 		});
 		expect(JSON.parse(movie!.tmdbData)).not.toHaveProperty('credits');
 		expect(String(fetchMock.mock.calls[0][0])).toContain('append_to_response=credits');
+	});
+
+	it('se queda con los primeros actores del reparto', async () => {
+		const cast = Array.from({ length: CAST_LIMIT + 5 }, (_, i) => ({
+			name: `Actor ${i}`,
+			order: i
+		}));
+		vi.spyOn(global, 'fetch').mockResolvedValueOnce(
+			jsonResponse({ ...BLADE_RUNNER, credits: { cast, crew: [] } })
+		);
+
+		const movie = await getMovie(78);
+
+		expect(movie!.cast).toHaveLength(CAST_LIMIT);
+		expect(movie!.cast[0]).toBe('Actor 0');
 	});
 
 	it('usa la sinopsis en inglés si no la hay en castellano', async () => {
@@ -187,5 +210,33 @@ describe('getMovie', () => {
 		expect(await getMovie(78)).toBeNull();
 		expect(await getMovie(78)).not.toBeNull();
 		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe('getMovieCast', () => {
+	it('pide solo los créditos y devuelve el reparto en orden', async () => {
+		const fetchMock = vi
+			.spyOn(global, 'fetch')
+			.mockResolvedValueOnce(jsonResponse({ cast: BLADE_RUNNER.credits.cast }));
+
+		expect(await getMovieCast(78)).toEqual(['Harrison Ford', 'Rutger Hauer', 'Sean Young']);
+		expect(String(fetchMock.mock.calls[0][0])).toContain('/movie/78/credits');
+	});
+
+	it('[] si TMDB ya no tiene la película, null si falla', async () => {
+		vi.spyOn(global, 'fetch')
+			.mockResolvedValueOnce(new Response('{}', { status: 404 }))
+			.mockResolvedValueOnce(new Response('{}', { status: 503 }));
+
+		expect(await getMovieCast(78)).toEqual([]);
+		expect(await getMovieCast(78)).toBeNull();
+	});
+
+	it('null sin clave de TMDB, sin hacer peticiones', async () => {
+		mockEnv.TMDB_API_KEY = '';
+		const fetchMock = vi.spyOn(global, 'fetch');
+
+		expect(await getMovieCast(78)).toBeNull();
+		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });

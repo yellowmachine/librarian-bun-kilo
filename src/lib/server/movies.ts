@@ -3,7 +3,7 @@
 // copia tapan los del catálogo (COALESCE), y en las altas manuales son los
 // únicos que hay.
 import { nanoid } from 'nanoid';
-import { eq, and, ne, desc, inArray, sql } from 'drizzle-orm';
+import { eq, and, ne, desc, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from './db/index';
 import {
 	movies,
@@ -40,7 +40,8 @@ const effectiveCoverUrl = sql<string | null>`COALESCE(${userMovies.coverUrl}, ${
 
 // ─── Upsert en el catálogo global ─────────────────────────────────────────────
 // Sin RLS (catálogo global). Si ya existe no se toca: la ficha de TMDB de una
-// película cambia poco y no merece una escritura en cada alta.
+// película cambia poco y no merece una escritura en cada alta. Solo se
+// completa el reparto si la fila es de antes de guardarlo.
 
 export async function upsertMovie(data: TmdbMovie): Promise<string> {
 	await db
@@ -51,14 +52,27 @@ export async function upsertMovie(data: TmdbMovie): Promise<string> {
 			originalTitle: data.originalTitle,
 			releaseYear: data.releaseYear,
 			directors: data.directors,
+			cast: data.cast,
 			runtime: data.runtime,
 			genres: data.genres,
 			overview: data.overview,
 			posterUrl: data.posterUrl,
 			tmdbData: data.tmdbData
 		})
-		.onConflictDoNothing({ target: movies.id });
+		.onConflictDoUpdate({
+			target: movies.id,
+			set: { cast: data.cast, updatedAt: new Date() },
+			setWhere: isNull(movies.cast)
+		});
 	return data.id;
+}
+
+/** Rellena el reparto de una película del catálogo que aún no lo tiene. */
+export async function setMovieCast(movieId: string, cast: string[]): Promise<void> {
+	await db
+		.update(movies)
+		.set({ cast, updatedAt: new Date() })
+		.where(and(eq(movies.id, movieId), isNull(movies.cast)));
 }
 
 // ─── Biblioteca destino ───────────────────────────────────────────────────────
@@ -147,6 +161,8 @@ export type UserMovieWithDetails = {
 	releaseYear: number | null;
 	runtime: number | null;
 	genres: string[];
+	/** Reparto del catálogo; null si es alta manual o aún no se ha pedido a TMDB. */
+	cast: string[] | null;
 	overview: string | null;
 	coverUrl: string | null;
 	format: MediaFormat;
@@ -172,6 +188,7 @@ const movieColumns = {
 	releaseYear: effectiveReleaseYear,
 	runtime: movies.runtime,
 	genres: movies.genres,
+	cast: movies.cast,
 	overview: effectiveOverview,
 	coverUrl: effectiveCoverUrl,
 	format: userMovies.format,
