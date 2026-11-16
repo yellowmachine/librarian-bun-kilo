@@ -22,11 +22,10 @@
 		tagsToCreate?: NewTag[];
 	} = $props();
 
+	const DEFAULT_COLOR = '#0a0a0a';
+
 	let inputValue = $state('');
 	let open = $state(false);
-	let creatingNew = $state(false);
-	let pendingName = $state('');
-	let newTagColor = $state('#0a0a0a');
 	let inputEl = $state<HTMLInputElement | null>(null);
 	let containerEl = $state<HTMLDivElement | null>(null);
 
@@ -71,31 +70,24 @@
 		tagsToCreate = tagsToCreate.filter((t) => t.name !== name);
 	}
 
-	function startCreate() {
-		pendingName = inputValue.trim();
-		creatingNew = true;
+	// Crear y añadir en un solo paso: la etiqueta entra con el color por defecto, que se
+	// puede cambiar después pulsando el punto de color de su chip.
+	function createAndAdd() {
+		const name = inputValue.trim();
+		if (!name) return;
+		tagsToCreate = [...tagsToCreate, { name, color: DEFAULT_COLOR }];
+		inputValue = '';
 		open = false;
 	}
 
-	function confirmCreate() {
-		tagsToCreate = [...tagsToCreate, { name: pendingName, color: newTagColor }];
-		creatingNew = false;
-		pendingName = '';
-		newTagColor = '#0a0a0a';
-		inputValue = '';
-	}
-
-	function cancelCreate() {
-		creatingNew = false;
-		pendingName = '';
-		newTagColor = '#0a0a0a';
-		inputValue = '';
+	function setPendingColor(name: string, color: string) {
+		tagsToCreate = tagsToCreate.map((t) => (t.name === name ? { ...t, color } : t));
 	}
 
 	function handleBlur(e: FocusEvent) {
 		if (containerEl && !containerEl.contains(e.relatedTarget as Node)) {
 			open = false;
-			if (!creatingNew) inputValue = '';
+			inputValue = '';
 		}
 	}
 
@@ -103,6 +95,14 @@
 		if (e.key === 'Escape') {
 			open = false;
 			inputEl?.blur();
+		}
+	}
+
+	// Enter con un nombre nuevo lo crea y añade (y no envía el formulario del alta).
+	function handleInputKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && showCreate) {
+			e.preventDefault();
+			createAndAdd();
 		}
 	}
 
@@ -139,12 +139,19 @@
 				<span
 					class="flex items-center gap-1 border border-dashed border-paper-border px-2 py-0.5 text-xs text-ink-muted"
 				>
-					{#if newTag.color}
-						<span
-							class="inline-block h-2 w-2 flex-shrink-0 rounded-full"
-							style="background-color: {newTag.color}"
-						></span>
-					{/if}
+					<label
+						class="relative inline-block h-2.5 w-2.5 flex-shrink-0 cursor-pointer rounded-full border border-paper-border"
+						style={newTag.color ? `background-color: ${newTag.color}` : ''}
+						title="Change color"
+					>
+						<input
+							type="color"
+							value={newTag.color ?? DEFAULT_COLOR}
+							oninput={(e) => setPendingColor(newTag.name, e.currentTarget.value)}
+							class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+							aria-label="Color for tag {newTag.name}"
+						/>
+					</label>
 					{newTag.name}
 					<button
 						type="button"
@@ -159,88 +166,60 @@
 		</div>
 	{/if}
 
-	{#if creatingNew}
-		<!-- Formulario de creación con color picker -->
-		<div class="flex items-center gap-2">
-			<span
-				class="flex-1 truncate border border-paper-border px-3 py-1.5 text-sm text-ink-muted"
-				title={pendingName}
-			>
-				{pendingName}
-			</span>
-			<input
-				type="color"
-				bind:value={newTagColor}
-				title="Choose a color"
-				class="h-8 w-8 cursor-pointer rounded-none border border-paper-border p-0.5"
-			/>
-			<button type="button" onclick={confirmCreate} class="border btn-primary px-3 py-1.5 text-xs">
-				Create
-			</button>
-			<button
-				type="button"
-				onclick={cancelCreate}
-				class="text-ink-faint hover:text-ink-muted"
-				aria-label="Cancel"
-			>
-				×
-			</button>
-		</div>
-	{:else}
-		<!-- Input de búsqueda -->
-		<div class="relative">
-			<input
-				bind:this={inputEl}
-				bind:value={inputValue}
-				type="text"
-				placeholder="Search or create tag..."
-				autocomplete="off"
-				onfocus={() => (open = true)}
-				oninput={() => (open = true)}
-				class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
-			/>
+	<!-- Input de búsqueda -->
+	<div class="relative">
+		<input
+			bind:this={inputEl}
+			bind:value={inputValue}
+			type="text"
+			placeholder="Search or create tag..."
+			autocomplete="off"
+			onfocus={() => (open = true)}
+			oninput={() => (open = true)}
+			onkeydown={handleInputKeydown}
+			class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
+		/>
 
-			{#if open && (filtered.length > 0 || showCreate)}
-				<ul
-					class="absolute right-0 left-0 z-10 overflow-y-auto border border-paper-border bg-paper shadow-sm {placement.direction ===
-					'up'
-						? 'bottom-full mb-0.5'
-						: 'top-full mt-0.5'}"
-					style="max-height: {placement.maxHeight}px"
-					role="listbox"
-				>
-					{#each filtered as tag (tag.id)}
-						<li role="option" aria-selected="false">
-							<button
-								type="button"
-								onclick={() => selectTag(tag)}
-								class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-paper-ui"
-							>
-								{#if tag.color}
-									<span
-										class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
-										style="background-color: {tag.color}"
-									></span>
-								{/if}
-								{tag.name}
-							</button>
-						</li>
-					{/each}
+		{#if open && (filtered.length > 0 || showCreate)}
+			<ul
+				class="absolute right-0 left-0 z-10 overflow-y-auto border border-paper-border bg-paper shadow-sm {placement.direction ===
+				'up'
+					? 'bottom-full mb-0.5'
+					: 'top-full mt-0.5'}"
+				style="max-height: {placement.maxHeight}px"
+				role="listbox"
+			>
+				{#each filtered as tag (tag.id)}
+					<li role="option" aria-selected="false">
+						<button
+							type="button"
+							onclick={() => selectTag(tag)}
+							class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-paper-ui"
+						>
+							{#if tag.color}
+								<span
+									class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
+									style="background-color: {tag.color}"
+								></span>
+							{/if}
+							{tag.name}
+						</button>
+					</li>
+				{/each}
 
-					{#if showCreate}
-						<li role="option" aria-selected="false" class="border-t border-paper-border">
-							<button
-								type="button"
-								onclick={startCreate}
-								class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-muted hover:bg-paper-ui"
-							>
-								<span class="text-ink-faint">+</span>
-								Create <strong class="text-ink-muted">«{inputValue.trim()}»</strong>
-							</button>
-						</li>
-					{/if}
-				</ul>
-			{/if}
-		</div>
-	{/if}
+				{#if showCreate}
+					<li role="option" aria-selected="false" class="border-t border-paper-border">
+						<button
+							type="button"
+							onclick={createAndAdd}
+							class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-muted hover:bg-paper-ui"
+						>
+							<span class="text-ink-faint">+</span>
+							Create and add <strong class="text-ink-muted">«{inputValue.trim()}»</strong>
+						</button>
+					</li>
+				{/if}
+			</ul>
+		{/if}
+	</div>
 </div>
