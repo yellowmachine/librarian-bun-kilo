@@ -327,7 +327,7 @@
 				</div>
 			{/if}
 
-			<TagCombobox {availableTags} />
+			<TagCombobox {availableTags} assignedTags={movie.tags} />
 			<p class="text-xs text-ink-faint">
 				Tags shared with a group show this movie to its members, like your books.
 			</p>

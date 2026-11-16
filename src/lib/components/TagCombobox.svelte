@@ -10,15 +10,22 @@
 
 	let {
 		availableTags,
+		assignedTags = [],
 		onTagAdded
 	}: {
 		availableTags: Tag[];
+		// Las ya puestas: no se ofrece crear otra con el mismo nombre.
+		assignedTags?: { name: string }[];
 		onTagAdded?: () => void;
 	} = $props();
 
+	const DEFAULT_COLOR = '#0a0a0a';
+
 	let inputValue = $state('');
 	let open = $state(false);
-	let newTagColor = $state('#0a0a0a');
+	let createForm = $state<HTMLFormElement | null>(null);
+	// Evita crear dos veces la misma etiqueta con un doble clic o Enter repetido.
+	let creating = $state(false);
 	let inputEl = $state<HTMLInputElement | null>(null);
 	let containerEl = $state<HTMLDivElement | null>(null);
 
@@ -39,15 +46,13 @@
 
 	// Coincidencia exacta (para saber si la etiqueta ya existe)
 	let exactMatch = $derived(
-		availableTags.find((t) => t.name.toLowerCase() === inputValue.trim().toLowerCase())
+		[...availableTags, ...assignedTags].find(
+			(t) => t.name.toLowerCase() === inputValue.trim().toLowerCase()
+		)
 	);
 
-	// Mostrar opción "Crear" cuando hay texto y no hay coincidencia exacta
+	// Mostrar opción "Crear y añadir" cuando hay texto y no hay coincidencia exacta
 	let showCreate = $derived(inputValue.trim().length > 0 && !exactMatch);
-
-	// Modo creación: cuando el usuario elige "Crear «nombre»"
-	let creatingNew = $state(false);
-	let pendingName = $state('');
 
 	function openDropdown() {
 		open = true;
@@ -55,7 +60,6 @@
 
 	function closeDropdown() {
 		open = false;
-		creatingNew = false;
 	}
 
 	function handleBlur(e: FocusEvent) {
@@ -72,130 +76,111 @@
 		}
 	}
 
-	function startCreate() {
-		pendingName = inputValue.trim();
-		creatingNew = true;
-		open = false;
+	// Crear y añadir en un solo paso, con el color por defecto (se cambia en /tags).
+	function createAndAdd() {
+		if (!showCreate || creating) return;
+		createForm?.requestSubmit();
 	}
 
-	function cancelCreate() {
-		creatingNew = false;
-		pendingName = '';
-		newTagColor = '#0a0a0a';
-		inputValue = '';
+	// Enter con un nombre nuevo lo crea y añade.
+	function handleInputKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && showCreate) {
+			e.preventDefault();
+			createAndAdd();
+		}
 	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div bind:this={containerEl} class="relative" onfocusout={handleBlur} onkeydown={handleKeydown}>
-	{#if creatingNew}
-		<!-- Formulario de creación con color picker -->
-		<form
-			method="POST"
-			action="?/createTag"
-			use:enhance={() => {
-				return async ({ update }) => {
-					await update();
-					creatingNew = false;
-					pendingName = '';
-					inputValue = '';
-					newTagColor = '#0a0a0a';
-					onTagAdded?.();
-				};
-			}}
-			class="flex items-center gap-2"
+	<!-- Formulario de creación: lo envían la opción «Create and add» y Enter -->
+	<form
+		bind:this={createForm}
+		method="POST"
+		action="?/createTag"
+		class="hidden"
+		use:enhance={() => {
+			creating = true;
+			return async ({ update }) => {
+				await update();
+				creating = false;
+				inputValue = '';
+				open = false;
+				onTagAdded?.();
+			};
+		}}
+	>
+		<input type="hidden" name="name" value={inputValue.trim()} />
+		<input type="hidden" name="color" value={DEFAULT_COLOR} />
+	</form>
+
+	<!-- Input de búsqueda / creación -->
+	<input
+		bind:this={inputEl}
+		bind:value={inputValue}
+		type="text"
+		placeholder="Search or create tag..."
+		autocomplete="off"
+		onfocus={openDropdown}
+		oninput={openDropdown}
+		onkeydown={handleInputKeydown}
+		class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
+	/>
+
+	<!-- Dropdown -->
+	{#if open && (filtered.length > 0 || showCreate)}
+		<ul
+			class="absolute right-0 left-0 z-10 overflow-y-auto border border-paper-border bg-paper shadow-sm {placement.direction ===
+			'up'
+				? 'bottom-full mb-0.5'
+				: 'top-full mt-0.5'}"
+			style="max-height: {placement.maxHeight}px"
+			role="listbox"
 		>
-			<input type="hidden" name="name" value={pendingName} />
-			<span
-				class="flex-1 truncate border border-paper-border px-3 py-1.5 text-sm text-ink-muted"
-				title={pendingName}
-			>
-				{pendingName}
-			</span>
-			<input
-				type="color"
-				name="color"
-				bind:value={newTagColor}
-				title="Elige un color"
-				class="h-8 w-8 cursor-pointer rounded-none border border-paper-border p-0.5"
-			/>
-			<button type="submit" class="border btn-primary px-3 py-1.5 text-xs"> Create </button>
-			<button
-				type="button"
-				onclick={cancelCreate}
-				class="text-ink-faint hover:text-ink-muted"
-				aria-label="Cancel"
-			>
-				×
-			</button>
-		</form>
-	{:else}
-		<!-- Input de búsqueda / creación -->
-		<input
-			bind:this={inputEl}
-			bind:value={inputValue}
-			type="text"
-			placeholder="Search or create tag..."
-			autocomplete="off"
-			onfocus={openDropdown}
-			oninput={openDropdown}
-			class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
-		/>
-
-		<!-- Dropdown -->
-		{#if open && (filtered.length > 0 || showCreate)}
-			<ul
-				class="absolute right-0 left-0 z-10 overflow-y-auto border border-paper-border bg-paper shadow-sm {placement.direction ===
-				'up'
-					? 'bottom-full mb-0.5'
-					: 'top-full mt-0.5'}"
-				style="max-height: {placement.maxHeight}px"
-				role="listbox"
-			>
-				{#each filtered as tag (tag.id)}
-					<li role="option" aria-selected="false">
-						<form
-							method="POST"
-							action="?/addTag"
-							use:enhance={() => {
-								return async ({ update }) => {
-									await update();
-									inputValue = '';
-									open = false;
-									onTagAdded?.();
-								};
-							}}
-						>
-							<input type="hidden" name="tagId" value={tag.id} />
-							<button
-								type="submit"
-								class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-paper-ui"
-							>
-								{#if tag.color}
-									<span
-										class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
-										style="background-color: {tag.color}"
-									></span>
-								{/if}
-								{tag.name}
-							</button>
-						</form>
-					</li>
-				{/each}
-
-				{#if showCreate}
-					<li role="option" aria-selected="false" class="border-t border-paper-border">
+			{#each filtered as tag (tag.id)}
+				<li role="option" aria-selected="false">
+					<form
+						method="POST"
+						action="?/addTag"
+						use:enhance={() => {
+							return async ({ update }) => {
+								await update();
+								inputValue = '';
+								open = false;
+								onTagAdded?.();
+							};
+						}}
+					>
+						<input type="hidden" name="tagId" value={tag.id} />
 						<button
-							type="button"
-							onclick={startCreate}
-							class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-muted hover:bg-paper-ui"
+							type="submit"
+							class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-paper-ui"
 						>
-							<span class="text-ink-faint">+</span>
-							Create <strong class="text-ink-muted">«{inputValue.trim()}»</strong>
+							{#if tag.color}
+								<span
+									class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
+									style="background-color: {tag.color}"
+								></span>
+							{/if}
+							{tag.name}
 						</button>
-					</li>
-				{/if}
-			</ul>
-		{/if}
+					</form>
+				</li>
+			{/each}
+
+			{#if showCreate}
+				<li role="option" aria-selected="false" class="border-t border-paper-border">
+					<button
+						type="button"
+						onclick={createAndAdd}
+						disabled={creating}
+						class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-ink-muted hover:bg-paper-ui"
+					>
+						<span class="text-ink-faint">+</span>
+						Create and add <strong class="text-ink-muted">«{inputValue.trim()}»</strong>
+					</button>
+				</li>
+			{/if}
+		</ul>
 	{/if}
 </div>
