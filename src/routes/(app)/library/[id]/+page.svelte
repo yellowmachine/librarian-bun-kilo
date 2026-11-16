@@ -734,7 +734,7 @@
 			{/if}
 
 			<!-- Combobox: buscar etiqueta existente o crear nueva -->
-			<TagCombobox {availableTags} />
+			<TagCombobox {availableTags} assignedTags={book.tags} />
 		</div>
 	{/if}
 

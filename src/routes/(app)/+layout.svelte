@@ -11,6 +11,7 @@
 		FilmSlate
 	} from 'phosphor-svelte';
 	import Breadcrumb from '$lib/components/Breadcrumb.svelte';
+	import InstallButton from '$lib/components/InstallButton.svelte';
 
 	let { children, data } = $props();
 	const { user, pendingLoans } = data;
@@ -36,16 +37,19 @@
 	<!-- ── Cabecera ──────────────────────────────────────────────────────── -->
 	<header data-top-bar class="sticky top-0 z-30 border-b border-paper-border bg-paper">
 		<div class="mx-auto flex max-w-4xl items-center justify-between gap-4 px-5 py-3">
-			<!-- Logotipo -->
-			<a
-				href="/library"
-				class="flex items-center gap-2 font-serif text-xl font-normal tracking-tight text-ink"
-			>
-				<img src="/icons/icon.svg" alt="" class="h-7 w-7 shrink-0" />
-				<!-- «Librarian», como el short_name del manifest: «The Svelte Librarian» no cabe junto al
-				     menú en el ancho de la página (max-w-4xl). -->
-				<span class="whitespace-nowrap">Librarian</span>
-			</a>
+			<!-- Logotipo + instalar (solo si el navegador lo ofrece y la app no está instalada) -->
+			<div class="flex items-center gap-3">
+				<a
+					href="/library"
+					class="flex items-center gap-2 font-serif text-xl font-normal tracking-tight text-ink"
+				>
+					<img src="/icons/icon.svg" alt="" class="h-7 w-7 shrink-0" />
+					<!-- «Librarian», como el short_name del manifest: «The Svelte Librarian» no cabe junto al
+					     menú en el ancho de la página (max-w-4xl). -->
+					<span class="whitespace-nowrap">Librarian</span>
+				</a>
+				<InstallButton />
+			</div>
 
 			<!-- Nav principal — solo visible en sm+; hasta lg, solo los iconos (no cabe con el texto) -->
 			<nav class="hidden items-center gap-1 sm:flex">
