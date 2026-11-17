@@ -1,38 +1,68 @@
 import type { RequestEvent } from '@sveltejs/kit';
 import { getUserBooks, getContactBooks } from '$lib/server/books';
-import { searchBooksFromOthers, getContacts, getSharedTagsForUser } from '$lib/server/groups';
+import {
+	searchBooksFromOthers,
+	getContacts,
+	getSharedTagsForUser,
+	getUserGroups,
+	getGroupItemCounts,
+	getGroupBooks
+} from '$lib/server/groups';
 import { getUserLibraries } from '$lib/server/libraries';
 
+export type LibraryTab = 'mine' | 'contacts' | 'groups' | 'search';
+const TABS: LibraryTab[] = ['mine', 'contacts', 'groups', 'search'];
+
+// Todo el estado de la página va en la URL (tab, contacto, grupo, búsqueda) para
+// que volver atrás desde la ficha de un libro deje al usuario donde estaba.
 export const load = async ({ locals, url }: RequestEvent) => {
+	const userId = locals.user!.id;
 	const libraryId = url.searchParams.get('libraryId');
+	const tabParam = url.searchParams.get('tab') as LibraryTab | null;
+	const tab: LibraryTab = tabParam && TABS.includes(tabParam) ? tabParam : 'mine';
 
-	const [userBooks, contacts, sharedTagsForOthers, userLibraries] = await Promise.all([
-		getUserBooks(locals.user!.id, libraryId ? { type: 'library', libraryId } : { type: 'all' }),
-		getContacts(locals.user!.id),
-		getSharedTagsForUser(locals.user!.id),
-		getUserLibraries(locals.user!.id)
+	const contactId = tab === 'contacts' ? url.searchParams.get('contact') : null;
+	const groupId = tab === 'groups' ? url.searchParams.get('group') : null;
+	const query = tab === 'search' ? (url.searchParams.get('q')?.trim() ?? '') : '';
+	const searchTagIds = tab === 'search' ? url.searchParams.getAll('tag') : [];
+	const searched = query !== '' || searchTagIds.length > 0;
+
+	const [userBooks, contacts, groups, sharedTagsForOthers, userLibraries] = await Promise.all([
+		getUserBooks(userId, libraryId ? { type: 'library', libraryId } : { type: 'all' }),
+		getContacts(userId),
+		getUserGroups(userId),
+		tab === 'search' ? getSharedTagsForUser(userId) : Promise.resolve([]),
+		getUserLibraries(userId)
 	]);
-	return { userBooks, contacts, sharedTagsForOthers, userLibraries, libraryId };
-};
 
-export const actions = {
-	searchOthers: async ({ locals, request }: RequestEvent) => {
-		const data = await request.formData();
-		const query = (data.get('query') as string)?.trim() ?? '';
-		const tagIds = data.getAll('tagIds') as string[];
-		const results = await searchBooksFromOthers(
-			locals.user!.id,
-			query,
-			tagIds.length ? tagIds : undefined
-		);
-		return { othersResults: results, othersQuery: query, othersTagIds: tagIds };
-	},
+	const selectedContact = contactId ? (contacts.find((c) => c.userId === contactId) ?? null) : null;
+	const selectedGroup = groupId ? (groups.find((g) => g.id === groupId) ?? null) : null;
 
-	contactBooks: async ({ locals, request }: RequestEvent) => {
-		const data = await request.formData();
-		const contactId = (data.get('contactId') as string)?.trim() ?? '';
-		if (!contactId) return { contactBooks: [], contactId: '' };
-		const results = await getContactBooks(locals.user!.id, contactId);
-		return { contactBooks: results, contactId };
-	}
+	const [contactBooks, groupBooks, searchResults] = await Promise.all([
+		selectedContact ? getContactBooks(userId, selectedContact.userId) : null,
+		selectedGroup ? getGroupBooks(userId, selectedGroup.id) : null,
+		searched ? searchBooksFromOthers(userId, query, searchTagIds) : null
+	]);
+
+	return {
+		tab,
+		userBooks,
+		contacts,
+		groups: groups.sort((a, b) => a.name.localeCompare(b.name)),
+		// Para la lista de grupos: cuánto comparten los demás en cada uno
+		groupItemCounts:
+			tab === 'groups' && !selectedGroup
+				? Object.fromEntries(
+						Object.entries(await getGroupItemCounts(userId)).map(([id, c]) => [id, c.books])
+					)
+				: {},
+		sharedTagsForOthers,
+		userLibraries,
+		libraryId,
+		selectedContact,
+		contactBooks,
+		selectedGroup: selectedGroup && { id: selectedGroup.id, name: selectedGroup.name },
+		groupBooks,
+		search: { query, tagIds: searchTagIds, results: searchResults }
+	};
 };

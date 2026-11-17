@@ -307,7 +307,7 @@
 			bind:value={edition}
 			maxlength="200"
 			placeholder="Steelbook, collector's edition, director's cut..."
-			class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+			class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 		/>
 	</div>
 
@@ -321,7 +321,7 @@
 			rows="2"
 			maxlength="1000"
 			placeholder="Condition, extras, region..."
-			class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+			class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 		></textarea>
 	</div>
 
@@ -336,7 +336,7 @@
 			<select
 				id="library"
 				bind:value={libraryId}
-				class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+				class="mt-1.5 w-full border border-field bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			>
 				{#each userLibraries as lib (lib.id)}
 					<option value={lib.id}>{lib.name}</option>
@@ -510,7 +510,7 @@
 				bind:value={query}
 				placeholder="Title, optionally with the year: Alien 1979"
 				autofocus
-				class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+				class="min-w-0 flex-1 border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			/>
 			<button type="submit" disabled={searching} class="border btn-primary px-4 py-2 text-sm">
 				Search
@@ -587,7 +587,7 @@
 					required
 					maxlength="500"
 					autofocus
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -603,7 +603,7 @@
 					type="text"
 					bind:value={manualOriginalTitle}
 					maxlength="500"
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -620,7 +620,7 @@
 						type="text"
 						bind:value={manualDirectors}
 						placeholder="Separate several with commas"
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 				<div>
@@ -637,7 +637,7 @@
 						min="1800"
 						max="2999"
 						bind:value={manualYear}
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 			</div>
@@ -654,7 +654,7 @@
 					bind:value={manualOverview}
 					rows="3"
 					maxlength="5000"
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -671,7 +671,7 @@
 					bind:value={manualCoverUrl}
 					pattern="https://.*"
 					placeholder="https://..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 

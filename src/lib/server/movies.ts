@@ -13,7 +13,9 @@ import {
 	tags,
 	userMovieTags,
 	user,
-	loans
+	loans,
+	sharedTags,
+	groupMembers
 } from './db/schema';
 import { withRLS } from './db/rls';
 import { getOrCreateDefaultLibrary } from './libraries';
@@ -296,15 +298,50 @@ function withoutPrivate<T extends UserMovieWithDetails>(movie: T): T {
 
 async function visibleMovies(
 	userId: string,
-	opts: { excludeOwn: boolean; order: 'title' | 'recent'; limit: number }
+	opts: {
+		excludeOwn: boolean;
+		order: 'title' | 'recent';
+		limit: number;
+		/** Solo las de este dueño */
+		ownerId?: string;
+		/** Solo las compartidas en este grupo, y solo con las etiquetas compartidas en él */
+		groupId?: string;
+	}
 ): Promise<OthersMovie[]> {
 	return withRLS(userId, async (tx) => {
+		const conditions = [];
+		if (opts.excludeOwn) conditions.push(ne(userMovies.userId, userId));
+		if (opts.ownerId) conditions.push(eq(userMovies.userId, opts.ownerId));
+
+		let groupTagIds: Set<string> | null = null;
+		if (opts.groupId) {
+			const tagRows = await tx
+				.select({ tagId: sharedTags.tagId })
+				.from(sharedTags)
+				.innerJoin(
+					groupMembers,
+					and(eq(groupMembers.groupId, sharedTags.groupId), eq(groupMembers.userId, userId))
+				)
+				.where(eq(sharedTags.groupId, opts.groupId));
+			groupTagIds = new Set(tagRows.map((r) => r.tagId));
+			if (groupTagIds.size === 0) return [];
+			conditions.push(
+				inArray(
+					userMovies.id,
+					tx
+						.select({ id: userMovieTags.userMovieId })
+						.from(userMovieTags)
+						.where(inArray(userMovieTags.tagId, [...groupTagIds]))
+				)
+			);
+		}
+
 		const rows = await tx
 			.select({ ...movieColumns, ownerName: user.name })
 			.from(userMovies)
 			.leftJoin(movies, eq(userMovies.movieId, movies.id))
 			.innerJoin(user, eq(userMovies.userId, user.id))
-			.where(opts.excludeOwn ? ne(userMovies.userId, userId) : undefined)
+			.where(conditions.length > 0 ? and(...conditions) : undefined)
 			.orderBy(
 				opts.order === 'recent'
 					? desc(userMovies.addedAt)
@@ -317,7 +354,11 @@ async function visibleMovies(
 			rows.map((r) => r.userMovieId)
 		);
 		return rows.map((row) => {
-			const movie = { ...withArrays(row), tags: tagsByMovie.get(row.userMovieId) ?? [] };
+			const rowTags = tagsByMovie.get(row.userMovieId) ?? [];
+			const movie = {
+				...withArrays(row),
+				tags: groupTagIds ? rowTags.filter((t) => groupTagIds.has(t.id)) : rowTags
+			};
 			return row.ownerId === userId ? movie : withoutPrivate(movie);
 		});
 	});
@@ -326,6 +367,24 @@ async function visibleMovies(
 /** Películas de otros visibles por grupo, por título. */
 export function getMoviesFromOthers(userId: string, limit = 500): Promise<OthersMovie[]> {
 	return visibleMovies(userId, { excludeOwn: true, order: 'title', limit });
+}
+
+/** Las películas de un contacto que el usuario puede ver, por título. */
+export function getContactMovies(userId: string, contactId: string): Promise<OthersMovie[]> {
+	return visibleMovies(userId, {
+		excludeOwn: true,
+		order: 'title',
+		limit: 1000,
+		ownerId: contactId
+	});
+}
+
+/**
+ * Las que otros miembros comparten en un grupo concreto (con una etiqueta
+ * compartida en ese grupo, no en otro). Vacío si el usuario no es miembro.
+ */
+export function getGroupMovies(userId: string, groupId: string): Promise<OthersMovie[]> {
+	return visibleMovies(userId, { excludeOwn: true, order: 'title', limit: 1000, groupId });
 }
 
 /** Últimas películas añadidas que el usuario puede ver (como getGroupRecentBooks). */

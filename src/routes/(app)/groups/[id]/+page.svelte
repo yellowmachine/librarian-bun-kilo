@@ -3,9 +3,11 @@
 	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
 	import InviteQR from '$lib/components/InviteQR.svelte';
+	import { itemCountLabel } from '$lib/itemCounts';
+	import { tagChipStyle } from '$lib/tagColor';
 
 	let { data, form } = $props();
-	let { group, members, sharedTagsList, myTags } = $derived(data);
+	let { group, members, sharedTagsList, myTags, sharedTotals } = $derived(data);
 
 	const isOwnerOrAdmin = $derived(group.role === 'owner' || group.role === 'admin');
 	const isOwner = $derived(group.role === 'owner');
@@ -28,6 +30,14 @@
 
 	// Confirmación de salir del grupo
 	let confirmLeave = $state(false);
+
+	// Borrar el grupo (solo owner). Con más miembros, hay que escribir el nombre.
+	let confirmDelete = $state(false);
+	let deleteName = $state('');
+	let deleting = $state(false);
+	const otherMembers = $derived(members.length - 1);
+	const deleteReady = $derived(otherMembers === 0 || deleteName.trim() === group.name);
+	const sharedLabel = $derived(itemCountLabel(sharedTotals.books, sharedTotals.movies));
 </script>
 
 <div class="mx-auto max-w-2xl space-y-8">
@@ -125,6 +135,9 @@
 			{#if myTags.length > 0}
 				<div class="space-y-3">
 					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">My tags</p>
+					<p class="text-xs text-ink-faint">
+						Sharing a tag shows the group every book and movie that carries it.
+					</p>
 					<div class="flex flex-wrap gap-2">
 						{#each myTags as tag (tag.id)}
 							<form
@@ -142,9 +155,13 @@
 										: 'border-dashed border-paper-border text-ink-muted hover:border-ink hover:text-ink'}"
 								>
 									{tag.name}
-									{#if tag.alreadyShared}<span class="opacity-60">✓</span>{:else}<span
-											class="opacity-40">+</span
-										>{/if}
+									{#if tag.bookCount + tag.movieCount > 0}
+										<span class="opacity-60 hc:opacity-100"
+											>· {itemCountLabel(tag.bookCount, tag.movieCount)}</span
+										>
+									{/if}
+									{#if tag.alreadyShared}<span class="opacity-60 hc:opacity-100">✓</span
+										>{:else}<span class="opacity-40 hc:opacity-100">+</span>{/if}
 								</button>
 							</form>
 						{/each}
@@ -157,25 +174,16 @@
 				<p class="py-8 text-center text-sm text-ink-faint">No members have shared any tags yet.</p>
 			{:else}
 				<div class="space-y-3">
-					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">En el grupo</p>
+					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">In the group</p>
 					<ul class="divide-y divide-paper-border">
 						{#each sharedTagsList as st (st.sharedTagId)}
 							<li class="flex items-center gap-3 py-3">
-								<span
-									class="border px-3 py-0.5 text-xs"
-									style={st.tagColor
-										? `border-color: ${st.tagColor}44; color: ${st.tagColor}`
-										: 'border-color: var(--color-paper-border); color: #3d3d3d'}
-								>
+								<span class="border tag-chip px-3 py-0.5 text-xs" style={tagChipStyle(st.tagColor)}>
 									{st.tagName}
 								</span>
 								<span class="text-sm text-ink-muted">{st.ownerName}</span>
 								<span class="ml-auto text-xs text-ink-faint">
-									{st.bookCount}
-									{st.bookCount === 1 ? 'book' : 'books'}
-									{#if st.movieCount > 0}
-										· {st.movieCount} {st.movieCount === 1 ? 'movie' : 'movies'}
-									{/if}
+									{itemCountLabel(st.bookCount, st.movieCount) || 'Nothing yet'}
 								</span>
 							</li>
 						{/each}
@@ -224,7 +232,102 @@
 			</button>
 		{/if}
 	{/if}
+
+	<!-- Borrar el grupo (owner): no puede salir, así que es su manera de acabar con él -->
+	{#if isOwner}
+		<div class="flex items-center justify-between gap-4 border-t border-paper-border pt-6">
+			<p class="text-xs text-ink-faint">
+				Deleting the group removes it for everyone. Nobody loses any book, movie or tag.
+			</p>
+			<button
+				type="button"
+				class="shrink-0 border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50"
+				onclick={() => {
+					deleteName = '';
+					confirmDelete = true;
+				}}
+			>
+				Delete group
+			</button>
+		</div>
+	{/if}
 </div>
+
+<!-- Modal: confirmar borrado del grupo -->
+{#if confirmDelete}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-ink/20 px-4">
+		<div
+			class="w-full max-w-sm space-y-4 border border-paper-border bg-paper p-6 shadow-sm"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="delete-group-title"
+		>
+			<p id="delete-group-title" class="text-sm font-medium text-ink">
+				Delete «{group.name}»?
+			</p>
+			<ul class="list-disc space-y-1 pl-5 text-sm text-ink-muted">
+				{#if otherMembers > 0}
+					<li>
+						{otherMembers}
+						{otherMembers === 1 ? 'member loses' : 'members lose'} access to the group{sharedLabel
+							? ` and to the ${sharedLabel} shared in it`
+							: ''}.
+					</li>
+				{:else if sharedLabel}
+					<li>The {sharedLabel} you shared here stop being shared with it.</li>
+				{/if}
+				<li>The invitation code stops working.</li>
+				<li>Books, movies, tags and loans stay with their owners.</li>
+				<li>This cannot be undone.</li>
+			</ul>
+
+			<form
+				method="POST"
+				action="?/deleteGroup"
+				class="space-y-4"
+				use:enhance={() => {
+					deleting = true;
+					return async ({ update }) => {
+						await update();
+						deleting = false;
+						confirmDelete = false;
+					};
+				}}
+			>
+				{#if otherMembers > 0}
+					<div>
+						<label for="confirmName" class="block text-xs text-ink-muted">
+							Type <span class="font-medium text-ink">{group.name}</span> to confirm
+						</label>
+						<input
+							id="confirmName"
+							name="confirmName"
+							bind:value={deleteName}
+							autocomplete="off"
+							class="mt-1.5 w-full border border-field bg-paper px-3 py-2 text-sm text-ink focus:border-brown-600 focus:ring-0"
+						/>
+					</div>
+				{/if}
+				<div class="flex justify-end gap-3">
+					<button
+						type="button"
+						class="border btn-secondary px-4 py-2 text-sm"
+						onclick={() => (confirmDelete = false)}
+					>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						disabled={!deleteReady || deleting}
+						class="border border-red-600 bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						{deleting ? 'Deleting…' : 'Delete group'}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
 
 <!-- Modal: confirmar expulsión de miembro -->
 {#if pendingRemove}

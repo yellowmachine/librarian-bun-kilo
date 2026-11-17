@@ -672,10 +672,12 @@ export const groups = pgTable(
 			to: appUser,
 			using: isGroupAdmin(table.id, currentUserId)
 		}),
+		// Borrar el grupo, solo su owner: quien lo creó y sigue dentro como owner o admin (el rol
+		// no se puede cambiar, así que es el owner). Los admins no: es irreversible para todos.
 		pgPolicy('groups_delete', {
 			for: 'delete',
 			to: appUser,
-			using: isGroupAdmin(table.id, currentUserId)
+			using: sql`${table.createdBy} = ${currentUserId} and ${isGroupAdmin(table.id, currentUserId)}`
 		})
 	]
 );

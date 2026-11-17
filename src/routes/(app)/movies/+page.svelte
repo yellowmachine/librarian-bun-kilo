@@ -1,10 +1,16 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { navigating } from '$app/state';
 	import { MagnifyingGlass, Plus } from 'phosphor-svelte';
 	import BookGrid from '$lib/components/BookGrid.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 	import TmdbAttribution from '$lib/components/TmdbAttribution.svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { readableTagTextColor } from '$lib/tagColor';
+	import TagChips from '$lib/components/TagChips.svelte';
+	import ContactList from '$lib/components/ContactList.svelte';
+	import GroupList from '$lib/components/GroupList.svelte';
+	import type { MoviesTab } from './+page.server';
 	import type { UserMovieWithDetails } from '$lib/server/movies';
 	import {
 		MEDIA_FORMATS,
@@ -14,29 +20,45 @@
 	} from '$lib/mediaFormat';
 
 	let { data } = $props();
-	const { userMovies, othersMovies, userLibraries, libraryId } = $derived(data);
+	const {
+		tab,
+		userMovies,
+		othersMovies,
+		contacts,
+		groups,
+		groupItemCounts,
+		userLibraries,
+		libraryId,
+		selectedContact,
+		selectedGroup
+	} = $derived(data);
 
-	// svelte-ignore state_referenced_locally
-	let activeTab = $state<'mine' | 'others'>(data.tab);
-	let ownerFilter = $state('');
-
-	// La pestaña elegida decide la lista; los filtros son los mismos para las dos.
+	// La tab decide la lista; los filtros son los mismos para todas.
 	type Row = UserMovieWithDetails & { ownerName?: string };
-	const source: Row[] = $derived(activeTab === 'mine' ? userMovies : othersMovies);
+	const source: Row[] = $derived(tab === 'mine' ? userMovies : othersMovies);
+	// En la tab de un contacto todas son suyas: no hace falta poner el dueño
+	const showOwner = $derived(tab === 'groups' || tab === 'search');
 
-	const owners = $derived(
-		othersMovies
-			.map((m) => ({ id: m.ownerId, name: m.ownerName }))
-			.filter((o, i, all) => all.findIndex((x) => x.id === o.id) === i)
-			.sort((a, b) => a.name.localeCompare(b.name))
-	);
-
-	function switchTab(tab: 'mine' | 'others') {
-		activeTab = tab;
-		activeTagIds.clear();
-		activeFormat = null;
-		ownerFilter = '';
+	function tabHref(id: MoviesTab) {
+		if (id === 'mine') return libraryId ? `/movies?libraryId=${libraryId}` : '/movies';
+		return `/movies?tab=${id}`;
 	}
+
+	// Al cambiar de tab, contacto o grupo se limpian los filtros
+	const filterKey = $derived(`${tab}:${selectedContact?.userId ?? ''}:${selectedGroup?.id ?? ''}`);
+	$effect(() => {
+		void filterKey;
+		untrack(() => {
+			search = '';
+			activeTagIds.clear();
+			activeFormat = null;
+		});
+	});
+
+	const loadingSelection = $derived(
+		navigating.to?.url.pathname === '/movies' &&
+			(navigating.to.url.searchParams.has('contact') || navigating.to.url.searchParams.has('group'))
+	);
 
 	const heading = $derived(
 		libraryId ? (userLibraries.find((lib) => lib.id === libraryId)?.name ?? 'Movies') : 'Movies'
@@ -71,7 +93,6 @@
 
 	const filtered = $derived.by(() => {
 		let list = source;
-		if (activeTab === 'others' && ownerFilter) list = list.filter((m) => m.ownerId === ownerFilter);
 		if (activeFormat) list = list.filter((m) => m.format === activeFormat);
 		if (activeTagIds.size > 0)
 			list = list.filter((m) => m.tags.some((t) => activeTagIds.has(t.id)));
@@ -93,7 +114,7 @@
 	<div class="flex items-end justify-between gap-4">
 		<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{heading}</h1>
 		<div class="flex shrink-0 items-center gap-2">
-			{#if activeTab === 'mine' && userLibraries.length > 1}
+			{#if tab === 'mine' && userLibraries.length > 1}
 				<select
 					aria-label="Library"
 					value={libraryId ?? ''}
@@ -119,145 +140,138 @@
 		</div>
 	</div>
 
-	<div class="flex border-b border-paper-border">
-		{#each [{ key: 'mine', label: 'My movies', count: userMovies.length }, { key: 'others', label: 'From others', count: othersMovies.length }] as tab (tab.key)}
-			<button
-				onclick={() => switchTab(tab.key as 'mine' | 'others')}
-				class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
-				{activeTab === tab.key
-					? 'border-brown-700 font-medium text-ink'
-					: 'border-transparent text-ink-faint hover:text-ink-muted'}"
-			>
-				{tab.label}
-				<span class="text-xs {activeTab === tab.key ? 'text-ink-muted' : 'text-ink-faint'}">
-					{tab.count}
-				</span>
-			</button>
-		{/each}
-	</div>
-
-	{#if source.length > 0}
-		<div class="space-y-3">
-			{#if activeTab === 'others' && owners.length > 1}
-				<select
-					aria-label="Owner"
-					bind:value={ownerFilter}
-					class="border border-paper-border bg-paper px-3 py-1.5 text-sm text-ink-muted focus:border-brown-600 focus:ring-0"
-				>
-					<option value="">Everyone</option>
-					{#each owners as owner (owner.id)}
-						<option value={owner.id}>{owner.name}</option>
-					{/each}
-				</select>
+	{#snippet tabLink(id: MoviesTab, label: string, count?: number)}
+		<a
+			href={tabHref(id)}
+			class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm whitespace-nowrap transition-colors
+			{tab === id
+				? 'border-brown-700 font-medium text-ink'
+				: 'border-transparent text-ink-faint hover:text-ink-muted'}"
+		>
+			{label}
+			{#if count !== undefined}
+				<span class="text-xs {tab === id ? 'text-ink-muted' : 'text-ink-faint'}">{count}</span>
 			{/if}
+		</a>
+	{/snippet}
+	<nav class="flex overflow-x-auto border-b border-paper-border">
+		{@render tabLink('mine', 'My movies', userMovies.length)}
+		{@render tabLink('contacts', 'Contacts', contacts.length)}
+		{@render tabLink('groups', 'Groups', groups.length)}
+		{@render tabLink('search', 'Search')}
+	</nav>
 
-			{#if tagsInUse.length > 0}
-				<div class="flex flex-wrap gap-1.5">
-					{#each tagsInUse as tag (tag.id)}
-						{@const active = activeTagIds.has(tag.id)}
-						<button
-							onclick={() => toggleTag(tag.id)}
-							aria-pressed={active}
-							class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
-							style={active
-								? tag.color
-									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-									: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
-								: tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
-						>
-							{tag.name}
-						</button>
-					{/each}
-					{#if activeTagIds.size > 0}
-						<button
-							onclick={() => activeTagIds.clear()}
-							class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
-						>
-							Clear
-						</button>
-					{/if}
-				</div>
-			{/if}
+	{#if tab === 'contacts' && !selectedContact}
+		<ContactList {contacts} hrefFor={(id) => `/movies?tab=contacts&contact=${id}`} />
+	{:else if tab === 'groups' && !selectedGroup}
+		<GroupList
+			{groups}
+			hrefFor={(id) => `/movies?tab=groups&group=${id}`}
+			itemCounts={groupItemCounts}
+			kind="movie"
+		/>
+	{:else}
+		{#if selectedContact || selectedGroup}
+			<h2 class="font-serif text-xl font-normal text-ink">
+				{selectedContact?.name ?? selectedGroup?.name}
+			</h2>
+		{/if}
 
-			{#if formatsInUse.length > 1}
-				<div class="flex flex-wrap gap-1.5">
-					<button
-						onclick={() => (activeFormat = null)}
-						class="rounded-full border px-2.5 py-0.5 text-xs transition-colors
-						{activeFormat === null
-							? 'border-brown-700 bg-brown-700 text-brown-50'
-							: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
-					>
-						All
-					</button>
-					{#each formatsInUse as f (f)}
+		{#if loadingSelection}
+			<div class="flex justify-center py-12">
+				<Spinner size="md" />
+			</div>
+		{:else if source.length > 0}
+			<div class="space-y-3">
+				<TagChips
+					tags={tagsInUse}
+					activeIds={activeTagIds}
+					onToggle={toggleTag}
+					onClear={() => activeTagIds.clear()}
+				/>
+
+				{#if formatsInUse.length > 1}
+					<div class="flex flex-wrap gap-1.5">
 						<button
-							onclick={() => (activeFormat = activeFormat === f ? null : f)}
+							onclick={() => (activeFormat = null)}
 							class="rounded-full border px-2.5 py-0.5 text-xs transition-colors
-							{activeFormat === f
+						{activeFormat === null
 								? 'border-brown-700 bg-brown-700 text-brown-50'
 								: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
 						>
-							{MEDIA_FORMAT_LABELS[f]}
+							All
 						</button>
-					{/each}
+						{#each formatsInUse as f (f)}
+							<button
+								onclick={() => (activeFormat = activeFormat === f ? null : f)}
+								class="rounded-full border px-2.5 py-0.5 text-xs transition-colors
+							{activeFormat === f
+									? 'border-brown-700 bg-brown-700 text-brown-50'
+									: 'border-paper-border text-ink-muted hover:border-ink-faint'}"
+							>
+								{MEDIA_FORMAT_LABELS[f]}
+							</button>
+						{/each}
+					</div>
+				{/if}
+
+				<div class="relative">
+					<MagnifyingGlass
+						size={16}
+						class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
+					/>
+					<input
+						type="search"
+						bind:value={search}
+						placeholder={showOwner
+							? 'Search by title, director or owner...'
+							: 'Search by title or director...'}
+						class="w-full border border-field bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
+					/>
 				</div>
-			{/if}
-
-			<div class="relative">
-				<MagnifyingGlass
-					size={16}
-					class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
-				/>
-				<input
-					type="search"
-					bind:value={search}
-					placeholder={activeTab === 'mine'
-						? 'Search by title or director...'
-						: 'Search by title, director or owner...'}
-					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
-				/>
 			</div>
-		</div>
 
-		{#if filtered.length === 0}
-			<p class="py-12 text-center text-sm text-ink-faint">No results.</p>
+			{#if filtered.length === 0}
+				<p class="py-12 text-center text-sm text-ink-faint">No results.</p>
+			{:else}
+				<BookGrid
+					books={filtered.map((m) => ({
+						id: m.userMovieId,
+						title: m.title,
+						authors: m.directors,
+						coverUrl: m.coverUrl,
+						publishYear: m.releaseYear,
+						isAvailable: m.isAvailable,
+						copyLabel:
+							showOwner && m.ownerName !== undefined
+								? `${formatLine(m.format, m.edition)} · ${m.ownerName}`
+								: formatLine(m.format, m.edition),
+						href: `/movies/${m.userMovieId}`
+					}))}
+				/>
+			{/if}
+		{:else if tab === 'contacts'}
+			<p class="text-sm text-ink-faint">No shared movies from this contact.</p>
+		{:else if tab === 'groups'}
+			<p class="text-sm text-ink-faint">No one has shared movies in this group yet.</p>
+		{:else if tab === 'search'}
+			<div class="flex flex-col items-center justify-center py-24 text-center">
+				<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
+				<p class="max-w-sm text-sm text-ink-faint">
+					Nobody has shared movies with you yet. They show up here when someone in one of your
+					groups shares a tag their movies carry.
+				</p>
+				<a href="/groups" class="mt-4 text-sm link-action">Your groups</a>
+			</div>
 		{:else}
-			<BookGrid
-				books={filtered.map((m) => ({
-					id: m.userMovieId,
-					title: m.title,
-					authors: m.directors,
-					coverUrl: m.coverUrl,
-					publishYear: m.releaseYear,
-					isAvailable: m.isAvailable,
-					copyLabel:
-						m.ownerName !== undefined
-							? `${formatLine(m.format, m.edition)} · ${m.ownerName}`
-							: formatLine(m.format, m.edition),
-					href: `/movies/${m.userMovieId}`
-				}))}
-			/>
+			<div class="flex flex-col items-center justify-center py-24 text-center">
+				<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
+				<p class="text-sm text-ink-faint">
+					{libraryId ? 'No movies in this library yet.' : 'Your video library is empty.'}
+				</p>
+				<a href="/movies/add" class="mt-4 text-sm link-action"> Add your first movie </a>
+			</div>
 		{/if}
-	{:else if activeTab === 'others'}
-		<div class="flex flex-col items-center justify-center py-24 text-center">
-			<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
-			<p class="max-w-sm text-sm text-ink-faint">
-				Nobody has shared movies with you yet. They show up here when someone in one of your groups
-				shares a tag their movies carry.
-			</p>
-			<a href="/groups" class="mt-4 text-sm link-action">Your groups</a>
-		</div>
-	{:else}
-		<div class="flex flex-col items-center justify-center py-24 text-center">
-			<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
-			<p class="text-sm text-ink-faint">
-				{libraryId ? 'No movies in this library yet.' : 'Your video library is empty.'}
-			</p>
-			<a href="/movies/add" class="mt-4 text-sm link-action"> Add your first movie </a>
-		</div>
 	{/if}
 
 	<TmdbAttribution />

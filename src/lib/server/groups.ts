@@ -1,7 +1,7 @@
 import { nanoid, customAlphabet } from 'nanoid';
 
 const nanoidCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
-import { eq, and, inArray, sql, desc } from 'drizzle-orm';
+import { eq, and, ne, inArray, sql, desc } from 'drizzle-orm';
 import { db } from './db/index';
 import {
 	groups,
@@ -12,6 +12,7 @@ import {
 	userBooks,
 	books,
 	userBookTags,
+	userMovies,
 	userMovieTags
 } from './db/schema';
 import { user } from './db/auth.schema';
@@ -268,6 +269,20 @@ export async function removeMember(
 	);
 }
 
+// ─── Borrar un grupo ─────────────────────────────────────────────────────────
+
+/**
+ * Solo el owner (la RLS lo impone). Se van en cascada los miembros, el código
+ * de invitación y las etiquetas compartidas en él; los libros, las películas,
+ * las etiquetas y los préstamos de cada uno no se tocan. Devuelve si se borró.
+ */
+export async function deleteGroup(userId: string, groupId: string): Promise<boolean> {
+	const deleted = await withRLS(userId, (tx) =>
+		tx.delete(groups).where(eq(groups.id, groupId)).returning({ id: groups.id })
+	);
+	return deleted.length > 0;
+}
+
 // ─── Regenerar código de invitación ──────────────────────────────────────────
 
 export async function regenerateInviteCode(userId: string, groupId: string): Promise<string> {
@@ -351,11 +366,13 @@ export async function getSharedTagsInGroup(
 			movieCountMap.set(mt.tagId, (movieCountMap.get(mt.tagId) ?? 0) + 1);
 		}
 
-		return rows.map((row) => ({
-			...row,
-			bookCount: bookCountMap.get(row.tagId) ?? 0,
-			movieCount: movieCountMap.get(row.tagId) ?? 0
-		}));
+		return rows
+			.map((row) => ({
+				...row,
+				bookCount: bookCountMap.get(row.tagId) ?? 0,
+				movieCount: movieCountMap.get(row.tagId) ?? 0
+			}))
+			.sort((a, b) => a.tagName.localeCompare(b.tagName) || a.ownerName.localeCompare(b.ownerName));
 	});
 }
 
@@ -364,10 +381,26 @@ export async function getSharedTagsInGroup(
 export async function getUserTagsForGroup(
 	userId: string,
 	groupId: string
-): Promise<{ id: string; name: string; color: string | null; alreadyShared: boolean }[]> {
+): Promise<
+	{
+		id: string;
+		name: string;
+		color: string | null;
+		alreadyShared: boolean;
+		bookCount: number;
+		movieCount: number;
+	}[]
+> {
 	return withRLS(userId, async (tx) => {
+		// Cuántos libros y películas lleva cada etiqueta: compartirla los enseña todos
 		const userTagRows = await tx
-			.select({ id: tags.id, name: tags.name, color: tags.color })
+			.select({
+				id: tags.id,
+				name: tags.name,
+				color: tags.color,
+				bookCount: sql<number>`(select count(*) from user_book_tags ubt where ubt.tag_id = ${tags.id})::int`,
+				movieCount: sql<number>`(select count(*) from user_movie_tags umt where umt.tag_id = ${tags.id})::int`
+			})
 			.from(tags)
 			.where(eq(tags.userId, userId));
 
@@ -378,10 +411,88 @@ export async function getUserTagsForGroup(
 
 		const sharedSet = new Set(sharedRows.map((r) => r.tagId));
 
-		return userTagRows.map((t) => ({
-			...t,
-			alreadyShared: sharedSet.has(t.id)
-		}));
+		// Alfabético en JS, como el resto de la app: el orden de Postgres depende de la collation
+		// (con "C", las mayúsculas y los acentos van aparte)
+		return userTagRows
+			.map((t) => ({ ...t, alreadyShared: sharedSet.has(t.id) }))
+			.sort((a, b) => a.name.localeCompare(b.name));
+	});
+}
+
+// ─── Con qué grupos se comparten unas etiquetas propias ──────────────────────
+
+export type TagGroupShare = { tagId: string; groupId: string; groupName: string };
+
+/** Para la ficha de un libro o película: qué grupos lo ven y por qué etiqueta. */
+export async function getTagGroupShares(
+	userId: string,
+	tagIds: string[]
+): Promise<TagGroupShare[]> {
+	if (tagIds.length === 0) return [];
+	return withRLS(userId, (tx) =>
+		tx
+			.select({ tagId: sharedTags.tagId, groupId: groups.id, groupName: groups.name })
+			.from(sharedTags)
+			.innerJoin(groups, eq(sharedTags.groupId, groups.id))
+			.where(and(inArray(sharedTags.tagId, tagIds), eq(sharedTags.sharedBy, userId)))
+			.orderBy(groups.name)
+	);
+}
+
+// ─── Cuánto comparten los demás en cada grupo ────────────────────────────────
+
+/**
+ * Por grupo del usuario, cuántos libros y películas de otros miembros puede ver
+ * en él (los que llevan una etiqueta compartida en ese grupo). Con `includeOwn`,
+ * también los suyos: todo lo que se comparte en el grupo.
+ */
+export async function getGroupItemCounts(
+	userId: string,
+	opts: { includeOwn?: boolean } = {}
+): Promise<Record<string, { books: number; movies: number }>> {
+	return withRLS(userId, async (tx) => {
+		const myGroups = tx
+			.select({ groupId: groupMembers.groupId })
+			.from(groupMembers)
+			.where(eq(groupMembers.userId, userId));
+
+		// Una tras otra: comparten la transacción de RLS
+		const bookRows = await tx
+			.select({
+				groupId: sharedTags.groupId,
+				count: sql<number>`count(distinct ${userBooks.id})::int`
+			})
+			.from(sharedTags)
+			.innerJoin(userBookTags, eq(userBookTags.tagId, sharedTags.tagId))
+			.innerJoin(userBooks, eq(userBooks.id, userBookTags.userBookId))
+			.where(
+				and(
+					inArray(sharedTags.groupId, myGroups),
+					opts.includeOwn ? undefined : ne(userBooks.userId, userId)
+				)
+			)
+			.groupBy(sharedTags.groupId);
+		const movieRows = await tx
+			.select({
+				groupId: sharedTags.groupId,
+				count: sql<number>`count(distinct ${userMovies.id})::int`
+			})
+			.from(sharedTags)
+			.innerJoin(userMovieTags, eq(userMovieTags.tagId, sharedTags.tagId))
+			.innerJoin(userMovies, eq(userMovies.id, userMovieTags.userMovieId))
+			.where(
+				and(
+					inArray(sharedTags.groupId, myGroups),
+					opts.includeOwn ? undefined : ne(userMovies.userId, userId)
+				)
+			)
+			.groupBy(sharedTags.groupId);
+
+		const counts: Record<string, { books: number; movies: number }> = {};
+		for (const r of bookRows) counts[r.groupId] = { books: r.count, movies: 0 };
+		for (const r of movieRows)
+			counts[r.groupId] = { books: counts[r.groupId]?.books ?? 0, movies: r.count };
+		return counts;
 	});
 }
 
@@ -419,6 +530,76 @@ export async function getSharedTagsForUser(
 	});
 }
 
+type RlsTx = Parameters<Parameters<typeof withRLS>[1]>[0];
+
+/**
+ * Libros ajenos que llevan alguna de las etiquetas `tagIds` (compartidas con
+ * grupos del usuario), con solo esas etiquetas visibles. Excluye los propios.
+ */
+async function booksWithSharedTags(
+	tx: RlsTx,
+	userId: string,
+	tagIds: string[]
+): Promise<GroupBookResult[]> {
+	if (tagIds.length === 0) return [];
+
+	const ubTagRows = await tx
+		.select({ userBookId: userBookTags.userBookId })
+		.from(userBookTags)
+		.where(inArray(userBookTags.tagId, tagIds));
+
+	if (ubTagRows.length === 0) return [];
+	const userBookIds = [...new Set(ubTagRows.map((r) => r.userBookId))];
+
+	const detailRows = await tx
+		.select({
+			userBookId: userBooks.id,
+			bookId: userBooks.bookId,
+			title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+			authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
+			coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
+			publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
+			alternateTitle: sql<
+				string | null
+			>`COALESCE(${userBooks.alternateTitle}, ${books.alternateTitle})`,
+			isAvailable: userBooks.isAvailable,
+			ownerId: userBooks.userId,
+			ownerName: user.name
+		})
+		.from(userBooks)
+		.leftJoin(books, eq(userBooks.bookId, books.id))
+		.innerJoin(user, eq(userBooks.userId, user.id))
+		.where(and(inArray(userBooks.id, userBookIds), sql`${userBooks.userId} != ${userId}`))
+		.orderBy(sql`COALESCE(${userBooks.title}, ${books.title}) ASC`);
+
+	if (detailRows.length === 0) return [];
+
+	const filteredIds = detailRows.map((r) => r.userBookId);
+	const bookTagRows = await tx
+		.select({
+			userBookId: userBookTags.userBookId,
+			id: tags.id,
+			name: tags.name,
+			color: tags.color
+		})
+		.from(userBookTags)
+		.innerJoin(tags, eq(userBookTags.tagId, tags.id))
+		.where(and(inArray(userBookTags.userBookId, filteredIds), inArray(userBookTags.tagId, tagIds)));
+
+	const tagsMap = new Map<string, { id: string; name: string; color: string | null }[]>();
+	for (const bt of bookTagRows) {
+		const list = tagsMap.get(bt.userBookId) ?? [];
+		list.push({ id: bt.id, name: bt.name, color: bt.color });
+		tagsMap.set(bt.userBookId, list);
+	}
+
+	return detailRows.map((row) => ({
+		...row,
+		authors: row.authors ?? [],
+		tags: tagsMap.get(row.userBookId) ?? []
+	}));
+}
+
 export async function searchBooksFromOthers(
 	userId: string,
 	query: string,
@@ -451,78 +632,17 @@ export async function searchBooksFromOthers(
 			.from(sharedTags)
 			.where(inArray(sharedTags.groupId, groupIds));
 
-		if (sharedTagRows.length === 0) return [];
 		const tagIds = [...new Set(sharedTagRows.map((r) => r.tagId))];
 
-		// 3. user_book_ids que tienen esos tags (RLS permite verlos via in_group policy)
-		// Si hay filtro de tags, solo usar los seleccionados (que estén en los compartidos)
+		// 3. Si hay filtro de tags, solo los seleccionados (que estén en los compartidos)
 		const effectiveTagIds = hasTagFilter
 			? filterTagIds!.filter((id) => tagIds.includes(id))
 			: tagIds;
-		if (effectiveTagIds.length === 0) return [];
 
-		const ubTagRows = await tx
-			.select({ userBookId: userBookTags.userBookId })
-			.from(userBookTags)
-			.where(inArray(userBookTags.tagId, effectiveTagIds));
-
-		if (ubTagRows.length === 0) return [];
-		const userBookIds = [...new Set(ubTagRows.map((r) => r.userBookId))];
-
-		// 4. Detalle de los libros, excluyendo los propios
-		const detailRows = await tx
-			.select({
-				userBookId: userBooks.id,
-				bookId: userBooks.bookId,
-				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
-				authors: sql<string[]>`COALESCE(${userBooks.authors}, ${books.authors})`,
-				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
-				publishYear: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`,
-				alternateTitle: sql<
-					string | null
-				>`COALESCE(${userBooks.alternateTitle}, ${books.alternateTitle})`,
-				isAvailable: userBooks.isAvailable,
-				ownerId: userBooks.userId,
-				ownerName: user.name
-			})
-			.from(userBooks)
-			.leftJoin(books, eq(userBooks.bookId, books.id))
-			.innerJoin(user, eq(userBooks.userId, user.id))
-			.where(and(inArray(userBooks.id, userBookIds), sql`${userBooks.userId} != ${userId}`));
-
-		if (detailRows.length === 0) return [];
-
-		// 5. Tags visibles por libro (solo los shared)
-		const filteredIds = detailRows.map((r) => r.userBookId);
-		const bookTagRows = await tx
-			.select({
-				userBookId: userBookTags.userBookId,
-				id: tags.id,
-				name: tags.name,
-				color: tags.color
-			})
-			.from(userBookTags)
-			.innerJoin(tags, eq(userBookTags.tagId, tags.id))
-			.where(
-				and(inArray(userBookTags.userBookId, filteredIds), inArray(userBookTags.tagId, tagIds))
-			);
-
-		const tagsMap = new Map<string, { id: string; name: string; color: string | null }[]>();
-		for (const bt of bookTagRows) {
-			const list = tagsMap.get(bt.userBookId) ?? [];
-			list.push({ id: bt.id, name: bt.name, color: bt.color });
-			tagsMap.set(bt.userBookId, list);
-		}
-
-		// 6. Filtro de texto en JS (título, autores, propietario, tags)
-		const results = detailRows.map((row) => ({
-			...row,
-			authors: row.authors ?? [],
-			tags: tagsMap.get(row.userBookId) ?? []
-		}));
-
+		const results = await booksWithSharedTags(tx, userId, effectiveTagIds);
 		if (!hasQuery) return results;
 
+		// 4. Filtro de texto en JS (título, autores, propietario, tags)
 		return results.filter(
 			(book) =>
 				normalize(book.title).includes(q) ||
@@ -531,6 +651,27 @@ export async function searchBooksFromOthers(
 				book.tags.some((t) => normalize(t.name).includes(q)) ||
 				(book.alternateTitle && normalize(book.alternateTitle).includes(q))
 		);
+	});
+}
+
+/**
+ * Libros que otros miembros comparten en un grupo concreto: los que llevan una
+ * etiqueta compartida con ese grupo (no basta con que el dueño sea miembro, puede
+ * compartirlos solo en otro grupo). Vacío si el usuario no es miembro.
+ */
+export async function getGroupBooks(userId: string, groupId: string): Promise<GroupBookResult[]> {
+	return withRLS(userId, async (tx) => {
+		const sharedTagRows = await tx
+			.select({ tagId: sharedTags.tagId })
+			.from(sharedTags)
+			.innerJoin(
+				groupMembers,
+				and(eq(groupMembers.groupId, sharedTags.groupId), eq(groupMembers.userId, userId))
+			)
+			.where(eq(sharedTags.groupId, groupId));
+
+		const tagIds = [...new Set(sharedTagRows.map((r) => r.tagId))];
+		return booksWithSharedTags(tx, userId, tagIds);
 	});
 }
 

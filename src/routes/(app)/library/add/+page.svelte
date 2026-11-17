@@ -1064,7 +1064,7 @@
 				bind:value={manualQuery}
 				placeholder="Title, author or ISBN..."
 				autofocus
-				class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+				class="min-w-0 flex-1 border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			/>
 			<button type="submit" class="border btn-primary px-4 py-2 text-sm"> Search </button>
 		</form>
@@ -1228,7 +1228,7 @@
 					bind:value={notes}
 					rows="2"
 					placeholder="Edition, book condition..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -1243,7 +1243,7 @@
 					<select
 						id="confirm-library"
 						bind:value={selectedLibraryId}
-						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					>
 						{#each availableLibraries as lib (lib.id)}
 							<option value={lib.id}>{lib.name}</option>
@@ -1300,7 +1300,7 @@
 					required
 					autofocus
 					placeholder="Book title"
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -1340,7 +1340,7 @@
 					type="text"
 					bind:value={formAlternateTitle}
 					placeholder="Title in another language..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 
@@ -1357,7 +1357,7 @@
 						type="text"
 						bind:value={formIsbn}
 						placeholder="9780000000000"
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 				<div>
@@ -1374,7 +1374,7 @@
 						placeholder="2024"
 						min="0"
 						max="9999"
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 			</div>
@@ -1413,7 +1413,7 @@
 					bind:value={formDescription}
 					rows="3"
 					placeholder="Synopsis or notes about the book..."
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full resize-none border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -1429,7 +1429,7 @@
 					bind:value={notes}
 					rows="2"
 					placeholder="Edition, condition..."
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full resize-none border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -1444,7 +1444,7 @@
 					<select
 						id="form-library"
 						bind:value={selectedLibraryId}
-						class="mt-1.5 w-full border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					>
 						{#each availableLibraries as lib (lib.id)}
 							<option value={lib.id}>{lib.name}</option>

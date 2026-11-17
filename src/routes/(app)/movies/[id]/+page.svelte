@@ -3,7 +3,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import { Sparkle, Trash } from 'phosphor-svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
-	import { readableTagTextColor } from '$lib/tagColor';
+	import SharingStatus from '$lib/components/SharingStatus.svelte';
+	import { tagChipStyle } from '$lib/tagColor';
 	import Espera from '$lib/components/Espera.svelte';
 	import { resizeImageFile } from '$lib/image';
 	import BookCard from '$lib/components/BookCard.svelte';
@@ -13,7 +14,8 @@
 	import { MEDIA_FORMATS, MEDIA_FORMAT_LABELS, formatLine } from '$lib/mediaFormat';
 
 	let { data, form } = $props();
-	const { movie, isOwner, borrowInfo, reviews, userLibraries, userTags, hasAiKey } = $derived(data);
+	const { movie, isOwner, borrowInfo, reviews, userLibraries, userTags, tagShares, hasAiKey } =
+		$derived(data);
 
 	// ── Etiquetas ─────────────────────────────────────────────────────────────
 	const assignedTagIds = $derived(new Set(movie.tags.map((t) => t.id)));
@@ -153,12 +155,7 @@
 				<span class={labelClass}>Shared as</span>
 				<div class="flex flex-wrap gap-2">
 					{#each movie.tags as tag (tag.id)}
-						<span
-							class="border px-3 py-1 text-xs"
-							style={tag.color
-								? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-								: 'border-color: var(--color-paper-border); color: #3d3d3d'}
-						>
+						<span class="border tag-chip px-3 py-1 text-xs" style={tagChipStyle(tag.color)}>
 							{tag.name}
 						</span>
 					{/each}
@@ -192,7 +189,7 @@
 							maxlength="1000"
 							placeholder="Message to {movie.ownerName} (optional)"
 							rows="3"
-							class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
+							class="w-full resize-none border border-field px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 						></textarea>
 						<button type="submit" class="w-full border btn-primary py-2.5 text-sm">
 							Ask to borrow
@@ -243,7 +240,7 @@
 					name="isAvailable"
 					value="true"
 					checked={movie.isAvailable}
-					class="border-paper-border text-ink focus:ring-0"
+					class="border-field text-ink focus:ring-0"
 				/>
 				Available (not lent out)
 			</label>
@@ -314,10 +311,8 @@
 							<button
 								type="submit"
 								title="Remove tag"
-								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-700"
-								style={tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
+								class="group flex items-center gap-1.5 border tag-chip px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-700"
+								style={tagChipStyle(tag.color)}
 							>
 								{tag.name}
 								<span class="opacity-0 group-hover:opacity-100">×</span>
@@ -328,9 +323,7 @@
 			{/if}
 
 			<TagCombobox {availableTags} assignedTags={movie.tags} />
-			<p class="text-xs text-ink-faint">
-				Tags shared with a group show this movie to its members, like your books.
-			</p>
+			<SharingStatus tags={movie.tags} shares={tagShares} kind="movie" />
 		</div>
 
 		<!-- ── Biblioteca ───────────────────────────────────────────────────── -->
@@ -368,7 +361,7 @@
 						required
 						pattern="https://.*"
 						placeholder="https://..."
-						class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="min-w-0 flex-1 border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 					<button type="submit" class="border btn-primary px-4 py-2 text-sm">Save</button>
 				</form>

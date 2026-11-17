@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { ArrowLeft, PencilSimple, Check, X, Trash, Plus } from 'phosphor-svelte';
-	import { readableTagTextColor } from '$lib/tagColor';
+	import { tagChipStyle } from '$lib/tagColor';
 
 	let { data } = $props();
 	let { tags } = $derived(data);
@@ -171,12 +171,7 @@
 					{:else if isConfirming(tag.id)}
 						<!-- Confirmación de borrado con impacto -->
 						<div class="flex items-center gap-3">
-							<span
-								class="border px-3 py-0.5 text-xs"
-								style={tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
-							>
+							<span class="border tag-chip px-3 py-0.5 text-xs" style={tagChipStyle(tag.color)}>
 								{tag.name}
 							</span>
 							<span class="flex-1 text-xs text-ink-muted">
@@ -212,12 +207,7 @@
 					{:else}
 						<!-- Vista normal -->
 						<div class="flex items-center gap-3">
-							<span
-								class="border px-3 py-0.5 text-xs"
-								style={tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
-							>
+							<span class="border tag-chip px-3 py-0.5 text-xs" style={tagChipStyle(tag.color)}>
 								{tag.name}
 							</span>
 							<span class="text-xs text-ink-faint">

@@ -4,6 +4,7 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { building } from '$app/environment';
 import { error, type Handle, type ServerInit } from '@sveltejs/kit';
 import { inviteFirstAccount } from '$lib/server/invitations';
+import { CONTRAST_COOKIE, parseContrast } from '$lib/contrast';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const session = await auth.api.getSession({ headers: event.request.headers });
@@ -22,7 +23,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 		return withRLS(userId, fn);
 	};
 
-	return svelteKitHandler({ event, resolve, auth, building });
+	// Contraste elegido en la cuenta (cookie), ya en el HTML para que no parpadee
+	const contrast = parseContrast(event.cookies.get(CONTRAST_COOKIE));
+	const resolveWithContrast: typeof resolve = (e, opts) =>
+		resolve(e, {
+			...opts,
+			transformPageChunk: async (input) => {
+				const html = opts?.transformPageChunk ? await opts.transformPageChunk(input) : input.html;
+				return html?.replace('%contrast%', contrast);
+			}
+		});
+
+	return svelteKitHandler({ event, resolve: resolveWithContrast, auth, building });
 };
 
 // Al arrancar sin cuentas, la primera invitación (ADMIN_EMAIL). No en el build.

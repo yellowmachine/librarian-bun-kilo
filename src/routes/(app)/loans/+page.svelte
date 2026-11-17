@@ -67,7 +67,7 @@
 			type="search"
 			bind:value={inputValue}
 			placeholder="Search by title or author…"
-			class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
+			class="min-w-0 flex-1 border border-field bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 		/>
 	</form>
 

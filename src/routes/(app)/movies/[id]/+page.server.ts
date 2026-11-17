@@ -18,6 +18,7 @@ import { getMovieForBorrow, requestLoan } from '$lib/server/loans';
 import { getMovieReviews, upsertMovieReview, deleteMovieReview } from '$lib/server/movieReviews';
 import { tags } from '$lib/server/db/schema';
 import { getUserLibraries } from '$lib/server/libraries';
+import { getTagGroupShares } from '$lib/server/groups';
 import { isMediaFormat } from '$lib/mediaFormat';
 
 export const load = async ({ locals, params }: RequestEvent) => {
@@ -48,6 +49,13 @@ export const load = async ({ locals, params }: RequestEvent) => {
 		isOwner,
 		userLibraries: isOwner ? userLibraries : [],
 		userTags: isOwner ? userTags : [],
+		// Con qué grupos se comparte y por qué etiqueta (solo para el dueño)
+		tagShares: isOwner
+			? await getTagGroupShares(
+					userId,
+					movie.tags.map((t) => t.id)
+				)
+			: [],
 		hasAiKey: isOwner && hasAiKey
 	};
 };

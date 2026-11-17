@@ -28,6 +28,8 @@ import {
 	applyMovieTags,
 	removeMovieTag,
 	getMoviesFromOthers,
+	getContactMovies,
+	getGroupMovies,
 	getRecentVisibleMovies,
 	forViewer
 } from '../movies';
@@ -310,5 +312,30 @@ describe('películas de otros', () => {
 		expect(forViewer(movie!, ALICE).notes).toBeNull();
 		expect(forViewer(movie!, BOB).notes).toBe('Rayado el disco 2');
 		expect(await getUserMovie(ALICE, hidden)).toBeNull();
+	});
+
+	it('las de un contacto: solo las que comparte', async () => {
+		const movies = await getContactMovies(ALICE, BOB);
+		expect(movies.map((m) => m.userMovieId)).toEqual([shared]);
+		expect(movies[0].notes).toBeNull();
+	});
+
+	it('las de un grupo: solo las compartidas en ese grupo, con sus etiquetas', async () => {
+		const seed = [
+			`INSERT INTO groups (id, name, created_by) VALUES ('grp2', 'Otro', '${BOB}'), ('grp3', 'Solo Bob', '${BOB}')`,
+			`INSERT INTO group_members (group_id, user_id, role) VALUES ('grp2', '${BOB}', 'owner'), ('grp2', '${ALICE}', 'member'), ('grp3', '${BOB}', 'owner')`,
+			`INSERT INTO shared_tags (id, tag_id, group_id, shared_by) SELECT 'st3', id, 'grp3', '${BOB}' FROM tags WHERE name = 'Notas'`
+		];
+		await holder.tdb.asSuperuser(async (tx) => {
+			for (const stmt of seed) await tx.execute(stmt as string);
+		});
+
+		const club = await getGroupMovies(ALICE, 'grp');
+		expect(club.map((m) => m.userMovieId)).toEqual([shared]);
+		expect(club[0].tags.map((t) => t.name)).toEqual(['Cine']);
+		// Bob está en «Otro» pero no comparte nada ahí
+		expect(await getGroupMovies(ALICE, 'grp2')).toEqual([]);
+		// Alice no es miembro de «Solo Bob»
+		expect(await getGroupMovies(ALICE, 'grp3')).toEqual([]);
 	});
 });

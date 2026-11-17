@@ -24,6 +24,7 @@ import {
 } from '$lib/server/reviews';
 import { getBookForBorrow, requestLoan } from '$lib/server/loans';
 import { getUserLibraries, moveBookToLibrary } from '$lib/server/libraries';
+import { getTagGroupShares } from '$lib/server/groups';
 
 export const load = async ({ locals, params }: RequestEvent) => {
 	const book = await getUserBook(locals.user!.id, params.id!);
@@ -31,18 +32,26 @@ export const load = async ({ locals, params }: RequestEvent) => {
 
 	const isOwner = book.ownerId === locals.user!.id;
 
-	const [userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries] = await Promise.all([
-		isOwner
-			? withRLS(locals.user!.id, (tx) =>
-					tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
-				)
-			: Promise.resolve([]),
-		book.bookId ? getMyReview(locals.user!.id, book.bookId) : null,
-		book.bookId ? getBookReviews(locals.user!.id, book.bookId) : [],
-		book.bookId ? getBookReviewStats(locals.user!.id, book.bookId) : null,
-		!isOwner ? getBookForBorrow(locals.user!.id, params.id!) : Promise.resolve(null),
-		isOwner ? getUserLibraries(locals.user!.id) : Promise.resolve([])
-	]);
+	const [userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries, tagShares] =
+		await Promise.all([
+			isOwner
+				? withRLS(locals.user!.id, (tx) =>
+						tx.select().from(tags).where(eq(tags.userId, locals.user!.id))
+					)
+				: Promise.resolve([]),
+			book.bookId ? getMyReview(locals.user!.id, book.bookId) : null,
+			book.bookId ? getBookReviews(locals.user!.id, book.bookId) : [],
+			book.bookId ? getBookReviewStats(locals.user!.id, book.bookId) : null,
+			!isOwner ? getBookForBorrow(locals.user!.id, params.id!) : Promise.resolve(null),
+			isOwner ? getUserLibraries(locals.user!.id) : Promise.resolve([]),
+			// Con qué grupos se comparte y por qué etiqueta (solo para el dueño)
+			isOwner
+				? getTagGroupShares(
+						locals.user!.id,
+						book.tags.map((t) => t.id)
+					)
+				: Promise.resolve([])
+		]);
 
 	return {
 		// Sin las notas ni la biblioteca del dueño si quien mira es otro
@@ -53,7 +62,8 @@ export const load = async ({ locals, params }: RequestEvent) => {
 		reviews,
 		reviewStats,
 		borrowInfo,
-		userLibraries
+		userLibraries,
+		tagShares
 	};
 };
 

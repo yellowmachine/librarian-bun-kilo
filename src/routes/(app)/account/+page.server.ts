@@ -7,8 +7,9 @@ import {
 } from '$lib/server/openrouterKey';
 import { getMonthCostUsd } from '$lib/server/aiUsage';
 import type { Actions, PageServerLoad } from './$types';
+import { CONTRAST_COOKIE, parseContrast } from '$lib/contrast';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, cookies }) => {
 	const userId = locals.user!.id;
 	const [sent, hasKey, monthCostUsd] = await Promise.all([
 		invitations.sentBy(userId),
@@ -16,6 +17,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		getMonthCostUsd(userId)
 	]);
 	return {
+		contrast: parseContrast(cookies.get(CONTRAST_COOKIE)),
 		hasKey,
 		monthCostUsd,
 		invitations: sent.map(({ token, ...i }) => ({
@@ -50,5 +52,17 @@ export const actions: Actions = {
 
 	removeKey: async ({ locals }) => {
 		await removeOpenRouterApiKey(locals.user!.id);
+	},
+
+	// Por dispositivo: un año, y para toda la app (también las páginas sin sesión)
+	setContrast: async ({ cookies, request }) => {
+		const contrast = parseContrast(String((await request.formData()).get('contrast') ?? ''));
+		cookies.set(CONTRAST_COOKIE, contrast, {
+			path: '/',
+			maxAge: 60 * 60 * 24 * 365,
+			sameSite: 'lax',
+			httpOnly: true
+		});
+		return { contrast };
 	}
 };
