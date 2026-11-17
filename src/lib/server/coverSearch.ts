@@ -31,7 +31,7 @@ const MAX_HTML_BYTES = 1024 * 1024;
 const MIN_IMAGE_BYTES = 2_000;
 const MAX_CANDIDATES = 6;
 const MAX_PAGES_TO_SCRAPE = 8;
-const USER_AGENT = `Librarian/1.0 (+${env.ORIGIN ?? 'https://librarian.scholio.review'})`;
+const USER_AGENT = `Librarian/1.0 (+${env.ORIGIN ?? 'https://librarian.seilide.app'})`;
 
 export interface CoverQuery {
 	title: string;

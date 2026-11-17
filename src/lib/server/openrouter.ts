@@ -102,7 +102,7 @@ export async function openRouterChat<T>(
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				'Content-Type': 'application/json',
-				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.scholio.review',
+				'HTTP-Referer': env.ORIGIN ?? 'https://librarian.seilide.app',
 				'X-Title': 'Librarian'
 			},
 			body: JSON.stringify(request)
