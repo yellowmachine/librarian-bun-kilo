@@ -10,14 +10,14 @@
 		Export,
 		Plus,
 		CaretDown,
-		CheckSquare,
-		ArrowRight,
-		Users
+		CheckSquare
 	} from 'phosphor-svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
 	import BookGrid from '$lib/components/BookGrid.svelte';
 	import TagChips from '$lib/components/TagChips.svelte';
+	import ContactList from '$lib/components/ContactList.svelte';
+	import GroupList from '$lib/components/GroupList.svelte';
 	import type { LibraryTab } from './+page.server';
 
 	let exportOpen = $state(false);
@@ -554,70 +554,11 @@
 
 		<!-- ── Contactos ─────────────────────────────────────────────────────── -->
 	{:else if tab === 'contacts' && !selectedContact}
-		{#if contacts.length === 0}
-			<div class="py-16 text-center">
-				<p class="text-sm text-ink-faint">
-					Your contacts are the people in your groups. You don't have any yet.
-				</p>
-				<a href="/groups" class="mt-4 inline-block text-sm link-action">Create or join a group</a>
-			</div>
-		{:else}
-			<ul class="divide-y divide-paper-border">
-				{#each contacts as c (c.userId)}
-					<li>
-						<a
-							href={`/library?tab=contacts&contact=${c.userId}`}
-							class="-mx-2 flex items-center gap-4 px-2 py-3 transition-colors hover:bg-paper-ui"
-						>
-							<div
-								class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-paper-border bg-paper-ui font-serif text-sm text-ink-muted"
-							>
-								{c.name.charAt(0).toUpperCase()}
-							</div>
-							<span class="min-w-0 flex-1 truncate text-sm text-ink">{c.name}</span>
-							<ArrowRight size={16} class="flex-shrink-0 text-ink-faint" />
-						</a>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<ContactList {contacts} hrefFor={(id) => `/library?tab=contacts&contact=${id}`} />
 
 		<!-- ── Grupos ────────────────────────────────────────────────────────── -->
 	{:else if tab === 'groups' && !selectedGroup}
-		{#if groups.length === 0}
-			<div class="py-16 text-center">
-				<p class="text-sm text-ink-faint">You don't belong to any groups yet.</p>
-				<a href="/groups" class="mt-4 inline-block text-sm link-action">Create or join a group</a>
-			</div>
-		{:else}
-			<ul class="divide-y divide-paper-border">
-				{#each groups as g (g.id)}
-					<li>
-						<a
-							href={`/library?tab=groups&group=${g.id}`}
-							class="-mx-2 flex items-center gap-4 px-2 py-3 transition-colors hover:bg-paper-ui"
-						>
-							<div
-								class="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-paper-border bg-paper-ui"
-							>
-								<Users size={16} class="text-ink-faint" />
-							</div>
-							<div class="min-w-0 flex-1">
-								<p class="truncate text-sm text-ink">{g.name}</p>
-								{#if g.description}
-									<p class="truncate text-xs text-ink-faint">{g.description}</p>
-								{/if}
-							</div>
-							<span class="flex-shrink-0 text-xs text-ink-faint">
-								{g.memberCount}
-								{g.memberCount === 1 ? 'member' : 'members'}
-							</span>
-							<ArrowRight size={16} class="flex-shrink-0 text-ink-faint" />
-						</a>
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<GroupList {groups} hrefFor={(id) => `/library?tab=groups&group=${id}`} />
 
 		<!-- ── Libros de un contacto o de un grupo ───────────────────────────── -->
 	{:else if tab === 'contacts' || tab === 'groups'}

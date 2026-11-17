@@ -8,7 +8,7 @@
 		borrowInfo?: { ownerName?: string } | null;
 		selectedContact?: { userId: string; name: string } | null;
 		selectedGroup?: { id: string; name: string } | null;
-		movie?: { title?: string; libraryId?: string | null };
+		movie?: { title?: string; libraryId?: string | null; ownerId?: string; ownerName?: string };
 		isOwner?: boolean;
 		userLibraries?: { id: string; name: string }[];
 		group?: { name?: string };
@@ -19,17 +19,18 @@
 		const path = page.url.pathname;
 		const data = page.data as PageData;
 
-		// Biblioteca: los libros de un contacto o un grupo cuelgan de su tab
-		if (path === '/library') {
+		// Biblioteca y videoteca: lo de un contacto o un grupo cuelga de su tab
+		if (path === '/library' || path === '/movies') {
+			const section = path === '/library' ? 'Library' : 'Movies';
 			if (data.selectedContact) {
 				return [
-					{ label: 'Library · Contacts', href: '/library?tab=contacts' },
+					{ label: `${section} · Contacts`, href: `${path}?tab=contacts` },
 					{ label: data.selectedContact.name }
 				];
 			}
 			if (data.selectedGroup) {
 				return [
-					{ label: 'Library · Groups', href: '/library?tab=groups' },
+					{ label: `${section} · Groups`, href: `${path}?tab=groups` },
 					{ label: data.selectedGroup.name }
 				];
 			}
@@ -37,17 +38,21 @@
 		}
 
 		// Raíces — sin breadcrumb
-		if (path === '/movies' || path === '/groups' || path === '/loans') return [];
+		if (path === '/groups' || path === '/loans') return [];
 
 		if (path.startsWith('/movies')) {
 			if (path === '/movies/add') {
 				return [{ label: 'Movies', href: '/movies' }, { label: 'Add movie' }];
 			}
 			if (/^\/movies\/[^/]+$/.test(path)) {
-				if (data.isOwner === false) {
+				// Película de otra persona: cuelga de sus películas en la tab de contactos
+				if (data.isOwner === false && data.movie?.ownerId) {
 					return [
-						{ label: 'Movies · From others', href: '/movies?tab=others' },
-						{ label: data.movie?.title ?? '…' }
+						{
+							label: `Movies · ${data.movie.ownerName ?? 'Contacts'}`,
+							href: `/movies?tab=contacts&contact=${data.movie.ownerId}`
+						},
+						{ label: data.movie.title ?? '…' }
 					];
 				}
 				const library = data.userLibraries?.find((lib) => lib.id === data.movie?.libraryId);
