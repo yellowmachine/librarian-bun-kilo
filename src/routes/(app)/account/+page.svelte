@@ -3,6 +3,7 @@
 	import { input, label, primary, problem } from '$lib/auth-form';
 	import { formatUsd } from '$lib/aiUsageLabels';
 	import type { Contrast } from '$lib/contrast';
+	import { DownloadSimple } from 'phosphor-svelte';
 
 	let { data, form } = $props();
 
@@ -92,6 +93,30 @@
 				{/each}
 			</ul>
 		{/if}
+	</section>
+
+	<!-- ── Exportar ───────────────────────────────────────────────────── -->
+	<section class="space-y-5">
+		<div>
+			<h2 class="text-sm font-medium text-ink">Exportar tus datos</h2>
+			<p class="mt-1 text-sm text-ink-muted">
+				Todas tus bibliotecas, con sus libros y películas: etiquetas, notas y tus puntuaciones. Solo
+				lo tuyo, no lo que te comparten.
+			</p>
+		</div>
+		<div class="flex flex-wrap items-center gap-3">
+			<a
+				href="/api/export?format=yaml"
+				download
+				class="inline-flex items-center gap-1.5 border btn-primary px-4 py-2 text-sm"
+			>
+				<DownloadSimple size={15} /> Exportar (YAML)
+			</a>
+			<a href="/api/export?format=json" download class="text-sm link-action">JSON</a>
+			<a href="/api/export?format=bibtex" download class="text-sm link-action">
+				BibTeX <span class="text-ink-faint">(solo libros)</span>
+			</a>
+		</div>
 	</section>
 
 	<!-- ── Contraste ──────────────────────────────────────────────────── -->

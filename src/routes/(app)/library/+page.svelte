@@ -357,7 +357,7 @@
 					>
 						<a
 							href="/api/export?format=yaml"
-							download="library.yaml"
+							download
 							onclick={() => (exportOpen = false)}
 							class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
 						>
@@ -366,7 +366,7 @@
 						</a>
 						<a
 							href="/api/export?format=bibtex"
-							download="library.bib"
+							download
 							onclick={() => (exportOpen = false)}
 							class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
 						>
