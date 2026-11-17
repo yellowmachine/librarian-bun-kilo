@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
+	import { ArrowLeft, Copy, ArrowsClockwise, X, PencilSimple } from 'phosphor-svelte';
 	import InviteQR from '$lib/components/InviteQR.svelte';
 	import { itemCountLabel } from '$lib/itemCounts';
 	import { tagChipStyle } from '$lib/tagColor';
@@ -24,6 +24,11 @@
 
 	// Mostrar errores de acciones en un banner transitorio
 	let actionError = $derived(form?.error as string | undefined);
+
+	// Editar nombre y descripción (owner o admin), en la propia cabecera
+	let editing = $state(false);
+	let saving = $state(false);
+	const renameError = $derived(form?.renameError as string | undefined);
 
 	// Confirmación de expulsión de miembro
 	let pendingRemove = $state<{ userId: string; name: string } | null>(null);
@@ -55,17 +60,96 @@
 		>
 			<ArrowLeft size={16} /> Grupos
 		</a>
-		<div class="mt-3 flex items-start justify-between">
-			<div>
-				<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{group.name}</h1>
-				{#if group.description}
-					<p class="mt-1 text-sm text-ink-faint">{group.description}</p>
+		{#if editing}
+			<form
+				method="POST"
+				action="?/rename"
+				class="mt-3 space-y-4"
+				use:enhance={() => {
+					saving = true;
+					return async ({ result, update }) => {
+						await update({ reset: false });
+						saving = false;
+						if (result.type === 'success') editing = false;
+					};
+				}}
+			>
+				<div>
+					<label
+						for="group-name"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						Group name
+					</label>
+					<input
+						id="group-name"
+						name="name"
+						type="text"
+						required
+						maxlength="60"
+						value={group.name}
+						class="mt-1.5 block w-full border-0 border-b border-field bg-transparent px-0 py-2 font-serif text-xl text-ink focus:border-brown-600 focus:ring-0"
+					/>
+				</div>
+				<div>
+					<label
+						for="group-description"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						Description <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
+					</label>
+					<textarea
+						id="group-description"
+						name="description"
+						rows="2"
+						value={group.description ?? ''}
+						class="mt-1.5 w-full border-0 border-b border-field bg-transparent px-0 py-2 text-sm text-ink focus:border-brown-600 focus:ring-0"
+					></textarea>
+				</div>
+				{#if renameError}
+					<p class="text-sm text-red-700" role="alert">{renameError}</p>
 				{/if}
+				<div class="flex gap-3">
+					<button
+						type="submit"
+						disabled={saving}
+						class="border btn-primary px-4 py-2 text-sm disabled:opacity-50"
+					>
+						{saving ? 'Saving…' : 'Save'}
+					</button>
+					<button
+						type="button"
+						class="border btn-secondary px-4 py-2 text-sm"
+						onclick={() => (editing = false)}
+					>
+						Cancel
+					</button>
+				</div>
+			</form>
+		{:else}
+			<div class="mt-3 flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{group.name}</h1>
+					{#if group.description}
+						<p class="mt-1 text-sm text-ink-faint">{group.description}</p>
+					{/if}
+				</div>
+				<div class="mt-1 flex shrink-0 items-center gap-3">
+					{#if isOwnerOrAdmin}
+						<button
+							type="button"
+							onclick={() => (editing = true)}
+							class="flex items-center gap-1 text-xs action-text"
+						>
+							<PencilSimple size={12} /> Edit
+						</button>
+					{/if}
+					<span class="text-xs text-ink-faint">
+						{group.role === 'owner' ? 'owner' : group.role === 'admin' ? 'admin' : 'member'}
+					</span>
+				</div>
 			</div>
-			<span class="mt-1 text-xs text-ink-faint">
-				{group.role === 'owner' ? 'owner' : group.role === 'admin' ? 'admin' : 'member'}
-			</span>
-		</div>
+		{/if}
 	</div>
 
 	<!-- Código de invitación -->

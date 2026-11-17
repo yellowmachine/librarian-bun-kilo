@@ -20,7 +20,9 @@ import {
 	getUserTagsForGroup,
 	getSharedTagsInGroup,
 	getSharedTagsForUser,
-	deleteGroup
+	deleteGroup,
+	renameGroup,
+	parseGroupFields
 } from '../groups';
 
 const ALICE = 'user-alice';
@@ -213,5 +215,57 @@ describe('deleteGroup', () => {
 	it('cuenta todo lo compartido en el grupo, también lo propio', async () => {
 		const all = await getGroupItemCounts(BOB, { includeOwn: true });
 		expect(all['grp-club']).toEqual({ books: 2, movies: 1 });
+	});
+});
+
+describe('renameGroup', () => {
+	async function groupRow(id: string) {
+		const res = await holder.tdb.asSuperuser((tx) =>
+			tx.execute(`SELECT name, description FROM groups WHERE id = '${id}'` as string)
+		);
+		return res.rows[0];
+	}
+
+	it('el owner cambia nombre y descripción', async () => {
+		expect(
+			await renameGroup(BOB, 'grp-club', { name: 'Cineclub', description: 'Los jueves' })
+		).toBe(true);
+		expect(await groupRow('grp-club')).toEqual({ name: 'Cineclub', description: 'Los jueves' });
+	});
+
+	it('un admin también; un miembro no', async () => {
+		await holder.tdb.asSuperuser((tx) =>
+			tx.execute(
+				`UPDATE group_members SET role = 'admin' WHERE group_id = 'grp-club' AND user_id = '${CAROL}'` as string
+			)
+		);
+		expect(await renameGroup(ALICE, 'grp-club', { name: 'De Alice', description: null })).toBe(
+			false
+		);
+		expect(await renameGroup(CAROL, 'grp-club', { name: 'De Carol', description: null })).toBe(
+			true
+		);
+		expect(await groupRow('grp-club')).toEqual({ name: 'De Carol', description: null });
+	});
+});
+
+describe('parseGroupFields', () => {
+	const form = (fields: Record<string, string>) => {
+		const data = new FormData();
+		for (const [k, v] of Object.entries(fields)) data.set(k, v);
+		return data;
+	};
+
+	it('recorta, y la descripción vacía es null', () => {
+		expect(parseGroupFields(form({ name: '  Club  ', description: '  ' }))).toEqual({
+			name: 'Club',
+			description: null
+		});
+	});
+
+	it('nombre obligatorio y de 60 caracteres como mucho', () => {
+		expect(parseGroupFields(form({ name: ' ' }))).toHaveProperty('error');
+		expect(parseGroupFields(form({ name: 'x'.repeat(61) }))).toHaveProperty('error');
+		expect(parseGroupFields(form({ name: 'x'.repeat(60) }))).toHaveProperty('name');
 	});
 });

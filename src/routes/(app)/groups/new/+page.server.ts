@@ -1,17 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { createGroup } from '$lib/server/groups';
+import { createGroup, parseGroupFields } from '$lib/server/groups';
 
 export const actions = {
 	default: async ({ locals, request }: RequestEvent) => {
-		const data = await request.formData();
-		const name = (data.get('name') as string)?.trim();
-		const description = (data.get('description') as string)?.trim() || undefined;
+		const fields = parseGroupFields(await request.formData());
+		if ('error' in fields) return fail(400, { error: fields.error });
 
-		if (!name) return fail(400, { error: 'El nombre es obligatorio' });
-		if (name.length > 60) return fail(400, { error: 'Máximo 60 caracteres' });
-
-		const groupId = await createGroup(locals.user!.id, { name, description });
+		const groupId = await createGroup(locals.user!.id, {
+			name: fields.name,
+			description: fields.description ?? undefined
+		});
 		redirect(302, `/groups/${groupId}`);
 	}
 };

@@ -66,6 +66,22 @@ export type GroupBookResult = {
 	tags: { id: string; name: string; color: string | null }[];
 };
 
+// ─── Nombre y descripción (crear y renombrar) ────────────────────────────────
+
+export const GROUP_NAME_MAX = 60;
+
+/** Lee y valida el nombre y la descripción de un formulario de grupo. */
+export function parseGroupFields(
+	data: FormData
+): { name: string; description: string | null } | { error: string } {
+	const name = String(data.get('name') ?? '').trim();
+	const description = String(data.get('description') ?? '').trim() || null;
+	if (!name) return { error: 'The group needs a name.' };
+	if (name.length > GROUP_NAME_MAX)
+		return { error: `The name can have ${GROUP_NAME_MAX} characters at most.` };
+	return { name, description };
+}
+
 // ─── Crear grupo ──────────────────────────────────────────────────────────────
 
 export async function createGroup(
@@ -267,6 +283,27 @@ export async function removeMember(
 			.delete(groupMembers)
 			.where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.userId, targetUserId)))
 	);
+}
+
+// ─── Renombrar un grupo ──────────────────────────────────────────────────────
+
+/**
+ * Cambia el nombre y la descripción. Owner o admin (la RLS de groups_update lo
+ * impone). Devuelve si se cambió.
+ */
+export async function renameGroup(
+	userId: string,
+	groupId: string,
+	data: { name: string; description: string | null }
+): Promise<boolean> {
+	const updated = await withRLS(userId, (tx) =>
+		tx
+			.update(groups)
+			.set({ name: data.name, description: data.description, updatedAt: new Date() })
+			.where(eq(groups.id, groupId))
+			.returning({ id: groups.id })
+	);
+	return updated.length > 0;
 }
 
 // ─── Borrar un grupo ─────────────────────────────────────────────────────────
