@@ -12,7 +12,13 @@ vi.mock('../db/rls', () => ({
 		holder.tdb.withRLS(userId, cb as never)
 }));
 
-import { getGroupBooks, searchBooksFromOthers } from '../groups';
+import {
+	getGroupBooks,
+	searchBooksFromOthers,
+	getGroupItemCounts,
+	getTagGroupShares,
+	getUserTagsForGroup
+} from '../groups';
 
 const ALICE = 'user-alice';
 const BOB = 'user-bob';
@@ -57,7 +63,11 @@ beforeEach(async () => {
 			('st-a', 'tag-a', 'grp-pareja', '${ALICE}'),
 			('st-b1', 'tag-b-pareja', 'grp-pareja', '${BOB}'),
 			('st-b2', 'tag-b-club', 'grp-club', '${BOB}'),
-			('st-c', 'tag-c', 'grp-club', '${CAROL}')`
+			('st-c', 'tag-c', 'grp-club', '${CAROL}')`,
+		// Bob también tiene una película con su etiqueta del Club
+		`INSERT INTO user_movies (id, user_id, library_id, title, format) VALUES
+			('um-b-alien', '${BOB}', 'lib-b', 'Alien', 'dvd')`,
+		`INSERT INTO user_movie_tags (user_movie_id, tag_id) VALUES ('um-b-alien', 'tag-b-club')`
 	];
 	await holder.tdb.asSuperuser(async (tx) => {
 		for (const stmt of seed) await tx.execute(stmt as string);
@@ -94,5 +104,43 @@ describe('searchBooksFromOthers', () => {
 	it('filtra por etiqueta sin texto', async () => {
 		const results = await searchBooksFromOthers(ALICE, '', ['tag-c']);
 		expect(results.map((b) => b.userBookId)).toEqual(['ub-c-ulises']);
+	});
+});
+
+describe('qué se comparte en cada grupo', () => {
+	it('cuenta libros y películas de otros por grupo', async () => {
+		expect(await getGroupItemCounts(ALICE)).toEqual({
+			'grp-pareja': { books: 1, movies: 0 },
+			'grp-club': { books: 2, movies: 1 }
+		});
+		// Carol no está en Pareja: solo ve el Club, y sin sus propios libros
+		expect(await getGroupItemCounts(CAROL)).toEqual({ 'grp-club': { books: 1, movies: 1 } });
+	});
+
+	it('tus etiquetas, con cuántos libros y películas enseñarías al compartirlas', async () => {
+		const mine = await getUserTagsForGroup(BOB, 'grp-club');
+		expect(mine).toEqual([
+			expect.objectContaining({
+				id: 'tag-b-club',
+				bookCount: 1,
+				movieCount: 1,
+				alreadyShared: true
+			}),
+			expect.objectContaining({
+				id: 'tag-b-pareja',
+				bookCount: 1,
+				movieCount: 0,
+				alreadyShared: false
+			})
+		]);
+	});
+
+	it('con qué grupos se comparten unas etiquetas propias', async () => {
+		expect(await getTagGroupShares(BOB, ['tag-b-club', 'tag-b-pareja'])).toEqual([
+			{ tagId: 'tag-b-club', groupId: 'grp-club', groupName: 'Club' },
+			{ tagId: 'tag-b-pareja', groupId: 'grp-pareja', groupName: 'Pareja' }
+		]);
+		// Las de otro no cuentan aunque Alice las vea
+		expect(await getTagGroupShares(ALICE, ['tag-b-club'])).toEqual([]);
 	});
 });

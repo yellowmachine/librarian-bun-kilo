@@ -5,6 +5,7 @@ import {
 	getContacts,
 	getSharedTagsForUser,
 	getUserGroups,
+	getGroupItemCounts,
 	getGroupBooks
 } from '$lib/server/groups';
 import { getUserLibraries } from '$lib/server/libraries';
@@ -48,6 +49,13 @@ export const load = async ({ locals, url }: RequestEvent) => {
 		userBooks,
 		contacts,
 		groups: groups.sort((a, b) => a.name.localeCompare(b.name)),
+		// Para la lista de grupos: cuánto comparten los demás en cada uno
+		groupItemCounts:
+			tab === 'groups' && !selectedGroup
+				? Object.fromEntries(
+						Object.entries(await getGroupItemCounts(userId)).map(([id, c]) => [id, c.books])
+					)
+				: {},
 		sharedTagsForOthers,
 		userLibraries,
 		libraryId,

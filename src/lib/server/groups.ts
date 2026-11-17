@@ -1,7 +1,7 @@
 import { nanoid, customAlphabet } from 'nanoid';
 
 const nanoidCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
-import { eq, and, inArray, sql, desc } from 'drizzle-orm';
+import { eq, and, ne, inArray, sql, desc } from 'drizzle-orm';
 import { db } from './db/index';
 import {
 	groups,
@@ -12,6 +12,7 @@ import {
 	userBooks,
 	books,
 	userBookTags,
+	userMovies,
 	userMovieTags
 } from './db/schema';
 import { user } from './db/auth.schema';
@@ -364,12 +365,29 @@ export async function getSharedTagsInGroup(
 export async function getUserTagsForGroup(
 	userId: string,
 	groupId: string
-): Promise<{ id: string; name: string; color: string | null; alreadyShared: boolean }[]> {
+): Promise<
+	{
+		id: string;
+		name: string;
+		color: string | null;
+		alreadyShared: boolean;
+		bookCount: number;
+		movieCount: number;
+	}[]
+> {
 	return withRLS(userId, async (tx) => {
+		// Cuántos libros y películas lleva cada etiqueta: compartirla los enseña todos
 		const userTagRows = await tx
-			.select({ id: tags.id, name: tags.name, color: tags.color })
+			.select({
+				id: tags.id,
+				name: tags.name,
+				color: tags.color,
+				bookCount: sql<number>`(select count(*) from user_book_tags ubt where ubt.tag_id = ${tags.id})::int`,
+				movieCount: sql<number>`(select count(*) from user_movie_tags umt where umt.tag_id = ${tags.id})::int`
+			})
 			.from(tags)
-			.where(eq(tags.userId, userId));
+			.where(eq(tags.userId, userId))
+			.orderBy(tags.name);
 
 		const sharedRows = await tx
 			.select({ tagId: sharedTags.tagId })
@@ -382,6 +400,71 @@ export async function getUserTagsForGroup(
 			...t,
 			alreadyShared: sharedSet.has(t.id)
 		}));
+	});
+}
+
+// ─── Con qué grupos se comparten unas etiquetas propias ──────────────────────
+
+export type TagGroupShare = { tagId: string; groupId: string; groupName: string };
+
+/** Para la ficha de un libro o película: qué grupos lo ven y por qué etiqueta. */
+export async function getTagGroupShares(
+	userId: string,
+	tagIds: string[]
+): Promise<TagGroupShare[]> {
+	if (tagIds.length === 0) return [];
+	return withRLS(userId, (tx) =>
+		tx
+			.select({ tagId: sharedTags.tagId, groupId: groups.id, groupName: groups.name })
+			.from(sharedTags)
+			.innerJoin(groups, eq(sharedTags.groupId, groups.id))
+			.where(and(inArray(sharedTags.tagId, tagIds), eq(sharedTags.sharedBy, userId)))
+			.orderBy(groups.name)
+	);
+}
+
+// ─── Cuánto comparten los demás en cada grupo ────────────────────────────────
+
+/**
+ * Por grupo del usuario, cuántos libros y películas de otros miembros puede ver
+ * en él (los que llevan una etiqueta compartida en ese grupo).
+ */
+export async function getGroupItemCounts(
+	userId: string
+): Promise<Record<string, { books: number; movies: number }>> {
+	return withRLS(userId, async (tx) => {
+		const myGroups = tx
+			.select({ groupId: groupMembers.groupId })
+			.from(groupMembers)
+			.where(eq(groupMembers.userId, userId));
+
+		// Una tras otra: comparten la transacción de RLS
+		const bookRows = await tx
+			.select({
+				groupId: sharedTags.groupId,
+				count: sql<number>`count(distinct ${userBooks.id})::int`
+			})
+			.from(sharedTags)
+			.innerJoin(userBookTags, eq(userBookTags.tagId, sharedTags.tagId))
+			.innerJoin(userBooks, eq(userBooks.id, userBookTags.userBookId))
+			.where(and(inArray(sharedTags.groupId, myGroups), ne(userBooks.userId, userId)))
+			.groupBy(sharedTags.groupId);
+		const movieRows = await tx
+			.select({
+				groupId: sharedTags.groupId,
+				count: sql<number>`count(distinct ${userMovies.id})::int`
+			})
+			.from(sharedTags)
+			.innerJoin(userMovieTags, eq(userMovieTags.tagId, sharedTags.tagId))
+			.innerJoin(userMovies, eq(userMovies.id, userMovieTags.userMovieId))
+			.where(and(inArray(sharedTags.groupId, myGroups), ne(userMovies.userId, userId)))
+			.groupBy(sharedTags.groupId);
+
+		const counts: Record<string, { books: number; movies: number }> = {};
+		for (const r of bookRows) counts[r.groupId] = { books: r.count, movies: 0 };
+		for (const r of movieRows)
+			counts[r.groupId] = { books: counts[r.groupId]?.books ?? 0, movies: r.count };
+		return counts;
 	});
 }
 

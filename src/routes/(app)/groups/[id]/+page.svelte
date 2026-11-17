@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { ArrowLeft, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
 	import InviteQR from '$lib/components/InviteQR.svelte';
+	import { itemCountLabel } from '$lib/itemCounts';
 
 	let { data, form } = $props();
 	let { group, members, sharedTagsList, myTags } = $derived(data);
@@ -125,6 +126,9 @@
 			{#if myTags.length > 0}
 				<div class="space-y-3">
 					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">My tags</p>
+					<p class="text-xs text-ink-faint">
+						Sharing a tag shows the group every book and movie that carries it.
+					</p>
 					<div class="flex flex-wrap gap-2">
 						{#each myTags as tag (tag.id)}
 							<form
@@ -142,6 +146,10 @@
 										: 'border-dashed border-paper-border text-ink-muted hover:border-ink hover:text-ink'}"
 								>
 									{tag.name}
+									{#if tag.bookCount + tag.movieCount > 0}
+										<span class="opacity-60">· {itemCountLabel(tag.bookCount, tag.movieCount)}</span
+										>
+									{/if}
 									{#if tag.alreadyShared}<span class="opacity-60">✓</span>{:else}<span
 											class="opacity-40">+</span
 										>{/if}
@@ -157,7 +165,7 @@
 				<p class="py-8 text-center text-sm text-ink-faint">No members have shared any tags yet.</p>
 			{:else}
 				<div class="space-y-3">
-					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">En el grupo</p>
+					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">In the group</p>
 					<ul class="divide-y divide-paper-border">
 						{#each sharedTagsList as st (st.sharedTagId)}
 							<li class="flex items-center gap-3 py-3">
@@ -171,11 +179,7 @@
 								</span>
 								<span class="text-sm text-ink-muted">{st.ownerName}</span>
 								<span class="ml-auto text-xs text-ink-faint">
-									{st.bookCount}
-									{st.bookCount === 1 ? 'book' : 'books'}
-									{#if st.movieCount > 0}
-										· {st.movieCount} {st.movieCount === 1 ? 'movie' : 'movies'}
-									{/if}
+									{itemCountLabel(st.bookCount, st.movieCount) || 'Nothing yet'}
 								</span>
 							</li>
 						{/each}

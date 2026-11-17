@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { Sparkle, Trash } from 'phosphor-svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
+	import SharingStatus from '$lib/components/SharingStatus.svelte';
 	import { readableTagTextColor } from '$lib/tagColor';
 	import Espera from '$lib/components/Espera.svelte';
 	import { resizeImageFile } from '$lib/image';
@@ -13,7 +14,8 @@
 	import { MEDIA_FORMATS, MEDIA_FORMAT_LABELS, formatLine } from '$lib/mediaFormat';
 
 	let { data, form } = $props();
-	const { movie, isOwner, borrowInfo, reviews, userLibraries, userTags, hasAiKey } = $derived(data);
+	const { movie, isOwner, borrowInfo, reviews, userLibraries, userTags, tagShares, hasAiKey } =
+		$derived(data);
 
 	// ── Etiquetas ─────────────────────────────────────────────────────────────
 	const assignedTagIds = $derived(new Set(movie.tags.map((t) => t.id)));
@@ -328,9 +330,7 @@
 			{/if}
 
 			<TagCombobox {availableTags} assignedTags={movie.tags} />
-			<p class="text-xs text-ink-faint">
-				Tags shared with a group show this movie to its members, like your books.
-			</p>
+			<SharingStatus tags={movie.tags} shares={tagShares} kind="movie" />
 		</div>
 
 		<!-- ── Biblioteca ───────────────────────────────────────────────────── -->

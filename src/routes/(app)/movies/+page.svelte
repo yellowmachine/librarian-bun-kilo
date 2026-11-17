@@ -26,6 +26,7 @@
 		othersMovies,
 		contacts,
 		groups,
+		groupItemCounts,
 		userLibraries,
 		libraryId,
 		selectedContact,
@@ -163,7 +164,12 @@
 	{#if tab === 'contacts' && !selectedContact}
 		<ContactList {contacts} hrefFor={(id) => `/movies?tab=contacts&contact=${id}`} />
 	{:else if tab === 'groups' && !selectedGroup}
-		<GroupList {groups} hrefFor={(id) => `/movies?tab=groups&group=${id}`} />
+		<GroupList
+			{groups}
+			hrefFor={(id) => `/movies?tab=groups&group=${id}`}
+			itemCounts={groupItemCounts}
+			kind="movie"
+		/>
 	{:else}
 		{#if selectedContact || selectedGroup}
 			<h2 class="font-serif text-xl font-normal text-ink">

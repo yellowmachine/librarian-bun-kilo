@@ -7,6 +7,7 @@
 	import CoverPicker from '$lib/components/CoverPicker.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import TagCombobox from '$lib/components/TagCombobox.svelte';
+	import SharingStatus from '$lib/components/SharingStatus.svelte';
 	import Espera from '$lib/components/Espera.svelte';
 	import ReviewsSection from '$lib/components/ReviewsSection.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -36,8 +37,17 @@
 	}
 
 	let { data, form } = $props();
-	let { book, isOwner, userTags, myReview, reviews, reviewStats, borrowInfo, userLibraries } =
-		$derived(data);
+	let {
+		book,
+		isOwner,
+		userTags,
+		myReview,
+		reviews,
+		reviewStats,
+		borrowInfo,
+		userLibraries,
+		tagShares
+	} = $derived(data);
 
 	let assignedTagIds = $derived(new Set(book.tags.map((t: { id: string }) => t.id)));
 	let availableTags = $derived(userTags.filter((t: { id: string }) => !assignedTagIds.has(t.id)));
@@ -735,6 +745,7 @@
 
 			<!-- Combobox: buscar etiqueta existente o crear nueva -->
 			<TagCombobox {availableTags} assignedTags={book.tags} />
+			<SharingStatus tags={book.tags} shares={tagShares} kind="book" />
 		</div>
 	{/if}
 

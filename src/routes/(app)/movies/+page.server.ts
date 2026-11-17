@@ -5,7 +5,7 @@ import {
 	getContactMovies,
 	getGroupMovies
 } from '$lib/server/movies';
-import { getContacts, getUserGroups } from '$lib/server/groups';
+import { getContacts, getUserGroups, getGroupItemCounts } from '$lib/server/groups';
 import { getUserLibraries } from '$lib/server/libraries';
 
 export type MoviesTab = 'mine' | 'contacts' | 'groups' | 'search';
@@ -53,6 +53,13 @@ export const load = async ({ locals, url }: RequestEvent) => {
 		othersMovies,
 		contacts,
 		groups: groups.sort((a, b) => a.name.localeCompare(b.name)),
+		// Para la lista de grupos: cuánto comparten los demás en cada uno
+		groupItemCounts:
+			tab === 'groups' && !selectedGroup
+				? Object.fromEntries(
+						Object.entries(await getGroupItemCounts(userId)).map(([id, c]) => [id, c.movies])
+					)
+				: {},
 		userLibraries,
 		libraryId,
 		selectedContact,

@@ -28,6 +28,7 @@
 		userBooks,
 		contacts,
 		groups,
+		groupItemCounts,
 		sharedTagsForOthers,
 		userLibraries,
 		libraryId,
@@ -558,7 +559,12 @@
 
 		<!-- ── Grupos ────────────────────────────────────────────────────────── -->
 	{:else if tab === 'groups' && !selectedGroup}
-		<GroupList {groups} hrefFor={(id) => `/library?tab=groups&group=${id}`} />
+		<GroupList
+			{groups}
+			hrefFor={(id) => `/library?tab=groups&group=${id}`}
+			itemCounts={groupItemCounts}
+			kind="book"
+		/>
 
 		<!-- ── Libros de un contacto o de un grupo ───────────────────────────── -->
 	{:else if tab === 'contacts' || tab === 'groups'}

@@ -5,9 +5,14 @@
 		groups: { id: string; name: string; description: string | null; memberCount: number }[];
 		/** Adónde lleva cada grupo */
 		hrefFor: (groupId: string) => string;
+		/** Cuántos libros o películas comparten los demás en cada grupo */
+		itemCounts: Record<string, number>;
+		kind: 'book' | 'movie';
 	}
 
-	let { groups, hrefFor }: Props = $props();
+	let { groups, hrefFor, itemCounts, kind }: Props = $props();
+
+	const plural = (n: number) => `${n} ${kind}${n === 1 ? '' : 's'}`;
 </script>
 
 {#if groups.length === 0}
@@ -18,10 +23,12 @@
 {:else}
 	<ul class="divide-y divide-paper-border">
 		{#each groups as g (g.id)}
+			{@const count = itemCounts[g.id] ?? 0}
 			<li>
 				<a
 					href={hrefFor(g.id)}
-					class="-mx-2 flex items-center gap-4 px-2 py-3 transition-colors hover:bg-paper-ui"
+					class="-mx-2 flex items-center gap-4 px-2 py-3 transition-colors hover:bg-paper-ui
+					{count === 0 ? 'opacity-60' : ''}"
 				>
 					<div
 						class="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-paper-border bg-paper-ui"
@@ -34,9 +41,14 @@
 							<p class="truncate text-xs text-ink-faint">{g.description}</p>
 						{/if}
 					</div>
-					<span class="flex-shrink-0 text-xs text-ink-faint">
-						{g.memberCount}
-						{g.memberCount === 1 ? 'member' : 'members'}
+					<span class="flex-shrink-0 text-right text-xs text-ink-faint">
+						<span class={count > 0 ? 'text-ink-muted' : ''}>
+							{count > 0 ? plural(count) : `No ${kind}s shared`}
+						</span>
+						<span class="hidden sm:inline">
+							· {g.memberCount}
+							{g.memberCount === 1 ? 'member' : 'members'}
+						</span>
 					</span>
 					<ArrowRight size={16} class="flex-shrink-0 text-ink-faint" />
 				</a>
