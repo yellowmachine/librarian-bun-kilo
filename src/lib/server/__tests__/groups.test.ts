@@ -19,6 +19,7 @@ import {
 	getTagGroupShares,
 	getUserTagsForGroup,
 	getSharedTagsInGroup,
+	getSharedTagsForUser,
 	deleteGroup
 } from '../groups';
 
@@ -101,6 +102,17 @@ describe('searchBooksFromOthers', () => {
 	it('busca en todos los grupos del usuario, sin los propios', async () => {
 		const results = await searchBooksFromOthers(ALICE, 'dune');
 		expect(results.map((b) => b.userBookId)).toEqual(['ub-b-dune']);
+	});
+
+	it('sin texto ni etiquetas, todo lo compartido por otros, por título', async () => {
+		const results = await searchBooksFromOthers(ALICE, '');
+		expect(results.map((b) => b.userBookId)).toEqual(['ub-b-dune', 'ub-b-emma', 'ub-c-ulises']);
+		expect(await searchBooksFromOthers(ALICE, '', [], 2)).toHaveLength(2);
+	});
+
+	it('las etiquetas para filtrar son solo las de otros (las propias no darían nada)', async () => {
+		const tags = await getSharedTagsForUser(ALICE);
+		expect(tags.map((t) => t.id).sort()).toEqual(['tag-b-club', 'tag-b-pareja', 'tag-c']);
 	});
 
 	it('filtra por etiqueta sin texto', async () => {

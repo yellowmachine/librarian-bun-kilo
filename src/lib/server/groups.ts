@@ -517,7 +517,7 @@ export async function getSharedTagsForUser(
 			.select({ id: tags.id, name: tags.name, color: tags.color })
 			.from(sharedTags)
 			.innerJoin(tags, eq(sharedTags.tagId, tags.id))
-			.where(inArray(sharedTags.groupId, groupIds));
+			.where(and(inArray(sharedTags.groupId, groupIds), ne(tags.userId, userId)));
 
 		const seen = new Set<string>();
 		return rows
@@ -600,14 +600,20 @@ async function booksWithSharedTags(
 	}));
 }
 
+/**
+ * Libros de otros compartidos en los grupos del usuario, por título. Sin texto ni
+ * etiquetas, todos (hasta `limit`, como getMoviesFromOthers): la tab Search los
+ * lista antes de buscar. El texto busca en título, autores, dueño, etiquetas y
+ * título alternativo.
+ */
 export async function searchBooksFromOthers(
 	userId: string,
 	query: string,
-	filterTagIds?: string[]
+	filterTagIds?: string[],
+	limit = 500
 ): Promise<GroupBookResult[]> {
 	const hasQuery = query.trim().length > 0;
 	const hasTagFilter = filterTagIds && filterTagIds.length > 0;
-	if (!hasQuery && !hasTagFilter) return [];
 
 	const normalize = (s: string) =>
 		s
@@ -640,17 +646,19 @@ export async function searchBooksFromOthers(
 			: tagIds;
 
 		const results = await booksWithSharedTags(tx, userId, effectiveTagIds);
-		if (!hasQuery) return results;
+		if (!hasQuery) return results.slice(0, limit);
 
 		// 4. Filtro de texto en JS (título, autores, propietario, tags)
-		return results.filter(
-			(book) =>
-				normalize(book.title).includes(q) ||
-				book.authors.some((a: string) => normalize(a).includes(q)) ||
-				normalize(book.ownerName).includes(q) ||
-				book.tags.some((t) => normalize(t.name).includes(q)) ||
-				(book.alternateTitle && normalize(book.alternateTitle).includes(q))
-		);
+		return results
+			.filter(
+				(book) =>
+					normalize(book.title).includes(q) ||
+					book.authors.some((a: string) => normalize(a).includes(q)) ||
+					normalize(book.ownerName).includes(q) ||
+					book.tags.some((t) => normalize(t.name).includes(q)) ||
+					(book.alternateTitle && normalize(book.alternateTitle).includes(q))
+			)
+			.slice(0, limit);
 	});
 }
 
