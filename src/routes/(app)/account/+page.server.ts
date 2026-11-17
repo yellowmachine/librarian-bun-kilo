@@ -1,4 +1,6 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
+import { auth } from '$lib/server/auth';
+import { deleteAccount, getDeletionPreview, isRecentSession } from '$lib/server/accountDeletion';
 import { invitations, invitationLink, inviteAndSend } from '$lib/server/invitations';
 import {
 	hasOpenRouterApiKey,
@@ -11,12 +13,15 @@ import { CONTRAST_COOKIE, parseContrast } from '$lib/contrast';
 
 export const load: PageServerLoad = async ({ locals, cookies }) => {
 	const userId = locals.user!.id;
-	const [sent, hasKey, monthCostUsd] = await Promise.all([
+	const [sent, hasKey, monthCostUsd, deletion] = await Promise.all([
 		invitations.sentBy(userId),
 		hasOpenRouterApiKey(userId),
-		getMonthCostUsd(userId)
+		getMonthCostUsd(userId),
+		getDeletionPreview(userId)
 	]);
 	return {
+		deletion,
+		email: locals.user!.email,
 		contrast: parseContrast(cookies.get(CONTRAST_COOKIE)),
 		hasKey,
 		monthCostUsd,
@@ -64,5 +69,32 @@ export const actions: Actions = {
 			httpOnly: true
 		});
 		return { contrast };
+	},
+
+	// Borrar la cuenta (#94): nunca se bloquea por préstamos (ver accountDeletion.ts).
+	// Sin contraseña (quien entra con Seilide no tiene): el email escrito y una
+	// sesión de hace menos de 15 minutos.
+	deleteAccount: async ({ locals, request }) => {
+		const confirm = String((await request.formData()).get('confirmEmail') ?? '').trim();
+		const { user, session } = locals;
+		if (confirm.toLowerCase() !== user!.email.toLowerCase())
+			return fail(400, {
+				deletion: { message: 'El email no coincide con el de tu cuenta', reauth: false }
+			});
+		if (!isRecentSession(session!.createdAt))
+			return fail(400, {
+				deletion: {
+					message:
+						'Por seguridad, vuelve a entrar antes de borrar la cuenta: tu sesión empezó hace más de 15 minutos.',
+					reauth: true
+				}
+			});
+
+		await deleteAccount(user!.id);
+		// La sesión ya se fue con la cuenta: esto borra la cookie
+		await auth.api
+			.signOut({ headers: request.headers })
+			.catch((err) => console.error('[account] signOut after delete failed:', err));
+		redirect(303, '/login?account-deleted');
 	}
 };

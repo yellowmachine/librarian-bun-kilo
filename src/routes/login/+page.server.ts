@@ -15,7 +15,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		// (cancelado, rechazado, cliente mal configurado…).
 		seilideProblem: seilideProblem(url.searchParams.get('error')),
 		// Tras cambiar la contraseña (/reset-password).
-		passwordChanged: url.searchParams.has('password-changed')
+		passwordChanged: url.searchParams.has('password-changed'),
+		// Tras borrar la cuenta (/account).
+		accountDeleted: url.searchParams.has('account-deleted')
 	};
 };
 

@@ -99,6 +99,13 @@
       "when": 1794904139164,
       "tag": "0013_group_delete_owner_only",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794928316409,
+      "tag": "0014_account_deletion",
+      "breakpoints": true
     }
   ]
 }

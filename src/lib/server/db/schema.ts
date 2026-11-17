@@ -823,12 +823,15 @@ export const loans = pgTable(
 		itemTitle: text('item_title').notNull(),
 		itemCreators: text('item_creators').array(), // autores o directores
 		itemCoverUrl: text('item_cover_url'), // solo URLs públicas (https)
-		borrowerId: text('borrower_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'restrict' }),
-		ownerId: text('owner_id')
-			.notNull()
-			.references(() => user.id, { onDelete: 'restrict' }),
+		// Las dos partes. Si una borra su cuenta, su id queda a null y el préstamo
+		// sigue en el historial de la otra (accountDeletion.ts).
+		borrowerId: text('borrower_id').references(() => user.id, { onDelete: 'set null' }),
+		ownerId: text('owner_id').references(() => user.id, { onDelete: 'set null' }),
+		// El nombre de quien borró su cuenta con el préstamo en curso (active,
+		// return_requested): lo mínimo para que el otro sepa quién tiene su libro
+		// (RGPD, art. 17.3.e). Null en todo lo demás, también en los cerrados.
+		borrowerName: text('borrower_name'),
+		ownerName: text('owner_name'),
 		status: loanStatusEnum('status').default('requested').notNull(),
 		requestedAt: timestamp('requested_at').defaultNow().notNull(),
 		acceptedAt: timestamp('accepted_at'),
