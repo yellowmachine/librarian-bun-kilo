@@ -4,6 +4,7 @@
 	import { ArrowLeft, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
 	import InviteQR from '$lib/components/InviteQR.svelte';
 	import { itemCountLabel } from '$lib/itemCounts';
+	import { tagChipStyle } from '$lib/tagColor';
 
 	let { data, form } = $props();
 	let { group, members, sharedTagsList, myTags } = $derived(data);
@@ -147,12 +148,12 @@
 								>
 									{tag.name}
 									{#if tag.bookCount + tag.movieCount > 0}
-										<span class="opacity-60">· {itemCountLabel(tag.bookCount, tag.movieCount)}</span
+										<span class="opacity-60 hc:opacity-100"
+											>· {itemCountLabel(tag.bookCount, tag.movieCount)}</span
 										>
 									{/if}
-									{#if tag.alreadyShared}<span class="opacity-60">✓</span>{:else}<span
-											class="opacity-40">+</span
-										>{/if}
+									{#if tag.alreadyShared}<span class="opacity-60 hc:opacity-100">✓</span
+										>{:else}<span class="opacity-40 hc:opacity-100">+</span>{/if}
 								</button>
 							</form>
 						{/each}
@@ -169,12 +170,7 @@
 					<ul class="divide-y divide-paper-border">
 						{#each sharedTagsList as st (st.sharedTagId)}
 							<li class="flex items-center gap-3 py-3">
-								<span
-									class="border px-3 py-0.5 text-xs"
-									style={st.tagColor
-										? `border-color: ${st.tagColor}44; color: ${st.tagColor}`
-										: 'border-color: var(--color-paper-border); color: #3d3d3d'}
-								>
+								<span class="border tag-chip px-3 py-0.5 text-xs" style={tagChipStyle(st.tagColor)}>
 									{st.tagName}
 								</span>
 								<span class="text-sm text-ink-muted">{st.ownerName}</span>

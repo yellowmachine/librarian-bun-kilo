@@ -124,7 +124,7 @@
 		onfocus={openDropdown}
 		oninput={openDropdown}
 		onkeydown={handleInputKeydown}
-		class="w-full border border-paper-border px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
+		class="w-full border border-field px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
 	/>
 
 	<!-- Dropdown -->

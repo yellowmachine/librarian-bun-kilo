@@ -5,6 +5,19 @@
 /* Dark mode via clase .dark en <html> */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Alto contraste: data-contrast="more" en <html> (elegido en la cuenta), o el sistema lo pide
+   (prefers-contrast) y el usuario no ha elegido "normal". hooks.server.ts pone el atributo. */
+@custom-variant hc {
+	&:where([data-contrast='more'], [data-contrast='more'] *) {
+		@slot;
+	}
+	@media (prefers-contrast: more) {
+		&:where(:root:not([data-contrast='normal']), :root:not([data-contrast='normal']) *) {
+			@slot;
+		}
+	}
+}
+
 @theme {
 	/* Tipografía */
 	--font-sans: 'Inter', system-ui, sans-serif;
@@ -18,6 +31,14 @@
 	--color-ink: #1c1917;
 	--color-ink-muted: #57534e;
 	--color-ink-faint: #716a65;
+
+	/* Borde de los campos de formulario: 3:1 sobre paper y paper-ui (WCAG 1.4.11), más marcado
+	   que paper-border, que es para separadores */
+	--color-field: #8f857c;
+
+	/* Estrellas de las reseñas */
+	--color-star: #f59e0b;
+	--color-star-empty: #d1d5db;
 
 	--color-accent: #7c5c3e;
 	--color-accent-hover: #6b4f35;
@@ -47,6 +68,40 @@
 	--color-dark-ink-faint: #57534e;
 }
 
+/* Alto contraste: mismos nombres, valores que pasan AAA (7:1) en texto y 3:1 en bordes, sobre
+   blanco. Las clases de Tailwind leen estas variables, así que los componentes no cambian.
+   theme.test.ts comprueba los contrastes. */
+:root {
+	@variant hc {
+		--color-paper: #ffffff;
+		--color-paper-ui: #f3f1ee;
+		--color-paper-border: #78716c;
+		--color-field: #57534e;
+
+		--color-ink: #1c1917;
+		--color-ink-muted: #292524;
+		--color-ink-faint: #44403c;
+
+		--color-accent: #5a3f27;
+		--color-accent-hover: #43302c;
+
+		/* Acciones: enlaces y foco en el 800; los bordes claros, oscuros */
+		--color-brown-300: #57403a;
+		--color-brown-400: #43302c;
+		--color-brown-500: #57403a;
+		--color-brown-600: #43302c;
+		--color-brown-800: #2f231f;
+
+		/* Errores */
+		--color-red-200: #b91c1c;
+		--color-red-300: #b91c1c;
+		--color-red-700: #991b1b;
+
+		--color-star: #b45309;
+		--color-star-empty: #78716c;
+	}
+}
+
 /* Base */
 html {
 	font-family: var(--font-sans);
@@ -66,6 +121,19 @@ html.dark {
 @layer base {
 	:focus-visible {
 		outline-color: var(--color-brown-600);
+		@variant hc {
+			outline-width: 3px;
+			outline-offset: 2px;
+		}
+	}
+}
+
+/* En alto contraste, el foco de los campos también es un contorno grueso, no solo el color del
+   borde. Fuera de capa para ganar a focus:outline-none. */
+:is(input:not([type='checkbox'], [type='radio']), select, textarea):focus {
+	@variant hc {
+		outline: 3px solid var(--color-brown-600);
+		outline-offset: 0;
 	}
 }
 
@@ -90,12 +158,13 @@ html.dark {
 }
 
 @utility btn-secondary {
-	border-color: var(--color-brown-300);
+	/* 4:1 sobre el papel, para que el botón se vea como tal (WCAG 1.4.11) */
+	border-color: var(--color-brown-500);
 	color: var(--color-brown-700);
 	transition-property: color, background-color, border-color;
 	transition-duration: 150ms;
 	&:hover:not(:disabled) {
-		border-color: var(--color-brown-400);
+		border-color: var(--color-brown-600);
 		background-color: var(--color-brown-100);
 	}
 }
@@ -106,6 +175,11 @@ html.dark {
 	color: var(--color-brown-600);
 	transition-property: color;
 	transition-duration: 150ms;
+	/* En alto contraste, subrayadas como los enlaces: que no dependan solo del color */
+	@variant hc {
+		text-decoration-line: underline;
+		text-underline-offset: 2px;
+	}
 	&:hover:not(:disabled) {
 		color: var(--color-brown-800);
 	}
@@ -120,6 +194,30 @@ html.dark {
 	transition-duration: 150ms;
 	&:hover {
 		color: var(--color-brown-800);
+	}
+}
+
+/* Chips de tag. El color lo elige el usuario: tagChipStyle() (tagColor.ts) pasa las variables
+   --tag-border, --tag-bg, --tag-solid y el color de texto legible (--tag-fg, y --tag-fg-hc para
+   alto contraste). Sin color, los de la app. */
+@utility tag-chip {
+	border-color: var(--tag-border, var(--color-paper-border));
+	color: var(--tag-fg, var(--color-ink-muted));
+	@variant hc {
+		border-color: var(--tag-fg-hc, var(--color-ink));
+		color: var(--tag-fg-hc, var(--color-ink));
+	}
+}
+
+/* Chip seleccionado (filtros). En alto contraste, relleno: no basta un matiz de fondo. */
+@utility tag-chip-active {
+	border-color: var(--tag-solid, var(--color-ink-faint));
+	background-color: var(--tag-bg, var(--color-paper-border));
+	color: var(--tag-fg, var(--color-ink));
+	@variant hc {
+		border-color: var(--tag-fg-hc, var(--color-ink));
+		background-color: var(--tag-fg-hc, var(--color-ink));
+		color: var(--color-paper);
 	}
 }
 

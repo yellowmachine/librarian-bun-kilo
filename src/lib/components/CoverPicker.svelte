@@ -86,7 +86,7 @@
 				type="url"
 				bind:value
 				placeholder="…or paste an image URL (https://)"
-				class="w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+				class="w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 			/>
 		</div>
 	</div>

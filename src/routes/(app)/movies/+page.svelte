@@ -226,7 +226,7 @@
 						placeholder={showOwner
 							? 'Search by title, director or owner...'
 							: 'Search by title or director...'}
-						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
+						class="w-full border border-field bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 					/>
 				</div>
 			</div>

@@ -45,7 +45,7 @@
 					placeholder="ABC12345"
 					autofocus
 					maxlength="8"
-					class="min-w-0 flex-1 border border-paper-border px-3 py-2 font-mono text-sm tracking-widest uppercase focus:border-brown-600 focus:ring-0"
+					class="min-w-0 flex-1 border border-field px-3 py-2 font-mono text-sm tracking-widest uppercase focus:border-brown-600 focus:ring-0"
 				/>
 				<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Enter </button>
 			</form>

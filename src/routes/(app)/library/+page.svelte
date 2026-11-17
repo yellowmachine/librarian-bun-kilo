@@ -476,7 +476,7 @@
 						type="search"
 						bind:value={search}
 						placeholder="Search by title or author..."
-						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
+						class="w-full border border-field bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 					/>
 				</div>
 				<button
@@ -504,7 +504,7 @@
 					{#if selectedIds.size > 0}
 						<select
 							bind:value={moveTargetLibraryId}
-							class="border border-paper-border bg-paper px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
+							class="border border-field bg-paper px-3 py-1.5 text-sm focus:border-brown-600 focus:ring-0"
 						>
 							<option value="">Move to…</option>
 							{#each userLibraries as lib (lib.id)}
@@ -601,7 +601,7 @@
 					placeholder={tab === 'groups'
 						? 'Search by title, author or person...'
 						: 'Search by title or author...'}
-					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
+					class="w-full border border-field bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 				/>
 			</div>
 			{#if filteredBrowseBooks.length === 0}
@@ -651,7 +651,7 @@
 					type="search"
 					bind:value={searchInput}
 					placeholder="Title, author, ISBN, tag or person..."
-					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
+					class="w-full border border-field bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 				/>
 			</div>
 			<button

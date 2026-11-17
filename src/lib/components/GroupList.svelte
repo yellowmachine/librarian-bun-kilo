@@ -28,7 +28,7 @@
 				<a
 					href={hrefFor(g.id)}
 					class="-mx-2 flex items-center gap-4 px-2 py-3 transition-colors hover:bg-paper-ui
-					{count === 0 ? 'opacity-60' : ''}"
+					{count === 0 ? 'opacity-60 hc:opacity-100' : ''}"
 				>
 					<div
 						class="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-paper-border bg-paper-ui"

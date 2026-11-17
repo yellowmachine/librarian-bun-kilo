@@ -80,7 +80,7 @@
 					placeholder="Office"
 					autofocus
 					maxlength="100"
-					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="min-w-0 flex-1 border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 				<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Create </button>
 			</form>
@@ -118,7 +118,7 @@
 							bind:value={editName}
 							autofocus
 							maxlength="100"
-							class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+							class="min-w-0 flex-1 border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 						/>
 						<button type="submit" class="shrink-0 border btn-primary px-3 py-2 text-sm">
 							Save

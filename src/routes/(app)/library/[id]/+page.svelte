@@ -11,7 +11,7 @@
 	import Espera from '$lib/components/Espera.svelte';
 	import ReviewsSection from '$lib/components/ReviewsSection.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { readableTagTextColor } from '$lib/tagColor';
+	import { tagChipStyle } from '$lib/tagColor';
 	import type { BookSearchResult } from '$lib/types';
 
 	let confirmMessage = $state('');
@@ -364,7 +364,7 @@
 					type="text"
 					required
 					bind:value={correctTitle}
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 			<div>
@@ -388,7 +388,7 @@
 					type="text"
 					bind:value={linkQuery}
 					placeholder="Title, author or ISBN..."
-					class="min-w-0 flex-1 border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="min-w-0 flex-1 border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 				<button type="submit" class="border btn-primary px-4 py-2 text-sm"> Search </button>
 			</form>
@@ -437,7 +437,7 @@
 					type="text"
 					required
 					bind:value={editTitle}
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				/>
 			</div>
 			<div>
@@ -457,7 +457,7 @@
 						name="isbn"
 						type="text"
 						bind:value={editIsbn}
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 				<div>
@@ -472,7 +472,7 @@
 						min="0"
 						max="9999"
 						bind:value={editPublishYear}
-						class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+						class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 					/>
 				</div>
 			</div>
@@ -487,7 +487,7 @@
 					name="description"
 					rows="4"
 					bind:value={editDescription}
-					class="mt-1.5 w-full resize-none border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full resize-none border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 			<button type="submit" class="border btn-primary px-5 py-2 text-sm"> Save changes </button>
@@ -562,7 +562,7 @@
 					id="library-id"
 					name="libraryId"
 					bind:value={selectedLibraryId}
-					class="min-w-0 flex-1 border border-paper-border bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="min-w-0 flex-1 border border-field bg-paper px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				>
 					{#each userLibraries as library (library.id)}
 						<option value={library.id}>{library.name}</option>
@@ -607,7 +607,7 @@
 					bind:value={notes}
 					rows="3"
 					placeholder="Edition, book condition..."
-					class="mt-1.5 w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="mt-1.5 w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 			</div>
 
@@ -668,10 +668,8 @@
 								<button
 									type="button"
 									onclick={() => applySuggestedTags([tag.id], [])}
-									class="border px-3 py-1 text-xs transition-colors hover:border-ink-faint"
-									style={tag.color
-										? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-										: 'border-color: var(--color-paper-border); color: #3d3d3d'}
+									class="border tag-chip px-3 py-1 text-xs transition-colors hover:border-ink-faint"
+									style={tagChipStyle(tag.color)}
 								>
 									+ {tag.name}
 								</button>
@@ -726,14 +724,12 @@
 							<input type="hidden" name="tagId" value={tag.id} />
 							<button
 								type="submit"
-								class="group flex items-center gap-1.5 border px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-700 {unsuggestedAssigned.has(
+								class="group flex items-center gap-1.5 border tag-chip px-3 py-1 text-xs transition-colors hover:border-red-200 hover:text-red-700 {unsuggestedAssigned.has(
 									tag.id
 								)
 									? 'border-dashed'
 									: ''}"
-								style={tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: var(--color-paper-border); color: #3d3d3d'}
+								style={tagChipStyle(tag.color)}
 							>
 								{tag.name}
 								<span class="opacity-0 group-hover:opacity-100">×</span>
@@ -792,7 +788,7 @@
 						name="notes"
 						placeholder="Message to the owner (optional)"
 						rows="3"
-						class="w-full resize-none border border-paper-border px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
+						class="w-full resize-none border border-field px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 					></textarea>
 					<button type="submit" class="w-full border btn-primary py-2.5 text-sm">
 						Request loan

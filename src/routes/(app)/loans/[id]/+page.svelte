@@ -209,7 +209,7 @@
 							name="ownerNotes"
 							placeholder="Message to the borrower (optional)"
 							rows="2"
-							class="mb-2 w-full resize-none border border-paper-border bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
+							class="mb-2 w-full resize-none border border-field bg-paper px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brown-600 focus:ring-0 focus:outline-none"
 						></textarea>
 					{/if}
 					<button

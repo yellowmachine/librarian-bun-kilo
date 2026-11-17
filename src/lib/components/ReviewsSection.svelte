@@ -103,7 +103,7 @@
 					rows="3"
 					maxlength="5000"
 					placeholder="What did you think? (optional)"
-					class="w-full border border-paper-border px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
+					class="w-full border border-field px-3 py-2 text-sm focus:border-brown-600 focus:ring-0"
 				></textarea>
 				<div class="flex items-center gap-3">
 					<button

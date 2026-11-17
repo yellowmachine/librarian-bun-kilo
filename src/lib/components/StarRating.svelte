@@ -51,8 +51,7 @@
 				height={size}
 				viewBox="0 0 24 24"
 				aria-hidden="true"
-				class="shrink-0 transition-colors"
-				style="color: {filled(star) ? '#f59e0b' : '#d1d5db'}"
+				class="shrink-0 transition-colors {filled(star) ? 'text-star' : 'text-star-empty'}"
 			>
 				<path
 					fill="currentColor"
@@ -65,7 +64,7 @@
 				onclick={() => select(star)}
 				onmouseenter={() => (hovered = star)}
 				onmouseleave={() => (hovered = 0)}
-				class="shrink-0 cursor-pointer transition-transform hover:scale-110 focus:outline-none"
+				class="shrink-0 cursor-pointer transition-transform hover:scale-110"
 				aria-label="{star} estrella{star !== 1 ? 's' : ''}"
 			>
 				<svg
@@ -73,8 +72,7 @@
 					height={size}
 					viewBox="0 0 24 24"
 					aria-hidden="true"
-					class="transition-colors"
-					style="color: {filled(star) ? '#f59e0b' : '#d1d5db'}"
+					class="transition-colors {filled(star) ? 'text-star' : 'text-star-empty'}"
 				>
 					<path
 						fill="currentColor"

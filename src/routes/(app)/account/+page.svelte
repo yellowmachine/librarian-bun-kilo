@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { input, label, primary, problem } from '$lib/auth-form';
 	import { formatUsd } from '$lib/aiUsageLabels';
+	import type { Contrast } from '$lib/contrast';
 
 	let { data, form } = $props();
 
@@ -18,6 +19,12 @@
 		copied = link;
 		setTimeout(() => (copied = null), 2000);
 	}
+
+	const CONTRAST_LABELS: Record<Contrast, { label: string; hint: string }> = {
+		system: { label: 'Como el sistema', hint: 'Alto si tu dispositivo pide más contraste' },
+		normal: { label: 'Normal', hint: 'Los colores de siempre' },
+		more: { label: 'Alto', hint: 'Texto y bordes más oscuros, fondo blanco' }
+	};
 
 	const date = (d: Date) => d.toLocaleDateString('es', { day: 'numeric', month: 'short' });
 </script>
@@ -85,6 +92,53 @@
 				{/each}
 			</ul>
 		{/if}
+	</section>
+
+	<!-- ── Contraste ──────────────────────────────────────────────────── -->
+	<section class="space-y-5">
+		<div>
+			<h2 class="text-sm font-medium text-ink">Contraste</h2>
+			<p class="mt-1 text-sm text-ink-muted">Se guarda en este dispositivo.</p>
+		</div>
+
+		<form
+			method="POST"
+			action="?/setContrast"
+			use:enhance={({ formData }) => {
+				// Se aplica ya, sin esperar a recargar: el atributo de <html> lo pone el servidor
+				document.documentElement.dataset.contrast = String(formData.get('contrast'));
+				return async ({ update }) => update({ reset: false });
+			}}
+		>
+			<fieldset class="space-y-2">
+				<legend class="sr-only">Contraste</legend>
+				{#each Object.entries(CONTRAST_LABELS) as [value, option] (value)}
+					<label
+						class="flex cursor-pointer items-start gap-3 border px-4 py-3 text-sm transition-colors
+						{data.contrast === value
+							? 'border-brown-600 bg-paper'
+							: 'border-paper-border hover:border-ink-faint'}"
+					>
+						<input
+							type="radio"
+							name="contrast"
+							{value}
+							checked={data.contrast === value}
+							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							class="mt-0.5 border-field text-brown-700 focus:ring-brown-600"
+						/>
+						<span>
+							<span class="block text-ink">{option.label}</span>
+							<span class="block text-xs text-ink-faint">{option.hint}</span>
+						</span>
+					</label>
+				{/each}
+			</fieldset>
+			<noscript
+				><button type="submit" class="mt-3 border btn-secondary px-4 py-2 text-sm">Guardar</button
+				></noscript
+			>
+		</form>
 	</section>
 
 	<!-- ── OpenRouter ─────────────────────────────────────────────────── -->

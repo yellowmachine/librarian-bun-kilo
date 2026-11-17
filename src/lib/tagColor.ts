@@ -83,6 +83,9 @@ function hslToHex(h: number, s: number, l: number): string {
 // "paper-ui" (#f5eee4, ≈ 0.86), 0.152. Con 0.14 queda 4.8:1 en el peor de los dos.
 // Se deja algo de margen porque la búsqueda avanza en pasos de L, no es exacta.
 const MAX_TEXT_LUMINANCE = 0.14;
+// Alto contraste: 7:1 (AAA) sobre paper-ui (#f3f1ee, ≈ 0.88) pide luminancia ≤ 0.084; con 0.08
+// queda margen. Sobre estos colores, el blanco del chip seleccionado también da 7:1.
+const MAX_TEXT_LUMINANCE_HC = 0.08;
 const MIN_LIGHTNESS_FLOOR = 8;
 const LIGHTNESS_STEP = 2;
 const MIN_SATURATION = 35;
@@ -93,9 +96,12 @@ const MIN_SATURATION = 35;
  * relativa sea lo bastante baja como para leerse sobre el fondo claro de
  * la app. Los colores ya oscuros se devuelven sin cambios.
  */
-export function readableTagTextColor(hex: string | null | undefined): string | null {
+export function readableTagTextColor(
+	hex: string | null | undefined,
+	maxLuminance = MAX_TEXT_LUMINANCE
+): string | null {
 	if (!hex) return null;
-	if (relativeLuminance(hexToRgb(hex)) <= MAX_TEXT_LUMINANCE) return hex;
+	if (relativeLuminance(hexToRgb(hex)) <= maxLuminance) return hex;
 
 	const { h, s, l } = hexToHsl(hex);
 	const saturation = Math.max(s, MIN_SATURATION);
@@ -105,7 +111,24 @@ export function readableTagTextColor(hex: string | null | undefined): string | n
 	while (lightness > MIN_LIGHTNESS_FLOOR) {
 		lightness -= LIGHTNESS_STEP;
 		candidate = hslToHex(h, saturation, lightness);
-		if (relativeLuminance(hexToRgb(candidate)) <= MAX_TEXT_LUMINANCE) break;
+		if (relativeLuminance(hexToRgb(candidate)) <= maxLuminance) break;
 	}
 	return candidate;
+}
+
+/**
+ * Variables CSS para pintar un chip de tag con su color (clases `tag-chip` y
+ * `tag-chip-active` de layout.css): borde y fondo tenues con el color tal cual,
+ * texto en la variante legible, y otra más oscura para alto contraste. Sin
+ * color, nada: el chip usa los colores de la app.
+ */
+export function tagChipStyle(hex: string | null | undefined): string {
+	if (!hex) return '';
+	return [
+		`--tag-border: ${hex}44`,
+		`--tag-bg: ${hex}22`,
+		`--tag-solid: ${hex}`,
+		`--tag-fg: ${readableTagTextColor(hex)}`,
+		`--tag-fg-hc: ${readableTagTextColor(hex, MAX_TEXT_LUMINANCE_HC)}`
+	].join('; ');
 }
