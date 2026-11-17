@@ -303,6 +303,11 @@
 	);
 
 	const searchTagSet = $derived(new Set(othersSearch.tagIds));
+	const searchResults = $derived(othersSearch.results ?? []);
+	// Sin texto ni etiquetas la búsqueda trae todo lo compartido: vacía, no hay nada
+	const nothingShared = $derived(
+		!othersSearch.query && othersSearch.tagIds.length === 0 && searchResults.length === 0
+	);
 
 	function runSearch(query: string, tagIds: string[]) {
 		const params = ['tab=search'];
@@ -352,7 +357,7 @@
 					>
 						<a
 							href="/api/export?format=yaml"
-							download="library.yaml"
+							download
 							onclick={() => (exportOpen = false)}
 							class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
 						>
@@ -361,7 +366,7 @@
 						</a>
 						<a
 							href="/api/export?format=bibtex"
-							download="library.bib"
+							download
 							onclick={() => (exportOpen = false)}
 							class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-muted hover:bg-paper-ui"
 						>
@@ -627,6 +632,16 @@
 		{/if}
 
 		<!-- ── Búsqueda en lo compartido ─────────────────────────────────────── -->
+		<!-- Sin filtros, la lista entera: si está vacía es que nadie comparte nada (como en Movies) -->
+	{:else if nothingShared}
+		<div class="flex flex-col items-center justify-center py-24 text-center">
+			<div class="mb-6 font-serif text-6xl text-ink-faint">·</div>
+			<p class="max-w-sm text-sm text-ink-faint">
+				Nobody has shared books with you yet. They show up here when someone in one of your groups
+				shares a tag their books carry.
+			</p>
+			<a href="/groups" class="mt-4 text-sm link-action">Your groups</a>
+		</div>
 	{:else}
 		<TagChips
 			tags={sharedTagsForOthers}
@@ -667,31 +682,27 @@
 			</button>
 		</form>
 
-		{#if othersSearch.results}
-			{#if othersSearch.results.length === 0}
-				<p class="text-sm text-ink-faint">
-					{othersSearch.query ? `No results for "${othersSearch.query}".` : 'No results.'}
-				</p>
-			{:else}
-				<p class="text-xs text-ink-faint">
-					{othersSearch.results.length}
-					{othersSearch.results.length === 1 ? 'result' : 'results'}
-				</p>
-				<BookGrid
-					books={othersSearch.results.map((b) => ({
-						id: b.userBookId,
-						title: b.title,
-						authors: b.authors,
-						coverUrl: b.coverUrl,
-						publishYear: b.publishYear,
-						isAvailable: b.isAvailable,
-						ownerName: b.ownerName,
-						href: `/library/${b.userBookId}`
-					}))}
-				/>
-			{/if}
+		{#if searchResults.length === 0}
+			<p class="py-12 text-center text-sm text-ink-faint">
+				{othersSearch.query ? `No results for "${othersSearch.query}".` : 'No results.'}
+			</p>
 		{:else}
-			<p class="text-sm text-ink-faint">Search books shared by people in your groups.</p>
+			<p class="text-xs text-ink-faint">
+				{searchResults.length}
+				{searchResults.length === 1 ? 'book' : 'books'}
+			</p>
+			<BookGrid
+				books={searchResults.map((b) => ({
+					id: b.userBookId,
+					title: b.title,
+					authors: b.authors,
+					coverUrl: b.coverUrl,
+					publishYear: b.publishYear,
+					isAvailable: b.isAvailable,
+					ownerName: b.ownerName,
+					href: `/library/${b.userBookId}`
+				}))}
+			/>
 		{/if}
 	{/if}
 </div>

@@ -19,7 +19,11 @@ import {
 	getTagGroupShares,
 	getUserTagsForGroup,
 	getSharedTagsInGroup,
-	deleteGroup
+	getSharedTagsForUser,
+	deleteGroup,
+	renameGroup,
+	parseGroupFields,
+	getSharedTagItems
 } from '../groups';
 
 const ALICE = 'user-alice';
@@ -101,6 +105,17 @@ describe('searchBooksFromOthers', () => {
 	it('busca en todos los grupos del usuario, sin los propios', async () => {
 		const results = await searchBooksFromOthers(ALICE, 'dune');
 		expect(results.map((b) => b.userBookId)).toEqual(['ub-b-dune']);
+	});
+
+	it('sin texto ni etiquetas, todo lo compartido por otros, por título', async () => {
+		const results = await searchBooksFromOthers(ALICE, '');
+		expect(results.map((b) => b.userBookId)).toEqual(['ub-b-dune', 'ub-b-emma', 'ub-c-ulises']);
+		expect(await searchBooksFromOthers(ALICE, '', [], 2)).toHaveLength(2);
+	});
+
+	it('las etiquetas para filtrar son solo las de otros (las propias no darían nada)', async () => {
+		const tags = await getSharedTagsForUser(ALICE);
+		expect(tags.map((t) => t.id).sort()).toEqual(['tag-b-club', 'tag-b-pareja', 'tag-c']);
 	});
 
 	it('filtra por etiqueta sin texto', async () => {
@@ -201,5 +216,93 @@ describe('deleteGroup', () => {
 	it('cuenta todo lo compartido en el grupo, también lo propio', async () => {
 		const all = await getGroupItemCounts(BOB, { includeOwn: true });
 		expect(all['grp-club']).toEqual({ books: 2, movies: 1 });
+	});
+});
+
+describe('renameGroup', () => {
+	async function groupRow(id: string) {
+		const res = await holder.tdb.asSuperuser((tx) =>
+			tx.execute(`SELECT name, description FROM groups WHERE id = '${id}'` as string)
+		);
+		return res.rows[0];
+	}
+
+	it('el owner cambia nombre y descripción', async () => {
+		expect(
+			await renameGroup(BOB, 'grp-club', { name: 'Cineclub', description: 'Los jueves' })
+		).toBe(true);
+		expect(await groupRow('grp-club')).toEqual({ name: 'Cineclub', description: 'Los jueves' });
+	});
+
+	it('un admin también; un miembro no', async () => {
+		await holder.tdb.asSuperuser((tx) =>
+			tx.execute(
+				`UPDATE group_members SET role = 'admin' WHERE group_id = 'grp-club' AND user_id = '${CAROL}'` as string
+			)
+		);
+		expect(await renameGroup(ALICE, 'grp-club', { name: 'De Alice', description: null })).toBe(
+			false
+		);
+		expect(await renameGroup(CAROL, 'grp-club', { name: 'De Carol', description: null })).toBe(
+			true
+		);
+		expect(await groupRow('grp-club')).toEqual({ name: 'De Carol', description: null });
+	});
+});
+
+describe('parseGroupFields', () => {
+	const form = (fields: Record<string, string>) => {
+		const data = new FormData();
+		for (const [k, v] of Object.entries(fields)) data.set(k, v);
+		return data;
+	};
+
+	it('recorta, y la descripción vacía es null', () => {
+		expect(parseGroupFields(form({ name: '  Club  ', description: '  ' }))).toEqual({
+			name: 'Club',
+			description: null
+		});
+	});
+
+	it('nombre obligatorio y de 60 caracteres como mucho', () => {
+		expect(parseGroupFields(form({ name: ' ' }))).toHaveProperty('error');
+		expect(parseGroupFields(form({ name: 'x'.repeat(61) }))).toHaveProperty('error');
+		expect(parseGroupFields(form({ name: 'x'.repeat(60) }))).toHaveProperty('name');
+	});
+});
+
+describe('getSharedTagItems', () => {
+	it('lo que lleva una etiqueta de otro: libros y películas', async () => {
+		const items = await getSharedTagItems(ALICE, 'grp-club', 'tag-b-club');
+		expect(items.books.map((b) => b.id)).toEqual(['ub-b-emma']);
+		expect(items.movies.map((m) => m.id)).toEqual(['um-b-alien']);
+		expect(items.movies[0]).toMatchObject({ title: 'Alien', creators: [] });
+	});
+
+	it('también lo propio: lo que uno enseña al grupo', async () => {
+		const items = await getSharedTagItems(ALICE, 'grp-pareja', 'tag-a');
+		expect(items.books.map((b) => b.id)).toEqual(['ub-a-dune']);
+	});
+
+	it('nada si la etiqueta no está compartida en ese grupo', async () => {
+		// «Para Alice» se comparte en Pareja, no en el Club
+		expect(await getSharedTagItems(ALICE, 'grp-club', 'tag-b-pareja')).toEqual({
+			books: [],
+			movies: []
+		});
+	});
+
+	it('nada si no eres miembro', async () => {
+		expect(await getSharedTagItems(CAROL, 'grp-pareja', 'tag-b-pareja')).toEqual({
+			books: [],
+			movies: []
+		});
+	});
+
+	it('el recuento de la lista coincide con lo que se despliega', async () => {
+		for (const st of await getSharedTagsInGroup(ALICE, 'grp-club')) {
+			const items = await getSharedTagItems(ALICE, 'grp-club', st.tagId);
+			expect([items.books.length, items.movies.length]).toEqual([st.bookCount, st.movieCount]);
+		}
 	});
 });

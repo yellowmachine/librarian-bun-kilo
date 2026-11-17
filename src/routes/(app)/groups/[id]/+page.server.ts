@@ -11,7 +11,9 @@ import {
 	removeMember,
 	regenerateInviteCode,
 	deleteGroup,
-	getGroupItemCounts
+	getGroupItemCounts,
+	renameGroup,
+	parseGroupFields
 } from '$lib/server/groups';
 
 export const load = async ({ locals, params }: RequestEvent) => {
@@ -72,6 +74,16 @@ export const actions = {
 
 		await removeMember(locals.user!.id, params.id!, targetUserId);
 		return { success: true };
+	},
+
+	// Cambiar nombre y descripción (owner o admin; la RLS lo impone)
+	rename: async ({ locals, params, request }: RequestEvent) => {
+		const fields = parseGroupFields(await request.formData());
+		if ('error' in fields) return fail(400, { renameError: fields.error });
+
+		if (!(await renameGroup(locals.user!.id, params.id!, fields)))
+			return fail(403, { renameError: 'Only the owner or an admin can rename the group.' });
+		return { renamed: true };
 	},
 
 	// Borrar el grupo (solo el owner; la RLS lo impone). Con más miembros, hay que escribir su

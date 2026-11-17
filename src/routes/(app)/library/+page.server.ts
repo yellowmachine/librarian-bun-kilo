@@ -25,7 +25,6 @@ export const load = async ({ locals, url }: RequestEvent) => {
 	const groupId = tab === 'groups' ? url.searchParams.get('group') : null;
 	const query = tab === 'search' ? (url.searchParams.get('q')?.trim() ?? '') : '';
 	const searchTagIds = tab === 'search' ? url.searchParams.getAll('tag') : [];
-	const searched = query !== '' || searchTagIds.length > 0;
 
 	const [userBooks, contacts, groups, sharedTagsForOthers, userLibraries] = await Promise.all([
 		getUserBooks(userId, libraryId ? { type: 'library', libraryId } : { type: 'all' }),
@@ -41,7 +40,8 @@ export const load = async ({ locals, url }: RequestEvent) => {
 	const [contactBooks, groupBooks, searchResults] = await Promise.all([
 		selectedContact ? getContactBooks(userId, selectedContact.userId) : null,
 		selectedGroup ? getGroupBooks(userId, selectedGroup.id) : null,
-		searched ? searchBooksFromOthers(userId, query, searchTagIds) : null
+		// Sin texto ni etiquetas, todo lo compartido: Search lista antes de buscar, como en Movies
+		tab === 'search' ? searchBooksFromOthers(userId, query, searchTagIds) : null
 	]);
 
 	return {

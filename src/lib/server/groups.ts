@@ -11,6 +11,7 @@ import {
 	tags,
 	userBooks,
 	books,
+	movies,
 	userBookTags,
 	userMovies,
 	userMovieTags
@@ -65,6 +66,22 @@ export type GroupBookResult = {
 	isAvailable: boolean;
 	tags: { id: string; name: string; color: string | null }[];
 };
+
+// ─── Nombre y descripción (crear y renombrar) ────────────────────────────────
+
+export const GROUP_NAME_MAX = 60;
+
+/** Lee y valida el nombre y la descripción de un formulario de grupo. */
+export function parseGroupFields(
+	data: FormData
+): { name: string; description: string | null } | { error: string } {
+	const name = String(data.get('name') ?? '').trim();
+	const description = String(data.get('description') ?? '').trim() || null;
+	if (!name) return { error: 'The group needs a name.' };
+	if (name.length > GROUP_NAME_MAX)
+		return { error: `The name can have ${GROUP_NAME_MAX} characters at most.` };
+	return { name, description };
+}
 
 // ─── Crear grupo ──────────────────────────────────────────────────────────────
 
@@ -269,6 +286,27 @@ export async function removeMember(
 	);
 }
 
+// ─── Renombrar un grupo ──────────────────────────────────────────────────────
+
+/**
+ * Cambia el nombre y la descripción. Owner o admin (la RLS de groups_update lo
+ * impone). Devuelve si se cambió.
+ */
+export async function renameGroup(
+	userId: string,
+	groupId: string,
+	data: { name: string; description: string | null }
+): Promise<boolean> {
+	const updated = await withRLS(userId, (tx) =>
+		tx
+			.update(groups)
+			.set({ name: data.name, description: data.description, updatedAt: new Date() })
+			.where(eq(groups.id, groupId))
+			.returning({ id: groups.id })
+	);
+	return updated.length > 0;
+}
+
 // ─── Borrar un grupo ─────────────────────────────────────────────────────────
 
 /**
@@ -373,6 +411,76 @@ export async function getSharedTagsInGroup(
 				movieCount: movieCountMap.get(row.tagId) ?? 0
 			}))
 			.sort((a, b) => a.tagName.localeCompare(b.tagName) || a.ownerName.localeCompare(b.ownerName));
+	});
+}
+
+// ─── Qué lleva una etiqueta compartida en un grupo ───────────────────────────
+
+export type SharedTagItem = {
+	/** userBookId o userMovieId */
+	id: string;
+	title: string;
+	/** Autores del libro o directores de la película */
+	creators: string[];
+	coverUrl: string | null;
+	year: number | null;
+};
+
+/**
+ * Los libros y películas que lleva una etiqueta compartida en un grupo, también
+ * los propios (para ver qué enseña uno al grupo), por título. Vacío si la
+ * etiqueta no está compartida en ese grupo o el usuario no es miembro. La RLS
+ * deja ver lo de los demás por la propia etiqueta compartida.
+ */
+export async function getSharedTagItems(
+	userId: string,
+	groupId: string,
+	tagId: string
+): Promise<{ books: SharedTagItem[]; movies: SharedTagItem[] }> {
+	return withRLS(userId, async (tx) => {
+		const shared = await tx
+			.select({ id: sharedTags.id })
+			.from(sharedTags)
+			.innerJoin(
+				groupMembers,
+				and(eq(groupMembers.groupId, sharedTags.groupId), eq(groupMembers.userId, userId))
+			)
+			.where(and(eq(sharedTags.groupId, groupId), eq(sharedTags.tagId, tagId)));
+		if (shared.length === 0) return { books: [], movies: [] };
+
+		const bookRows = await tx
+			.select({
+				id: userBooks.id,
+				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+				creators: sql<string[] | null>`COALESCE(${userBooks.authors}, ${books.authors})`,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
+				year: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`
+			})
+			.from(userBookTags)
+			.innerJoin(userBooks, eq(userBooks.id, userBookTags.userBookId))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(userBookTags.tagId, tagId))
+			.orderBy(sql`lower(COALESCE(${userBooks.title}, ${books.title}))`);
+
+		const movieRows = await tx
+			.select({
+				id: userMovies.id,
+				title: sql<string>`COALESCE(${userMovies.title}, ${movies.title})`,
+				creators: sql<string[] | null>`COALESCE(${userMovies.directors}, ${movies.directors})`,
+				coverUrl: sql<string | null>`COALESCE(${userMovies.coverUrl}, ${movies.posterUrl})`,
+				year: sql<number | null>`COALESCE(${userMovies.releaseYear}, ${movies.releaseYear})`
+			})
+			.from(userMovieTags)
+			.innerJoin(userMovies, eq(userMovies.id, userMovieTags.userMovieId))
+			.leftJoin(movies, eq(userMovies.movieId, movies.id))
+			.where(eq(userMovieTags.tagId, tagId))
+			.orderBy(sql`lower(COALESCE(${userMovies.title}, ${movies.title}))`);
+
+		const withCreators = (r: Omit<SharedTagItem, 'creators'> & { creators: string[] | null }) => ({
+			...r,
+			creators: r.creators ?? []
+		});
+		return { books: bookRows.map(withCreators), movies: movieRows.map(withCreators) };
 	});
 }
 
@@ -517,7 +625,7 @@ export async function getSharedTagsForUser(
 			.select({ id: tags.id, name: tags.name, color: tags.color })
 			.from(sharedTags)
 			.innerJoin(tags, eq(sharedTags.tagId, tags.id))
-			.where(inArray(sharedTags.groupId, groupIds));
+			.where(and(inArray(sharedTags.groupId, groupIds), ne(tags.userId, userId)));
 
 		const seen = new Set<string>();
 		return rows
@@ -600,14 +708,20 @@ async function booksWithSharedTags(
 	}));
 }
 
+/**
+ * Libros de otros compartidos en los grupos del usuario, por título. Sin texto ni
+ * etiquetas, todos (hasta `limit`, como getMoviesFromOthers): la tab Search los
+ * lista antes de buscar. El texto busca en título, autores, dueño, etiquetas y
+ * título alternativo.
+ */
 export async function searchBooksFromOthers(
 	userId: string,
 	query: string,
-	filterTagIds?: string[]
+	filterTagIds?: string[],
+	limit = 500
 ): Promise<GroupBookResult[]> {
 	const hasQuery = query.trim().length > 0;
 	const hasTagFilter = filterTagIds && filterTagIds.length > 0;
-	if (!hasQuery && !hasTagFilter) return [];
 
 	const normalize = (s: string) =>
 		s
@@ -640,17 +754,19 @@ export async function searchBooksFromOthers(
 			: tagIds;
 
 		const results = await booksWithSharedTags(tx, userId, effectiveTagIds);
-		if (!hasQuery) return results;
+		if (!hasQuery) return results.slice(0, limit);
 
 		// 4. Filtro de texto en JS (título, autores, propietario, tags)
-		return results.filter(
-			(book) =>
-				normalize(book.title).includes(q) ||
-				book.authors.some((a: string) => normalize(a).includes(q)) ||
-				normalize(book.ownerName).includes(q) ||
-				book.tags.some((t) => normalize(t.name).includes(q)) ||
-				(book.alternateTitle && normalize(book.alternateTitle).includes(q))
-		);
+		return results
+			.filter(
+				(book) =>
+					normalize(book.title).includes(q) ||
+					book.authors.some((a: string) => normalize(a).includes(q)) ||
+					normalize(book.ownerName).includes(q) ||
+					book.tags.some((t) => normalize(t.name).includes(q)) ||
+					(book.alternateTitle && normalize(book.alternateTitle).includes(q))
+			)
+			.slice(0, limit);
 	});
 }
 

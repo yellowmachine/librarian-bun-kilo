@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, Copy, ArrowsClockwise, X } from 'phosphor-svelte';
+	import { ArrowLeft, Copy, ArrowsClockwise, X, PencilSimple, CaretDown } from 'phosphor-svelte';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import Spinner from '$lib/components/Spinner.svelte';
+	import type { SharedTagItem } from '$lib/server/groups';
 	import InviteQR from '$lib/components/InviteQR.svelte';
 	import { itemCountLabel } from '$lib/itemCounts';
 	import { tagChipStyle } from '$lib/tagColor';
@@ -24,6 +27,34 @@
 
 	// Mostrar errores de acciones en un banner transitorio
 	let actionError = $derived(form?.error as string | undefined);
+
+	// Lo que lleva cada etiqueta compartida, desplegado bajo su fila. Se pide al desplegar
+	// (no con la página) y se guarda mientras dura la página.
+	type SharedItems = { books: SharedTagItem[]; movies: SharedTagItem[] };
+	const expanded = new SvelteSet<string>();
+	const sharedItems = new SvelteMap<string, SharedItems | 'error'>();
+
+	async function toggleShared(sharedTagId: string, tagId: string) {
+		if (expanded.has(sharedTagId)) {
+			expanded.delete(sharedTagId);
+			return;
+		}
+		expanded.add(sharedTagId);
+		if (sharedItems.get(sharedTagId) && sharedItems.get(sharedTagId) !== 'error') return;
+		sharedItems.delete(sharedTagId);
+		try {
+			const res = await fetch(`/api/groups/${group.id}/tags/${tagId}`);
+			if (!res.ok) throw new Error(String(res.status));
+			sharedItems.set(sharedTagId, await res.json());
+		} catch {
+			sharedItems.set(sharedTagId, 'error');
+		}
+	}
+
+	// Editar nombre y descripción (owner o admin), en la propia cabecera
+	let editing = $state(false);
+	let saving = $state(false);
+	const renameError = $derived(form?.renameError as string | undefined);
 
 	// Confirmación de expulsión de miembro
 	let pendingRemove = $state<{ userId: string; name: string } | null>(null);
@@ -55,17 +86,96 @@
 		>
 			<ArrowLeft size={16} /> Grupos
 		</a>
-		<div class="mt-3 flex items-start justify-between">
-			<div>
-				<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{group.name}</h1>
-				{#if group.description}
-					<p class="mt-1 text-sm text-ink-faint">{group.description}</p>
+		{#if editing}
+			<form
+				method="POST"
+				action="?/rename"
+				class="mt-3 space-y-4"
+				use:enhance={() => {
+					saving = true;
+					return async ({ result, update }) => {
+						await update({ reset: false });
+						saving = false;
+						if (result.type === 'success') editing = false;
+					};
+				}}
+			>
+				<div>
+					<label
+						for="group-name"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						Group name
+					</label>
+					<input
+						id="group-name"
+						name="name"
+						type="text"
+						required
+						maxlength="60"
+						value={group.name}
+						class="mt-1.5 block w-full border-0 border-b border-field bg-transparent px-0 py-2 font-serif text-xl text-ink focus:border-brown-600 focus:ring-0"
+					/>
+				</div>
+				<div>
+					<label
+						for="group-description"
+						class="block text-xs font-medium tracking-widest text-ink-muted uppercase"
+					>
+						Description <span class="tracking-normal text-ink-faint normal-case">(optional)</span>
+					</label>
+					<textarea
+						id="group-description"
+						name="description"
+						rows="2"
+						value={group.description ?? ''}
+						class="mt-1.5 w-full border-0 border-b border-field bg-transparent px-0 py-2 text-sm text-ink focus:border-brown-600 focus:ring-0"
+					></textarea>
+				</div>
+				{#if renameError}
+					<p class="text-sm text-red-700" role="alert">{renameError}</p>
 				{/if}
+				<div class="flex gap-3">
+					<button
+						type="submit"
+						disabled={saving}
+						class="border btn-primary px-4 py-2 text-sm disabled:opacity-50"
+					>
+						{saving ? 'Saving…' : 'Save'}
+					</button>
+					<button
+						type="button"
+						class="border btn-secondary px-4 py-2 text-sm"
+						onclick={() => (editing = false)}
+					>
+						Cancel
+					</button>
+				</div>
+			</form>
+		{:else}
+			<div class="mt-3 flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<h1 class="font-serif text-2xl font-normal text-ink sm:text-3xl">{group.name}</h1>
+					{#if group.description}
+						<p class="mt-1 text-sm text-ink-faint">{group.description}</p>
+					{/if}
+				</div>
+				<div class="mt-1 flex shrink-0 items-center gap-3">
+					{#if isOwnerOrAdmin}
+						<button
+							type="button"
+							onclick={() => (editing = true)}
+							class="flex items-center gap-1 text-xs action-text"
+						>
+							<PencilSimple size={12} /> Edit
+						</button>
+					{/if}
+					<span class="text-xs text-ink-faint">
+						{group.role === 'owner' ? 'owner' : group.role === 'admin' ? 'admin' : 'member'}
+					</span>
+				</div>
 			</div>
-			<span class="mt-1 text-xs text-ink-faint">
-				{group.role === 'owner' ? 'owner' : group.role === 'admin' ? 'admin' : 'member'}
-			</span>
-		</div>
+		{/if}
 	</div>
 
 	<!-- Código de invitación -->
@@ -177,14 +287,91 @@
 					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">In the group</p>
 					<ul class="divide-y divide-paper-border">
 						{#each sharedTagsList as st (st.sharedTagId)}
-							<li class="flex items-center gap-3 py-3">
-								<span class="border tag-chip px-3 py-0.5 text-xs" style={tagChipStyle(st.tagColor)}>
-									{st.tagName}
-								</span>
-								<span class="text-sm text-ink-muted">{st.ownerName}</span>
-								<span class="ml-auto text-xs text-ink-faint">
-									{itemCountLabel(st.bookCount, st.movieCount) || 'Nothing yet'}
-								</span>
+							{@const label = itemCountLabel(st.bookCount, st.movieCount)}
+							{@const open = expanded.has(st.sharedTagId)}
+							{@const panelId = `shared-${st.sharedTagId}`}
+							<li class="py-3">
+								<div class="flex items-center gap-3">
+									<span
+										class="border tag-chip px-3 py-0.5 text-xs"
+										style={tagChipStyle(st.tagColor)}
+									>
+										{st.tagName}
+									</span>
+									<span class="text-sm text-ink-muted">{st.ownerName}</span>
+									{#if label}
+										<button
+											type="button"
+											onclick={() => toggleShared(st.sharedTagId, st.tagId)}
+											aria-expanded={open}
+											aria-controls={panelId}
+											class="ml-auto flex items-center gap-1 text-xs action-text"
+										>
+											{label}
+											<CaretDown
+												size={11}
+												aria-hidden="true"
+												class="transition-transform {open ? 'rotate-180' : ''}"
+											/>
+										</button>
+									{:else}
+										<span class="ml-auto text-xs text-ink-faint">Nothing yet</span>
+									{/if}
+								</div>
+
+								{#if open}
+									{@const items = sharedItems.get(st.sharedTagId)}
+									<div id={panelId} class="mt-3 space-y-4 border-l-2 border-paper-border pl-4">
+										{#if items === undefined}
+											<Spinner size="sm" />
+										{:else if items === 'error'}
+											<p class="text-xs text-red-700">Couldn't load what this tag shares.</p>
+										{:else}
+											{#each [{ heading: 'Books', list: items.books, base: '/library' }, { heading: 'Movies', list: items.movies, base: '/movies' }] as block (block.heading)}
+												{#if block.list.length > 0}
+													<div class="space-y-2">
+														{#if items.books.length > 0 && items.movies.length > 0}
+															<p
+																class="text-xs font-medium tracking-widest text-ink-faint uppercase"
+															>
+																{block.heading}
+															</p>
+														{/if}
+														<ul class="space-y-2">
+															{#each block.list as item (item.id)}
+																<li>
+																	<a
+																		href={`${block.base}/${item.id}`}
+																		class="-mx-2 flex items-center gap-3 px-2 py-1 transition-colors hover:bg-paper-ui"
+																	>
+																		<div class="h-12 w-8 flex-shrink-0 overflow-hidden bg-paper-ui">
+																			{#if item.coverUrl}
+																				<img
+																					src={item.coverUrl}
+																					alt=""
+																					loading="lazy"
+																					class="h-full w-full object-cover"
+																				/>
+																			{/if}
+																		</div>
+																		<span class="min-w-0 text-sm">
+																			<span class="block truncate text-ink">{item.title}</span>
+																			<span class="block truncate text-xs text-ink-faint">
+																				{[item.creators.join(', '), item.year]
+																					.filter(Boolean)
+																					.join(' · ')}
+																			</span>
+																		</span>
+																	</a>
+																</li>
+															{/each}
+														</ul>
+													</div>
+												{/if}
+											{/each}
+										{/if}
+									</div>
+								{/if}
 							</li>
 						{/each}
 					</ul>
