@@ -11,6 +11,7 @@ import {
 	tags,
 	userBooks,
 	books,
+	movies,
 	userBookTags,
 	userMovies,
 	userMovieTags
@@ -410,6 +411,76 @@ export async function getSharedTagsInGroup(
 				movieCount: movieCountMap.get(row.tagId) ?? 0
 			}))
 			.sort((a, b) => a.tagName.localeCompare(b.tagName) || a.ownerName.localeCompare(b.ownerName));
+	});
+}
+
+// ─── Qué lleva una etiqueta compartida en un grupo ───────────────────────────
+
+export type SharedTagItem = {
+	/** userBookId o userMovieId */
+	id: string;
+	title: string;
+	/** Autores del libro o directores de la película */
+	creators: string[];
+	coverUrl: string | null;
+	year: number | null;
+};
+
+/**
+ * Los libros y películas que lleva una etiqueta compartida en un grupo, también
+ * los propios (para ver qué enseña uno al grupo), por título. Vacío si la
+ * etiqueta no está compartida en ese grupo o el usuario no es miembro. La RLS
+ * deja ver lo de los demás por la propia etiqueta compartida.
+ */
+export async function getSharedTagItems(
+	userId: string,
+	groupId: string,
+	tagId: string
+): Promise<{ books: SharedTagItem[]; movies: SharedTagItem[] }> {
+	return withRLS(userId, async (tx) => {
+		const shared = await tx
+			.select({ id: sharedTags.id })
+			.from(sharedTags)
+			.innerJoin(
+				groupMembers,
+				and(eq(groupMembers.groupId, sharedTags.groupId), eq(groupMembers.userId, userId))
+			)
+			.where(and(eq(sharedTags.groupId, groupId), eq(sharedTags.tagId, tagId)));
+		if (shared.length === 0) return { books: [], movies: [] };
+
+		const bookRows = await tx
+			.select({
+				id: userBooks.id,
+				title: sql<string>`COALESCE(${userBooks.title}, ${books.title})`,
+				creators: sql<string[] | null>`COALESCE(${userBooks.authors}, ${books.authors})`,
+				coverUrl: sql<string | null>`COALESCE(${userBooks.coverUrl}, ${books.coverUrl})`,
+				year: sql<number | null>`COALESCE(${userBooks.publishYear}, ${books.publishYear})`
+			})
+			.from(userBookTags)
+			.innerJoin(userBooks, eq(userBooks.id, userBookTags.userBookId))
+			.leftJoin(books, eq(userBooks.bookId, books.id))
+			.where(eq(userBookTags.tagId, tagId))
+			.orderBy(sql`lower(COALESCE(${userBooks.title}, ${books.title}))`);
+
+		const movieRows = await tx
+			.select({
+				id: userMovies.id,
+				title: sql<string>`COALESCE(${userMovies.title}, ${movies.title})`,
+				creators: sql<string[] | null>`COALESCE(${userMovies.directors}, ${movies.directors})`,
+				coverUrl: sql<string | null>`COALESCE(${userMovies.coverUrl}, ${movies.posterUrl})`,
+				year: sql<number | null>`COALESCE(${userMovies.releaseYear}, ${movies.releaseYear})`
+			})
+			.from(userMovieTags)
+			.innerJoin(userMovies, eq(userMovies.id, userMovieTags.userMovieId))
+			.leftJoin(movies, eq(userMovies.movieId, movies.id))
+			.where(eq(userMovieTags.tagId, tagId))
+			.orderBy(sql`lower(COALESCE(${userMovies.title}, ${movies.title}))`);
+
+		const withCreators = (r: Omit<SharedTagItem, 'creators'> & { creators: string[] | null }) => ({
+			...r,
+			creators: r.creators ?? []
+		});
+		return { books: bookRows.map(withCreators), movies: movieRows.map(withCreators) };
 	});
 }
 

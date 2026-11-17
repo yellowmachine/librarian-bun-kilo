@@ -22,7 +22,8 @@ import {
 	getSharedTagsForUser,
 	deleteGroup,
 	renameGroup,
-	parseGroupFields
+	parseGroupFields,
+	getSharedTagItems
 } from '../groups';
 
 const ALICE = 'user-alice';
@@ -267,5 +268,41 @@ describe('parseGroupFields', () => {
 		expect(parseGroupFields(form({ name: ' ' }))).toHaveProperty('error');
 		expect(parseGroupFields(form({ name: 'x'.repeat(61) }))).toHaveProperty('error');
 		expect(parseGroupFields(form({ name: 'x'.repeat(60) }))).toHaveProperty('name');
+	});
+});
+
+describe('getSharedTagItems', () => {
+	it('lo que lleva una etiqueta de otro: libros y películas', async () => {
+		const items = await getSharedTagItems(ALICE, 'grp-club', 'tag-b-club');
+		expect(items.books.map((b) => b.id)).toEqual(['ub-b-emma']);
+		expect(items.movies.map((m) => m.id)).toEqual(['um-b-alien']);
+		expect(items.movies[0]).toMatchObject({ title: 'Alien', creators: [] });
+	});
+
+	it('también lo propio: lo que uno enseña al grupo', async () => {
+		const items = await getSharedTagItems(ALICE, 'grp-pareja', 'tag-a');
+		expect(items.books.map((b) => b.id)).toEqual(['ub-a-dune']);
+	});
+
+	it('nada si la etiqueta no está compartida en ese grupo', async () => {
+		// «Para Alice» se comparte en Pareja, no en el Club
+		expect(await getSharedTagItems(ALICE, 'grp-club', 'tag-b-pareja')).toEqual({
+			books: [],
+			movies: []
+		});
+	});
+
+	it('nada si no eres miembro', async () => {
+		expect(await getSharedTagItems(CAROL, 'grp-pareja', 'tag-b-pareja')).toEqual({
+			books: [],
+			movies: []
+		});
+	});
+
+	it('el recuento de la lista coincide con lo que se despliega', async () => {
+		for (const st of await getSharedTagsInGroup(ALICE, 'grp-club')) {
+			const items = await getSharedTagItems(ALICE, 'grp-club', st.tagId);
+			expect([items.books.length, items.movies.length]).toEqual([st.bookCount, st.movieCount]);
+		}
 	});
 });

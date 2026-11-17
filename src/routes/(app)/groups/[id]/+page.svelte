@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowLeft, Copy, ArrowsClockwise, X, PencilSimple } from 'phosphor-svelte';
+	import { ArrowLeft, Copy, ArrowsClockwise, X, PencilSimple, CaretDown } from 'phosphor-svelte';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+	import Spinner from '$lib/components/Spinner.svelte';
+	import type { SharedTagItem } from '$lib/server/groups';
 	import InviteQR from '$lib/components/InviteQR.svelte';
 	import { itemCountLabel } from '$lib/itemCounts';
 	import { tagChipStyle } from '$lib/tagColor';
@@ -24,6 +27,29 @@
 
 	// Mostrar errores de acciones en un banner transitorio
 	let actionError = $derived(form?.error as string | undefined);
+
+	// Lo que lleva cada etiqueta compartida, desplegado bajo su fila. Se pide al desplegar
+	// (no con la página) y se guarda mientras dura la página.
+	type SharedItems = { books: SharedTagItem[]; movies: SharedTagItem[] };
+	const expanded = new SvelteSet<string>();
+	const sharedItems = new SvelteMap<string, SharedItems | 'error'>();
+
+	async function toggleShared(sharedTagId: string, tagId: string) {
+		if (expanded.has(sharedTagId)) {
+			expanded.delete(sharedTagId);
+			return;
+		}
+		expanded.add(sharedTagId);
+		if (sharedItems.get(sharedTagId) && sharedItems.get(sharedTagId) !== 'error') return;
+		sharedItems.delete(sharedTagId);
+		try {
+			const res = await fetch(`/api/groups/${group.id}/tags/${tagId}`);
+			if (!res.ok) throw new Error(String(res.status));
+			sharedItems.set(sharedTagId, await res.json());
+		} catch {
+			sharedItems.set(sharedTagId, 'error');
+		}
+	}
 
 	// Editar nombre y descripción (owner o admin), en la propia cabecera
 	let editing = $state(false);
@@ -261,14 +287,91 @@
 					<p class="text-xs font-medium tracking-widest text-ink-faint uppercase">In the group</p>
 					<ul class="divide-y divide-paper-border">
 						{#each sharedTagsList as st (st.sharedTagId)}
-							<li class="flex items-center gap-3 py-3">
-								<span class="border tag-chip px-3 py-0.5 text-xs" style={tagChipStyle(st.tagColor)}>
-									{st.tagName}
-								</span>
-								<span class="text-sm text-ink-muted">{st.ownerName}</span>
-								<span class="ml-auto text-xs text-ink-faint">
-									{itemCountLabel(st.bookCount, st.movieCount) || 'Nothing yet'}
-								</span>
+							{@const label = itemCountLabel(st.bookCount, st.movieCount)}
+							{@const open = expanded.has(st.sharedTagId)}
+							{@const panelId = `shared-${st.sharedTagId}`}
+							<li class="py-3">
+								<div class="flex items-center gap-3">
+									<span
+										class="border tag-chip px-3 py-0.5 text-xs"
+										style={tagChipStyle(st.tagColor)}
+									>
+										{st.tagName}
+									</span>
+									<span class="text-sm text-ink-muted">{st.ownerName}</span>
+									{#if label}
+										<button
+											type="button"
+											onclick={() => toggleShared(st.sharedTagId, st.tagId)}
+											aria-expanded={open}
+											aria-controls={panelId}
+											class="ml-auto flex items-center gap-1 text-xs action-text"
+										>
+											{label}
+											<CaretDown
+												size={11}
+												aria-hidden="true"
+												class="transition-transform {open ? 'rotate-180' : ''}"
+											/>
+										</button>
+									{:else}
+										<span class="ml-auto text-xs text-ink-faint">Nothing yet</span>
+									{/if}
+								</div>
+
+								{#if open}
+									{@const items = sharedItems.get(st.sharedTagId)}
+									<div id={panelId} class="mt-3 space-y-4 border-l-2 border-paper-border pl-4">
+										{#if items === undefined}
+											<Spinner size="sm" />
+										{:else if items === 'error'}
+											<p class="text-xs text-red-700">Couldn't load what this tag shares.</p>
+										{:else}
+											{#each [{ heading: 'Books', list: items.books, base: '/library' }, { heading: 'Movies', list: items.movies, base: '/movies' }] as block (block.heading)}
+												{#if block.list.length > 0}
+													<div class="space-y-2">
+														{#if items.books.length > 0 && items.movies.length > 0}
+															<p
+																class="text-xs font-medium tracking-widest text-ink-faint uppercase"
+															>
+																{block.heading}
+															</p>
+														{/if}
+														<ul class="space-y-2">
+															{#each block.list as item (item.id)}
+																<li>
+																	<a
+																		href={`${block.base}/${item.id}`}
+																		class="-mx-2 flex items-center gap-3 px-2 py-1 transition-colors hover:bg-paper-ui"
+																	>
+																		<div class="h-12 w-8 flex-shrink-0 overflow-hidden bg-paper-ui">
+																			{#if item.coverUrl}
+																				<img
+																					src={item.coverUrl}
+																					alt=""
+																					loading="lazy"
+																					class="h-full w-full object-cover"
+																				/>
+																			{/if}
+																		</div>
+																		<span class="min-w-0 text-sm">
+																			<span class="block truncate text-ink">{item.title}</span>
+																			<span class="block truncate text-xs text-ink-faint">
+																				{[item.creators.join(', '), item.year]
+																					.filter(Boolean)
+																					.join(' · ')}
+																			</span>
+																		</span>
+																	</a>
+																</li>
+															{/each}
+														</ul>
+													</div>
+												{/if}
+											{/each}
+										{/if}
+									</div>
+								{/if}
 							</li>
 						{/each}
 					</ul>
