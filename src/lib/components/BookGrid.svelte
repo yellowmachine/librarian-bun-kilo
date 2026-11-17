@@ -11,6 +11,7 @@
 		isAvailable?: boolean;
 		/** "Copy 2 of 3" — shown when the user has more than one copy of this book */
 		copyLabel?: string;
+		ownerName?: string;
 		isMovie?: boolean;
 		href?: string;
 		onclick?: () => void;
@@ -54,6 +55,7 @@
 					publishYear={book.publishYear}
 					isAvailable={book.isAvailable}
 					copyLabel={book.copyLabel}
+					ownerName={book.ownerName}
 					isMovie={book.isMovie}
 					variant="grid"
 					onclick={() => onToggleSelect?.(book.id)}
@@ -67,6 +69,7 @@
 				publishYear={book.publishYear}
 				isAvailable={book.isAvailable}
 				copyLabel={book.copyLabel}
+				ownerName={book.ownerName}
 				isMovie={book.isMovie}
 				variant="grid"
 				href={book.href}

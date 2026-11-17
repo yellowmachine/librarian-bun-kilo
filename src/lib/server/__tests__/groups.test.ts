@@ -1,0 +1,98 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createTestDb, type TestDb } from '../db/test-db';
+
+const holder = vi.hoisted(() => ({ tdb: null as unknown as TestDb }));
+vi.mock('../db/index', () => ({
+	get db() {
+		return holder.tdb.db;
+	}
+}));
+vi.mock('../db/rls', () => ({
+	withRLS: (userId: string, cb: (tx: unknown) => Promise<unknown>) =>
+		holder.tdb.withRLS(userId, cb as never)
+}));
+
+import { getGroupBooks, searchBooksFromOthers } from '../groups';
+
+const ALICE = 'user-alice';
+const BOB = 'user-bob';
+const CAROL = 'user-carol';
+
+beforeEach(async () => {
+	holder.tdb = await createTestDb();
+	// «Pareja» = Alice + Bob; «Club» = Alice + Bob + Carol.
+	// Bob comparte «Dune» solo en Pareja y «Emma» solo en Club; Carol comparte
+	// «Ulises» en Club; Alice comparte su «Dune» en Pareja.
+	const seed = [
+		`INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at) VALUES
+			('${ALICE}', 'Alice', 'alice@test.com', true, now(), now()),
+			('${BOB}', 'Bob', 'bob@test.com', true, now(), now()),
+			('${CAROL}', 'Carol', 'carol@test.com', true, now(), now())`,
+		`INSERT INTO libraries (id, user_id, name, is_default) VALUES
+			('lib-a', '${ALICE}', 'Default', true),
+			('lib-b', '${BOB}', 'Default', true),
+			('lib-c', '${CAROL}', 'Default', true)`,
+		`INSERT INTO user_books (id, user_id, library_id, title, authors) VALUES
+			('ub-a-dune', '${ALICE}', 'lib-a', 'Dune', '{}'),
+			('ub-b-dune', '${BOB}', 'lib-b', 'Dune', '{}'),
+			('ub-b-emma', '${BOB}', 'lib-b', 'Emma', '{}'),
+			('ub-c-ulises', '${CAROL}', 'lib-c', 'Ulises', '{}')`,
+		`INSERT INTO tags (id, user_id, name) VALUES
+			('tag-a', '${ALICE}', 'Mine'),
+			('tag-b-pareja', '${BOB}', 'Para Alice'),
+			('tag-b-club', '${BOB}', 'Club'),
+			('tag-c', '${CAROL}', 'Club')`,
+		`INSERT INTO user_book_tags (user_book_id, tag_id) VALUES
+			('ub-a-dune', 'tag-a'),
+			('ub-b-dune', 'tag-b-pareja'),
+			('ub-b-emma', 'tag-b-club'),
+			('ub-c-ulises', 'tag-c')`,
+		`INSERT INTO groups (id, name, created_by) VALUES
+			('grp-pareja', 'Pareja', '${ALICE}'),
+			('grp-club', 'Club', '${BOB}')`,
+		`INSERT INTO group_members (group_id, user_id, role) VALUES
+			('grp-pareja', '${ALICE}', 'owner'), ('grp-pareja', '${BOB}', 'member'),
+			('grp-club', '${BOB}', 'owner'), ('grp-club', '${ALICE}', 'member'), ('grp-club', '${CAROL}', 'member')`,
+		`INSERT INTO shared_tags (id, tag_id, group_id, shared_by) VALUES
+			('st-a', 'tag-a', 'grp-pareja', '${ALICE}'),
+			('st-b1', 'tag-b-pareja', 'grp-pareja', '${BOB}'),
+			('st-b2', 'tag-b-club', 'grp-club', '${BOB}'),
+			('st-c', 'tag-c', 'grp-club', '${CAROL}')`
+	];
+	await holder.tdb.asSuperuser(async (tx) => {
+		for (const stmt of seed) await tx.execute(stmt as string);
+	});
+});
+afterEach(() => holder.tdb.cleanup());
+
+describe('getGroupBooks', () => {
+	it('solo los libros compartidos en ese grupo, sin los propios', async () => {
+		const pareja = await getGroupBooks(ALICE, 'grp-pareja');
+		expect(pareja.map((b) => b.userBookId)).toEqual(['ub-b-dune']);
+
+		const club = await getGroupBooks(ALICE, 'grp-club');
+		expect(club.map((b) => b.userBookId)).toEqual(['ub-b-emma', 'ub-c-ulises']);
+		expect(club.map((b) => b.ownerName)).toEqual(['Bob', 'Carol']);
+	});
+
+	it('solo muestra las etiquetas compartidas en ese grupo', async () => {
+		const [dune] = await getGroupBooks(ALICE, 'grp-pareja');
+		expect(dune.tags.map((t) => t.id)).toEqual(['tag-b-pareja']);
+	});
+
+	it('nada si no eres miembro del grupo', async () => {
+		expect(await getGroupBooks(CAROL, 'grp-pareja')).toEqual([]);
+	});
+});
+
+describe('searchBooksFromOthers', () => {
+	it('busca en todos los grupos del usuario, sin los propios', async () => {
+		const results = await searchBooksFromOthers(ALICE, 'dune');
+		expect(results.map((b) => b.userBookId)).toEqual(['ub-b-dune']);
+	});
+
+	it('filtra por etiqueta sin texto', async () => {
+		const results = await searchBooksFromOthers(ALICE, '', ['tag-c']);
+		expect(results.map((b) => b.userBookId)).toEqual(['ub-c-ulises']);
+	});
+});

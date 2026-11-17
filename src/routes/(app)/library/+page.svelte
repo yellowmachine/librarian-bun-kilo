@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { untrack } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { navigating } from '$app/state';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import {
 		MagnifyingGlass,
@@ -9,19 +10,38 @@
 		Export,
 		Plus,
 		CaretDown,
-		CheckSquare
+		CheckSquare,
+		ArrowRight,
+		Users
 	} from 'phosphor-svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import type { UserBookWithDetails } from '$lib/server/books';
-	import type { GroupBookResult } from '$lib/server/groups';
 	import BookGrid from '$lib/components/BookGrid.svelte';
-	import { readableTagTextColor } from '$lib/tagColor';
+	import TagChips from '$lib/components/TagChips.svelte';
+	import type { LibraryTab } from './+page.server';
 
 	let exportOpen = $state(false);
-	let activeTab = $state<'mine' | 'others' | 'contacts'>('mine');
 
-	let { data, form } = $props();
-	const { userBooks, contacts, sharedTagsForOthers, userLibraries, libraryId } = $derived(data);
+	let { data } = $props();
+	const {
+		tab,
+		userBooks,
+		contacts,
+		groups,
+		sharedTagsForOthers,
+		userLibraries,
+		libraryId,
+		selectedContact,
+		contactBooks,
+		selectedGroup,
+		groupBooks,
+		search: othersSearch
+	} = $derived(data);
+
+	function tabHref(id: LibraryTab) {
+		if (id === 'mine') return libraryId ? `/library?libraryId=${libraryId}` : '/library';
+		return `/library?tab=${id}`;
+	}
 
 	const currentLibraryName = $derived(
 		libraryId ? (userLibraries.find((lib) => lib.id === libraryId)?.name ?? 'Library') : 'Library'
@@ -153,6 +173,10 @@
 		moveError = '';
 	}
 
+	$effect(() => {
+		if (tab !== 'mine') untrack(exitSelectionMode);
+	});
+
 	function toggleSelect(userBookId: string) {
 		if (selectedIds.has(userBookId)) selectedIds.delete(userBookId);
 		else selectedIds.add(userBookId);
@@ -196,42 +220,39 @@
 		}
 	}
 
-	// ── Sección ajenos ────────────────────────────────────────────────────────
-	let othersSearching = $state(false);
-	let activeOtherTagIds = new SvelteSet<string>();
-	const othersResults = $derived((form?.othersResults ?? []) as GroupBookResult[]);
-	const othersQuery = $derived((form?.othersQuery ?? '') as string);
-	const othersTagIds = $derived((form?.othersTagIds ?? []) as string[]);
-	const othersSearched = $derived(
-		form !== null && form !== undefined && 'othersResults' in (form ?? {})
+	// ── Contactos y grupos: filtro en cliente sobre los libros cargados ─────────
+	let browseSearch = $state('');
+	let activeBrowseTagIds = new SvelteSet<string>();
+
+	type BrowseBook = {
+		userBookId: string;
+		title: string;
+		authors: string[];
+		alternateTitle: string | null;
+		coverUrl: string | null;
+		publishYear: number | null;
+		isAvailable: boolean;
+		ownerName?: string;
+		tags: { id: string; name: string; color: string | null }[];
+	};
+
+	const browseBooks = $derived<BrowseBook[] | null>(
+		tab === 'contacts' ? contactBooks : tab === 'groups' ? groupBooks : null
 	);
 
+	// Al cambiar de contacto o grupo se limpian los filtros
+	const browseKey = $derived(`${tab}:${selectedContact?.userId ?? ''}:${selectedGroup?.id ?? ''}`);
 	$effect(() => {
-		if (othersSearched) {
-			activeTab = 'others';
-			activeOtherTagIds.clear();
-			for (const id of othersTagIds) activeOtherTagIds.add(id);
-		}
+		void browseKey;
+		untrack(() => {
+			browseSearch = '';
+			activeBrowseTagIds.clear();
+		});
 	});
 
-	function toggleOtherTag(id: string) {
-		if (activeOtherTagIds.has(id)) activeOtherTagIds.delete(id);
-		else activeOtherTagIds.add(id);
-	}
-
-	// ── Sección contactos ─────────────────────────────────────────────────────
-	let contactsLoading = $state(false);
-	let contactSearch = $state('');
-	let activeContactTagIds = new SvelteSet<string>();
-	const contactBooks = $derived((form?.contactBooks ?? []) as UserBookWithDetails[]);
-	const selectedContactId = $derived((form?.contactId ?? '') as string);
-	const contactsFetched = $derived(
-		form !== null && form !== undefined && 'contactBooks' in (form ?? {})
-	);
-
-	const contactTags = $derived(() => {
+	const browseTags = $derived.by(() => {
 		const map = new SvelteMap<string, { id: string; name: string; color: string | null }>();
-		for (const book of contactBooks) {
+		for (const book of browseBooks ?? []) {
 			for (const tag of book.tags) {
 				if (!map.has(tag.id)) map.set(tag.id, tag);
 			}
@@ -239,36 +260,61 @@
 		return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
 	});
 
-	const filteredContactBooks = $derived(() => {
-		let list = contactBooks;
+	const filteredBrowseBooks = $derived.by(() => {
+		let list = browseBooks ?? [];
 
-		if (contactSearch.trim()) {
-			const q = normalize(contactSearch);
+		if (browseSearch.trim()) {
+			const q = normalize(browseSearch);
 			list = list.filter(
 				(b) =>
 					normalize(b.title).includes(q) ||
 					b.authors.some((a: string) => normalize(a).includes(q)) ||
-					(b.alternateTitle && normalize(b.alternateTitle).includes(q))
+					(b.alternateTitle && normalize(b.alternateTitle).includes(q)) ||
+					(b.ownerName && normalize(b.ownerName).includes(q))
 			);
 		}
 
-		if (activeContactTagIds.size > 0) {
-			list = list.filter((b) => b.tags.some((t) => activeContactTagIds.has(t.id)));
+		if (activeBrowseTagIds.size > 0) {
+			list = list.filter((b) => b.tags.some((t) => activeBrowseTagIds.has(t.id)));
 		}
 
 		return list;
 	});
 
-	$effect(() => {
-		if (contactsFetched) {
-			activeTab = 'contacts';
-			activeContactTagIds.clear();
-		}
-	});
+	function toggleBrowseTag(id: string) {
+		if (activeBrowseTagIds.has(id)) activeBrowseTagIds.delete(id);
+		else activeBrowseTagIds.add(id);
+	}
 
-	function toggleContactTag(id: string) {
-		if (activeContactTagIds.has(id)) activeContactTagIds.delete(id);
-		else activeContactTagIds.add(id);
+	// Mientras carga el contacto o grupo pulsado
+	const loadingSelection = $derived(
+		navigating.to?.url.pathname === '/library' &&
+			(navigating.to.url.searchParams.has('contact') || navigating.to.url.searchParams.has('group'))
+	);
+
+	// ── Búsqueda en lo compartido por otros (estado en la URL) ─────────────────
+	// Editable, pero vuelve a lo buscado cada vez que cambia la URL
+	let searchInput = $derived(othersSearch.query);
+
+	const searching = $derived(
+		navigating.to?.url.pathname === '/library' &&
+			navigating.to.url.searchParams.get('tab') === 'search'
+	);
+
+	const searchTagSet = $derived(new Set(othersSearch.tagIds));
+
+	function runSearch(query: string, tagIds: string[]) {
+		const params = ['tab=search'];
+		if (query.trim()) params.push(`q=${encodeURIComponent(query.trim())}`);
+		for (const id of tagIds) params.push(`tag=${encodeURIComponent(id)}`);
+		goto(`/library?${params.join('&')}`, { keepFocus: true, noScroll: true });
+	}
+
+	function toggleSearchTag(id: string) {
+		const next = searchTagSet.has(id)
+			? othersSearch.tagIds.filter((t) => t !== id)
+			: [...othersSearch.tagIds, id];
+		runSearch(searchInput, next);
 	}
 </script>
 
@@ -336,79 +382,36 @@
 	</div>
 
 	<!-- ── Tabs ──────────────────────────────────────────────────────────── -->
-	<div class="flex border-b border-paper-border">
-		<button
-			onclick={() => (activeTab = 'mine')}
-			class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
-			{activeTab === 'mine'
+	{#snippet tabLink(id: LibraryTab, label: string, count?: number)}
+		<a
+			href={tabHref(id)}
+			class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm whitespace-nowrap transition-colors
+			{tab === id
 				? 'border-brown-700 font-medium text-ink'
 				: 'border-transparent text-ink-faint hover:text-ink-muted'}"
 		>
-			My books
-			<span class="text-xs {activeTab === 'mine' ? 'text-ink-muted' : 'text-ink-faint'}">
-				{(userBooks as UserBookWithDetails[]).length}
-			</span>
-		</button>
-		<button
-			onclick={() => {
-				exitSelectionMode();
-				activeTab = 'others';
-			}}
-			class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
-			{activeTab === 'others'
-				? 'border-brown-700 font-medium text-ink'
-				: 'border-transparent text-ink-faint hover:text-ink-muted'}"
-		>
-			From others
-		</button>
-		{#if contacts.length > 0}
-			<button
-				onclick={() => {
-					exitSelectionMode();
-					activeTab = 'contacts';
-				}}
-				class="flex items-center gap-2 border-b-2 pr-6 pb-3 text-sm transition-colors
-				{activeTab === 'contacts'
-					? 'border-brown-700 font-medium text-ink'
-					: 'border-transparent text-ink-faint hover:text-ink-muted'}"
-			>
-				Contacts
-			</button>
-		{/if}
-	</div>
+			{label}
+			{#if count !== undefined}
+				<span class="text-xs {tab === id ? 'text-ink-muted' : 'text-ink-faint'}">{count}</span>
+			{/if}
+		</a>
+	{/snippet}
+	<nav class="flex overflow-x-auto border-b border-paper-border">
+		{@render tabLink('mine', 'My books', (userBooks as UserBookWithDetails[]).length)}
+		{@render tabLink('contacts', 'Contacts', contacts.length)}
+		{@render tabLink('groups', 'Groups', groups.length)}
+		{@render tabLink('search', 'Search')}
+	</nav>
 
 	<!-- ── Mis libros ────────────────────────────────────────────────────── -->
-	{#if activeTab === 'mine'}
+	{#if tab === 'mine'}
 		{#if (userBooks as UserBookWithDetails[]).length > 0}
-			<!-- Filtro de tags -->
-			{#if mineTags().length > 0}
-				<div class="flex flex-wrap gap-1.5">
-					{#each mineTags() as tag (tag.id)}
-						{@const active = activeMineTagIds.has(tag.id)}
-						<button
-							onclick={() => toggleMineTag(tag.id)}
-							class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
-							style={active
-								? tag.color
-									? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-									: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
-								: tag.color
-									? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-									: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
-						>
-							{tag.name}
-						</button>
-					{/each}
-					{#if activeMineTagIds.size > 0}
-						<button
-							onclick={() => activeMineTagIds.clear()}
-							class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
-						>
-							Clear
-						</button>
-					{/if}
-				</div>
-			{/if}
+			<TagChips
+				tags={mineTags()}
+				activeIds={activeMineTagIds}
+				onToggle={toggleMineTag}
+				onClear={() => activeMineTagIds.clear()}
+			/>
 
 			<!-- Índice alfabético -->
 			<div class="space-y-3">
@@ -549,53 +552,149 @@
 			</div>
 		{/if}
 
-		<!-- ── Libros de otros ────────────────────────────────────────────────── -->
-	{:else if activeTab === 'others'}
-		<!-- Filtro de tags compartidos -->
-		{#if sharedTagsForOthers.length > 0}
-			<div class="flex flex-wrap gap-1.5">
-				{#each sharedTagsForOthers as tag (tag.id)}
-					{@const active = activeOtherTagIds.has(tag.id)}
-					<button
-						onclick={() => toggleOtherTag(tag.id)}
-						class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
-						style={active
-							? tag.color
-								? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-								: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
-							: tag.color
-								? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-								: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
-					>
-						{tag.name}
-					</button>
-				{/each}
-				{#if activeOtherTagIds.size > 0}
-					<button
-						onclick={() => activeOtherTagIds.clear()}
-						class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
-					>
-						Clear
-					</button>
-				{/if}
+		<!-- ── Contactos ─────────────────────────────────────────────────────── -->
+	{:else if tab === 'contacts' && !selectedContact}
+		{#if contacts.length === 0}
+			<div class="py-16 text-center">
+				<p class="text-sm text-ink-faint">
+					Your contacts are the people in your groups. You don't have any yet.
+				</p>
+				<a href="/groups" class="mt-4 inline-block text-sm link-action">Create or join a group</a>
 			</div>
+		{:else}
+			<ul class="divide-y divide-paper-border">
+				{#each contacts as c (c.userId)}
+					<li>
+						<a
+							href={`/library?tab=contacts&contact=${c.userId}`}
+							class="-mx-2 flex items-center gap-4 px-2 py-3 transition-colors hover:bg-paper-ui"
+						>
+							<div
+								class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-paper-border bg-paper-ui font-serif text-sm text-ink-muted"
+							>
+								{c.name.charAt(0).toUpperCase()}
+							</div>
+							<span class="min-w-0 flex-1 truncate text-sm text-ink">{c.name}</span>
+							<ArrowRight size={16} class="flex-shrink-0 text-ink-faint" />
+						</a>
+					</li>
+				{/each}
+			</ul>
 		{/if}
 
+		<!-- ── Grupos ────────────────────────────────────────────────────────── -->
+	{:else if tab === 'groups' && !selectedGroup}
+		{#if groups.length === 0}
+			<div class="py-16 text-center">
+				<p class="text-sm text-ink-faint">You don't belong to any groups yet.</p>
+				<a href="/groups" class="mt-4 inline-block text-sm link-action">Create or join a group</a>
+			</div>
+		{:else}
+			<ul class="divide-y divide-paper-border">
+				{#each groups as g (g.id)}
+					<li>
+						<a
+							href={`/library?tab=groups&group=${g.id}`}
+							class="-mx-2 flex items-center gap-4 px-2 py-3 transition-colors hover:bg-paper-ui"
+						>
+							<div
+								class="flex h-9 w-9 flex-shrink-0 items-center justify-center border border-paper-border bg-paper-ui"
+							>
+								<Users size={16} class="text-ink-faint" />
+							</div>
+							<div class="min-w-0 flex-1">
+								<p class="truncate text-sm text-ink">{g.name}</p>
+								{#if g.description}
+									<p class="truncate text-xs text-ink-faint">{g.description}</p>
+								{/if}
+							</div>
+							<span class="flex-shrink-0 text-xs text-ink-faint">
+								{g.memberCount}
+								{g.memberCount === 1 ? 'member' : 'members'}
+							</span>
+							<ArrowRight size={16} class="flex-shrink-0 text-ink-faint" />
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+
+		<!-- ── Libros de un contacto o de un grupo ───────────────────────────── -->
+	{:else if tab === 'contacts' || tab === 'groups'}
+		<h2 class="font-serif text-xl font-normal text-ink">
+			{tab === 'contacts' ? selectedContact?.name : selectedGroup?.name}
+		</h2>
+
+		{#if loadingSelection}
+			<div class="flex justify-center py-12">
+				<Spinner size="md" />
+			</div>
+		{:else if (browseBooks ?? []).length === 0}
+			<p class="text-sm text-ink-faint">
+				{tab === 'contacts'
+					? 'No shared books from this contact.'
+					: 'No one has shared books in this group yet.'}
+			</p>
+		{:else}
+			<TagChips
+				tags={browseTags}
+				activeIds={activeBrowseTagIds}
+				onToggle={toggleBrowseTag}
+				onClear={() => activeBrowseTagIds.clear()}
+			/>
+
+			<div class="relative">
+				<MagnifyingGlass
+					size={16}
+					class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
+				/>
+				<input
+					type="search"
+					bind:value={browseSearch}
+					placeholder={tab === 'groups'
+						? 'Search by title, author or person...'
+						: 'Search by title or author...'}
+					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
+				/>
+			</div>
+			{#if filteredBrowseBooks.length === 0}
+				<p class="py-12 text-center text-sm text-ink-faint">No results.</p>
+			{:else}
+				<p class="text-xs text-ink-faint">
+					{filteredBrowseBooks.length}
+					{filteredBrowseBooks.length === 1 ? 'book' : 'books'}
+				</p>
+				<BookGrid
+					books={filteredBrowseBooks.map((b) => ({
+						id: b.userBookId,
+						title: b.title,
+						authors: b.authors,
+						coverUrl: b.coverUrl,
+						publishYear: b.publishYear,
+						isAvailable: b.isAvailable,
+						ownerName: b.ownerName,
+						href: `/library/${b.userBookId}`
+					}))}
+				/>
+			{/if}
+		{/if}
+
+		<!-- ── Búsqueda en lo compartido ─────────────────────────────────────── -->
+	{:else}
+		<TagChips
+			tags={sharedTagsForOthers}
+			activeIds={searchTagSet}
+			onToggle={toggleSearchTag}
+			onClear={() => runSearch(searchInput, [])}
+		/>
+
 		<form
-			method="POST"
-			action="?/searchOthers"
 			class="flex gap-2"
-			use:enhance={() => {
-				othersSearching = true;
-				return async ({ update }) => {
-					await update();
-					othersSearching = false;
-				};
+			onsubmit={(e) => {
+				e.preventDefault();
+				runSearch(searchInput, othersSearch.tagIds);
 			}}
 		>
-			{#each [...activeOtherTagIds] as tagId (tagId)}
-				<input type="hidden" name="tagIds" value={tagId} />
-			{/each}
 			<div class="relative flex-1">
 				<MagnifyingGlass
 					size={16}
@@ -603,18 +702,17 @@
 				/>
 				<input
 					type="search"
-					name="query"
-					value={othersQuery}
+					bind:value={searchInput}
 					placeholder="Title, author, ISBN, tag or person..."
 					class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
 				/>
 			</div>
 			<button
 				type="submit"
-				disabled={othersSearching}
+				disabled={searching}
 				class="border btn-primary px-4 py-2 text-sm disabled:opacity-50"
 			>
-				{#if othersSearching}
+				{#if searching}
 					<Spinner size="sm" />
 				{:else}
 					Search
@@ -622,126 +720,31 @@
 			</button>
 		</form>
 
-		{#if othersSearched}
-			{#if othersResults.length === 0}
-				<p class="text-sm text-ink-faint">No results for "{othersQuery}".</p>
+		{#if othersSearch.results}
+			{#if othersSearch.results.length === 0}
+				<p class="text-sm text-ink-faint">
+					{othersSearch.query ? `No results for "${othersSearch.query}".` : 'No results.'}
+				</p>
 			{:else}
 				<p class="text-xs text-ink-faint">
-					{othersResults.length}
-					{othersResults.length === 1 ? 'result' : 'results'}
+					{othersSearch.results.length}
+					{othersSearch.results.length === 1 ? 'result' : 'results'}
 				</p>
 				<BookGrid
-					books={othersResults.map((b) => ({
+					books={othersSearch.results.map((b) => ({
 						id: b.userBookId,
 						title: b.title,
 						authors: b.authors,
 						coverUrl: b.coverUrl,
+						publishYear: b.publishYear,
 						isAvailable: b.isAvailable,
+						ownerName: b.ownerName,
 						href: `/library/${b.userBookId}`
 					}))}
 				/>
 			{/if}
 		{:else}
 			<p class="text-sm text-ink-faint">Search books shared by people in your groups.</p>
-		{/if}
-
-		<!-- ── Contactos ─────────────────────────────────────────────────────── -->
-	{:else}
-		<form
-			method="POST"
-			action="?/contactBooks"
-			use:enhance={() => {
-				contactsLoading = true;
-				return async ({ update }) => {
-					await update();
-					contactsLoading = false;
-				};
-			}}
-		>
-			<select
-				name="contactId"
-				onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}
-				class="w-full border border-paper-border bg-paper-ui px-3 py-2 text-sm text-ink focus:border-brown-600 focus:bg-paper focus:ring-0"
-			>
-				<option value="">Select a contact…</option>
-				{#each contacts as c (c.userId)}
-					<option value={c.userId} selected={c.userId === selectedContactId}>{c.name}</option>
-				{/each}
-			</select>
-		</form>
-
-		{#if contactsLoading}
-			<div class="flex justify-center py-12">
-				<Spinner size="md" />
-			</div>
-		{:else if contactsFetched}
-			{#if contactBooks.length === 0}
-				<p class="text-sm text-ink-faint">No shared books from this contact.</p>
-			{:else}
-				<!-- Filtro de tags del contacto -->
-				{#if contactTags().length > 0}
-					<div class="flex flex-wrap gap-1.5">
-						{#each contactTags() as tag (tag.id)}
-							{@const active = activeContactTagIds.has(tag.id)}
-							<button
-								onclick={() => toggleContactTag(tag.id)}
-								class="rounded-full border px-2.5 py-0.5 text-xs transition-colors"
-								style={active
-									? tag.color
-										? `background-color: ${tag.color}22; border-color: ${tag.color}; color: ${readableTagTextColor(tag.color)}`
-										: 'background-color: var(--color-paper-border); border-color: #8a8480; color: #3a3430'
-									: tag.color
-										? `border-color: ${tag.color}44; color: ${readableTagTextColor(tag.color)}`
-										: 'border-color: var(--color-paper-border); color: var(--color-ink-faint)'}
-							>
-								{tag.name}
-							</button>
-						{/each}
-						{#if activeContactTagIds.size > 0}
-							<button
-								onclick={() => activeContactTagIds.clear()}
-								class="px-2.5 py-0.5 text-xs text-ink-faint hover:text-ink-muted"
-							>
-								Clear
-							</button>
-						{/if}
-					</div>
-				{/if}
-
-				<div class="relative">
-					<MagnifyingGlass
-						size={16}
-						class="absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint"
-					/>
-					<input
-						type="search"
-						bind:value={contactSearch}
-						placeholder="Search by title or author..."
-						class="w-full border border-paper-border bg-paper-ui py-2 pr-4 pl-9 text-sm text-ink placeholder-ink-faint focus:border-brown-600 focus:bg-paper focus:ring-0"
-					/>
-				</div>
-				{#if filteredContactBooks().length === 0}
-					<p class="py-12 text-center text-sm text-ink-faint">No results.</p>
-				{:else}
-					<p class="text-xs text-ink-faint">
-						{filteredContactBooks().length}
-						{filteredContactBooks().length === 1 ? 'book' : 'books'}
-					</p>
-					<BookGrid
-						books={filteredContactBooks().map((b) => ({
-							id: b.userBookId,
-							title: b.title,
-							authors: b.authors,
-							coverUrl: b.coverUrl,
-							publishYear: b.publishYear,
-							isAvailable: b.isAvailable,
-							href: `/library/${b.userBookId}`
-						}))}
-					/>
-				{/if}
-			{/if}
-		{:else}
-			<p class="text-sm text-ink-faint">Select a contact to browse their library.</p>
 		{/if}
 	{/if}
 </div>

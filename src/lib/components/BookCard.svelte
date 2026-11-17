@@ -10,6 +10,8 @@
 		isAvailable?: boolean;
 		/** "Copy 2 of 3" — solo variant 'grid', cuando hay más de una copia del mismo libro */
 		copyLabel?: string;
+		/** Dueño del ejemplar — solo variant 'grid', en listas que mezclan libros de varias personas */
+		ownerName?: string;
 		/** Marca la portada con un icono de película (listas que mezclan libros y películas) */
 		isMovie?: boolean;
 		/** Modo de presentación:
@@ -30,6 +32,7 @@
 		publishYear = null,
 		isAvailable = true,
 		copyLabel,
+		ownerName,
 		isMovie = false,
 		variant = 'grid',
 		href,
@@ -101,6 +104,9 @@
 				{#if copyLabel}
 					<p class="text-[10px] text-ink-faint">{copyLabel}</p>
 				{/if}
+				{#if ownerName}
+					<p class="truncate text-[10px] text-ink-faint">{ownerName}</p>
+				{/if}
 			</div>
 		</a>
 	{:else}
@@ -113,6 +119,9 @@
 				{/if}
 				{#if copyLabel}
 					<p class="text-[10px] text-ink-faint">{copyLabel}</p>
+				{/if}
+				{#if ownerName}
+					<p class="truncate text-[10px] text-ink-faint">{ownerName}</p>
 				{/if}
 			</div>
 		</button>
