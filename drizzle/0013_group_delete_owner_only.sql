@@ -1,0 +1,1 @@
+ALTER POLICY "groups_delete" ON "groups" TO app_user USING ("groups"."created_by" = current_setting('app.current_user_id', true) and is_group_admin("groups"."id", current_setting('app.current_user_id', true)));

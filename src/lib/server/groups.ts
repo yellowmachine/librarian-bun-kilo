@@ -269,6 +269,20 @@ export async function removeMember(
 	);
 }
 
+// ─── Borrar un grupo ─────────────────────────────────────────────────────────
+
+/**
+ * Solo el owner (la RLS lo impone). Se van en cascada los miembros, el código
+ * de invitación y las etiquetas compartidas en él; los libros, las películas,
+ * las etiquetas y los préstamos de cada uno no se tocan. Devuelve si se borró.
+ */
+export async function deleteGroup(userId: string, groupId: string): Promise<boolean> {
+	const deleted = await withRLS(userId, (tx) =>
+		tx.delete(groups).where(eq(groups.id, groupId)).returning({ id: groups.id })
+	);
+	return deleted.length > 0;
+}
+
 // ─── Regenerar código de invitación ──────────────────────────────────────────
 
 export async function regenerateInviteCode(userId: string, groupId: string): Promise<string> {
@@ -352,11 +366,13 @@ export async function getSharedTagsInGroup(
 			movieCountMap.set(mt.tagId, (movieCountMap.get(mt.tagId) ?? 0) + 1);
 		}
 
-		return rows.map((row) => ({
-			...row,
-			bookCount: bookCountMap.get(row.tagId) ?? 0,
-			movieCount: movieCountMap.get(row.tagId) ?? 0
-		}));
+		return rows
+			.map((row) => ({
+				...row,
+				bookCount: bookCountMap.get(row.tagId) ?? 0,
+				movieCount: movieCountMap.get(row.tagId) ?? 0
+			}))
+			.sort((a, b) => a.tagName.localeCompare(b.tagName) || a.ownerName.localeCompare(b.ownerName));
 	});
 }
 
@@ -386,8 +402,7 @@ export async function getUserTagsForGroup(
 				movieCount: sql<number>`(select count(*) from user_movie_tags umt where umt.tag_id = ${tags.id})::int`
 			})
 			.from(tags)
-			.where(eq(tags.userId, userId))
-			.orderBy(tags.name);
+			.where(eq(tags.userId, userId));
 
 		const sharedRows = await tx
 			.select({ tagId: sharedTags.tagId })
@@ -396,10 +411,11 @@ export async function getUserTagsForGroup(
 
 		const sharedSet = new Set(sharedRows.map((r) => r.tagId));
 
-		return userTagRows.map((t) => ({
-			...t,
-			alreadyShared: sharedSet.has(t.id)
-		}));
+		// Alfabético en JS, como el resto de la app: el orden de Postgres depende de la collation
+		// (con "C", las mayúsculas y los acentos van aparte)
+		return userTagRows
+			.map((t) => ({ ...t, alreadyShared: sharedSet.has(t.id) }))
+			.sort((a, b) => a.name.localeCompare(b.name));
 	});
 }
 
@@ -427,10 +443,12 @@ export async function getTagGroupShares(
 
 /**
  * Por grupo del usuario, cuántos libros y películas de otros miembros puede ver
- * en él (los que llevan una etiqueta compartida en ese grupo).
+ * en él (los que llevan una etiqueta compartida en ese grupo). Con `includeOwn`,
+ * también los suyos: todo lo que se comparte en el grupo.
  */
 export async function getGroupItemCounts(
-	userId: string
+	userId: string,
+	opts: { includeOwn?: boolean } = {}
 ): Promise<Record<string, { books: number; movies: number }>> {
 	return withRLS(userId, async (tx) => {
 		const myGroups = tx
@@ -447,7 +465,12 @@ export async function getGroupItemCounts(
 			.from(sharedTags)
 			.innerJoin(userBookTags, eq(userBookTags.tagId, sharedTags.tagId))
 			.innerJoin(userBooks, eq(userBooks.id, userBookTags.userBookId))
-			.where(and(inArray(sharedTags.groupId, myGroups), ne(userBooks.userId, userId)))
+			.where(
+				and(
+					inArray(sharedTags.groupId, myGroups),
+					opts.includeOwn ? undefined : ne(userBooks.userId, userId)
+				)
+			)
 			.groupBy(sharedTags.groupId);
 		const movieRows = await tx
 			.select({
@@ -457,7 +480,12 @@ export async function getGroupItemCounts(
 			.from(sharedTags)
 			.innerJoin(userMovieTags, eq(userMovieTags.tagId, sharedTags.tagId))
 			.innerJoin(userMovies, eq(userMovies.id, userMovieTags.userMovieId))
-			.where(and(inArray(sharedTags.groupId, myGroups), ne(userMovies.userId, userId)))
+			.where(
+				and(
+					inArray(sharedTags.groupId, myGroups),
+					opts.includeOwn ? undefined : ne(userMovies.userId, userId)
+				)
+			)
 			.groupBy(sharedTags.groupId);
 
 		const counts: Record<string, { books: number; movies: number }> = {};

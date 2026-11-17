@@ -17,7 +17,9 @@ import {
 	searchBooksFromOthers,
 	getGroupItemCounts,
 	getTagGroupShares,
-	getUserTagsForGroup
+	getUserTagsForGroup,
+	getSharedTagsInGroup,
+	deleteGroup
 } from '../groups';
 
 const ALICE = 'user-alice';
@@ -142,5 +144,62 @@ describe('qué se comparte en cada grupo', () => {
 		]);
 		// Las de otro no cuentan aunque Alice las vea
 		expect(await getTagGroupShares(ALICE, ['tag-b-club'])).toEqual([]);
+	});
+});
+
+describe('orden alfabético', () => {
+	it('tus etiquetas, sin importar mayúsculas ni acentos', async () => {
+		await holder.tdb.asSuperuser((tx) =>
+			tx.execute(
+				`INSERT INTO tags (id, user_id, name) VALUES ('t1', '${BOB}', 'zoo'), ('t2', '${BOB}', 'Árboles'), ('t3', '${BOB}', 'bosque')` as string
+			)
+		);
+		const names = (await getUserTagsForGroup(BOB, 'grp-club')).map((t) => t.name);
+		expect(names).toEqual(['Árboles', 'bosque', 'Club', 'Para Alice', 'zoo']);
+	});
+
+	it('las compartidas en el grupo, por etiqueta y luego por dueño', async () => {
+		const shared = await getSharedTagsInGroup(ALICE, 'grp-club');
+		expect(shared.map((t) => `${t.tagName}/${t.ownerName}`)).toEqual(['Club/Bob', 'Club/Carol']);
+	});
+});
+
+describe('deleteGroup', () => {
+	async function count(sql: string): Promise<number> {
+		const res = await holder.tdb.asSuperuser((tx) => tx.execute(sql as string));
+		return Number((res.rows[0] as { n: number }).n);
+	}
+
+	it('el owner lo borra: se van miembros y etiquetas compartidas, no los libros ni las etiquetas', async () => {
+		expect(await deleteGroup(BOB, 'grp-club')).toBe(true);
+
+		expect(await count(`SELECT count(*)::int AS n FROM groups WHERE id = 'grp-club'`)).toBe(0);
+		expect(
+			await count(`SELECT count(*)::int AS n FROM group_members WHERE group_id = 'grp-club'`)
+		).toBe(0);
+		expect(
+			await count(`SELECT count(*)::int AS n FROM shared_tags WHERE group_id = 'grp-club'`)
+		).toBe(0);
+		expect(await count(`SELECT count(*)::int AS n FROM user_books`)).toBe(4);
+		expect(await count(`SELECT count(*)::int AS n FROM user_movies`)).toBe(1);
+		expect(await count(`SELECT count(*)::int AS n FROM tags`)).toBe(4);
+		// Alice deja de ver «Emma» y «Ulises», que solo se compartían ahí
+		expect(await getGroupItemCounts(ALICE)).toEqual({ 'grp-pareja': { books: 1, movies: 0 } });
+	});
+
+	it('ni un miembro ni un admin pueden borrarlo', async () => {
+		await holder.tdb.asSuperuser((tx) =>
+			tx.execute(
+				`UPDATE group_members SET role = 'admin' WHERE group_id = 'grp-club' AND user_id = '${CAROL}'` as string
+			)
+		);
+		expect(await deleteGroup(ALICE, 'grp-club')).toBe(false);
+		expect(await deleteGroup(CAROL, 'grp-club')).toBe(false);
+		expect(await count(`SELECT count(*)::int AS n FROM groups WHERE id = 'grp-club'`)).toBe(1);
+	});
+
+	it('cuenta todo lo compartido en el grupo, también lo propio', async () => {
+		const all = await getGroupItemCounts(BOB, { includeOwn: true });
+		expect(all['grp-club']).toEqual({ books: 2, movies: 1 });
 	});
 });
