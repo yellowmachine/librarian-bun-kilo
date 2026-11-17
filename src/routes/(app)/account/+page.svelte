@@ -27,6 +27,9 @@
 		more: { label: 'Alto', hint: 'Texto y bordes más oscuros, fondo blanco' }
 	};
 
+	let confirmEmail = $state('');
+	const emailMatches = $derived(confirmEmail.trim().toLowerCase() === data.email.toLowerCase());
+
 	const date = (d: Date) => d.toLocaleDateString('es', { day: 'numeric', month: 'short' });
 </script>
 
@@ -96,7 +99,7 @@
 	</section>
 
 	<!-- ── Exportar ───────────────────────────────────────────────────── -->
-	<section class="space-y-5">
+	<section id="exportar" class="space-y-5">
 		<div>
 			<h2 class="text-sm font-medium text-ink">Exportar tus datos</h2>
 			<p class="mt-1 text-sm text-ink-muted">
@@ -220,6 +223,93 @@
 				/>
 			</div>
 			<button type="submit" class={primary}>Guardar clave</button>
+		</form>
+	</section>
+
+	<!-- ── Borrar la cuenta ───────────────────────────────────────────── -->
+	<section class="space-y-5 border-t border-red-200 pt-8">
+		<div>
+			<h2 class="text-sm font-medium text-red-700">Borrar la cuenta</h2>
+			<p class="mt-1 text-sm text-ink-muted">
+				Se borran tus bibliotecas, libros, películas, etiquetas, reseñas y tu clave de OpenRouter.
+				No se puede deshacer: antes, <a href="#exportar" class="link-action">exporta tus datos</a>.
+			</p>
+		</div>
+
+		{#if data.deletion.inProgressLoans.length > 0}
+			<div class="space-y-2 text-sm">
+				<p class="text-ink">Tienes préstamos en curso:</p>
+				<ul class="divide-y divide-paper-border border-y border-paper-border">
+					{#each data.deletion.inProgressLoans as loan (loan.id)}
+						<li class="py-2">
+							<a href="/loans/{loan.id}" class="link-action">{loan.title}</a>
+							<span class="text-ink-faint">
+								· {loan.asOwner ? `lo tiene ${loan.otherName}` : `es de ${loan.otherName}`}
+							</span>
+						</li>
+					{/each}
+				</ul>
+				<p class="text-ink-muted">
+					Mejor resuélvelos antes. Si borras igualmente, la otra persona seguirá viendo tu nombre en
+					ese préstamo (y nada más) hasta que lo cierre.
+				</p>
+			</div>
+		{/if}
+
+		{#if data.deletion.groups.length > 0}
+			<div class="space-y-2 text-sm">
+				<p class="text-ink">Grupos que creaste:</p>
+				<ul class="divide-y divide-paper-border border-y border-paper-border">
+					{#each data.deletion.groups as group (group.id)}
+						<li class="py-2">
+							<span class="text-ink">{group.name}</span>
+							<span class="text-ink-faint">
+								· {group.heirName ? `pasa a ${group.heirName}` : 'no queda nadie: se borra'}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+
+		<p class="text-sm text-ink-muted">
+			Los préstamos ya cerrados siguen en el historial de la otra persona como «Cuenta borrada». Si
+			entras con Seilide y vuelves más adelante, empezarás con una cuenta nueva y vacía.
+		</p>
+
+		{#if form?.deletion?.message}
+			<p class={problem} role="alert">{form.deletion.message}</p>
+			{#if form.deletion.reauth}
+				<form method="POST" action="/logout">
+					<button type="submit" class="border btn-secondary px-4 py-2 text-sm">
+						Volver a entrar
+					</button>
+				</form>
+			{/if}
+		{/if}
+
+		<form method="POST" action="?/deleteAccount" use:enhance class="space-y-5">
+			<div>
+				<label for="confirmEmail" class={label}>
+					Escribe tu email (<span class="text-ink">{data.email}</span>) para confirmar
+				</label>
+				<input
+					id="confirmEmail"
+					name="confirmEmail"
+					type="email"
+					autocomplete="off"
+					required
+					bind:value={confirmEmail}
+					class={input}
+				/>
+			</div>
+			<button
+				type="submit"
+				disabled={!emailMatches}
+				class="border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				Borrar la cuenta para siempre
+			</button>
 		</form>
 	</section>
 </div>

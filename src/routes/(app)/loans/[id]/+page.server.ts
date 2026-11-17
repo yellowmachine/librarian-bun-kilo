@@ -1,11 +1,13 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { getLoan, transitionLoan, type LoanStatus } from '$lib/server/loans';
+import { canCloseOrphan, getLoan, transitionLoan, type LoanStatus } from '$lib/server/loans';
 
 export const load = async ({ locals, params }: RequestEvent) => {
 	const loan = await getLoan(locals.user!.id, params.id!);
 	if (!loan) error(404, 'Préstamo no encontrado');
-	return { loan, currentUserId: locals.user!.id };
+	const currentUserId = locals.user!.id;
+	// La otra parte borró su cuenta con el préstamo en curso: quien queda lo cierra
+	return { loan, currentUserId, canClose: canCloseOrphan(loan, currentUserId) };
 };
 
 export const actions = {

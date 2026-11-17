@@ -18,6 +18,9 @@
 		{#if data.passwordChanged}
 			<p class={problem}>Contraseña cambiada. Ya puedes entrar con ella.</p>
 		{/if}
+		{#if data.accountDeleted}
+			<p class={problem}>Tu cuenta se ha borrado. Gracias por usar Librarian.</p>
+		{/if}
 		{#if data.seilideProblem}
 			<p class={problem} role="alert">{data.seilideProblem}</p>
 		{/if}

@@ -44,6 +44,15 @@
 
 	const actions = $derived((): Action[] => {
 		const s = loan.status;
+		if (data.canClose)
+			return [
+				{
+					label: isOwner ? 'I got it back' : 'Close the loan',
+					toStatus: 'returned',
+					variant: 'primary',
+					confirm: 'Close this loan? It will move to your history.'
+				}
+			];
 		if (isOwner) {
 			if (s === 'requested')
 				return [
@@ -182,6 +191,13 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if (isOwner && loan.borrowerDeleted) || (isBorrower && loan.ownerDeleted)}
+		<p class="text-sm text-ink-muted">
+			{isOwner ? loan.borrowerName : loan.ownerName} deleted their account.
+			{#if data.canClose}Close the loan when it's sorted out.{/if}
+		</p>
+	{/if}
 
 	<!-- Timeline -->
 	{#if timeline().length > 0}

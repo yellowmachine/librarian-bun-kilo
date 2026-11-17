@@ -45,7 +45,9 @@ const loanColumns = {
 	authors: itemCreators,
 	coverUrl: itemCover,
 	borrowerId: loans.borrowerId,
-	ownerId: loans.ownerId
+	ownerId: loans.ownerId,
+	storedBorrowerName: loans.borrowerName,
+	storedOwnerName: loans.ownerName
 };
 
 function selectLoans(tx: typeof db) {
@@ -59,6 +61,46 @@ function selectLoans(tx: typeof db) {
 }
 
 type LoanRow = Awaited<ReturnType<ReturnType<typeof selectLoans>['where']>>[number];
+
+/** Lo que se ve en lugar de quien borró su cuenta (sin nombre guardado) */
+export const DELETED_ACCOUNT = 'Cuenta borrada';
+
+type Person = { name: string; email: string | null };
+
+// Una de las partes: la cuenta si sigue, o lo que quedó al borrarla (el nombre
+// solo en préstamos en curso, ver accountDeletion.ts).
+function party(id: string | null, stored: string | null, users: Map<string, Person>) {
+	const found = id ? users.get(id) : undefined;
+	if (found) return { name: found.name, email: found.email ?? '', deleted: false };
+	return { name: id ? '?' : (stored ?? DELETED_ACCOUNT), email: '', deleted: id === null };
+}
+
+function withParties(row: LoanRow, users: Map<string, Person>): LoanWithDetails {
+	const { storedBorrowerName, storedOwnerName, ...rest } = row;
+	const borrower = party(row.borrowerId, storedBorrowerName, users);
+	const owner = party(row.ownerId, storedOwnerName, users);
+	return {
+		...rest,
+		...itemFields(row),
+		status: row.status as LoanStatus,
+		borrowerName: borrower.name,
+		borrowerEmail: borrower.email,
+		borrowerDeleted: borrower.deleted,
+		ownerName: owner.name,
+		ownerEmail: owner.email,
+		ownerDeleted: owner.deleted
+	};
+}
+
+async function usersById(ids: (string | null)[]): Promise<Map<string, Person>> {
+	const unique = [...new Set(ids.filter((id): id is string => id !== null))];
+	if (unique.length === 0) return new Map();
+	const rows = await db
+		.select({ id: user.id, name: user.name, email: user.email })
+		.from(user)
+		.where(inArray(user.id, unique));
+	return new Map(rows.map((u) => [u.id, u]));
+}
 
 // Dónde está su ficha (null si el dueño ya borró la copia)
 function itemFields(row: LoanRow) {
@@ -106,13 +148,16 @@ export type LoanWithDetails = {
 	/** Autores del libro o directores de la película */
 	authors: string[];
 	coverUrl: string | null;
-	// Personas
-	borrowerId: string;
+	// Personas. Si una borró su cuenta: id null, *Deleted true, y de nombre el
+	// guardado (préstamo en curso) o DELETED_ACCOUNT.
+	borrowerId: string | null;
 	borrowerName: string;
 	borrowerEmail: string;
-	ownerId: string;
+	borrowerDeleted: boolean;
+	ownerId: string | null;
 	ownerName: string;
 	ownerEmail: string;
+	ownerDeleted: boolean;
 };
 
 // ─── Solicitar préstamo ───────────────────────────────────────────────────────
@@ -230,48 +275,15 @@ export async function getUserLoans(userId: string): Promise<{
 		return { ownerLoans, borrowerLoans };
 	});
 
-	// Resolver nombres de usuarios implicados
-	const allUserIds = [
-		...new Set([
-			...rows.ownerLoans.map((r) => r.borrowerId),
-			...rows.borrowerLoans.map((r) => r.ownerId)
-		])
-	];
-
-	const userRows =
-		allUserIds.length > 0
-			? await db
-					.select({ id: user.id, name: user.name, email: user.email })
-					.from(user)
-					.where(inArray(user.id, allUserIds))
-			: [];
-
-	const userMap = new Map(userRows.map((u) => [u.id, u]));
-
-	// Datos del propio usuario
-	const selfRows = await db
-		.select({ id: user.id, name: user.name, email: user.email })
-		.from(user)
-		.where(eq(user.id, userId));
-	const self = selfRows[0] ?? { id: userId, name: 'You', email: '' };
-
-	function enrich(row: (typeof rows.ownerLoans)[0], asOwner: boolean): LoanWithDetails {
-		const borrowerInfo = asOwner ? (userMap.get(row.borrowerId) ?? { name: '?', email: '' }) : self;
-		const ownerInfo = asOwner ? self : (userMap.get(row.ownerId) ?? { name: '?', email: '' });
-		return {
-			...row,
-			...itemFields(row),
-			status: row.status as LoanStatus,
-			borrowerName: borrowerInfo.name,
-			borrowerEmail: borrowerInfo.email ?? '',
-			ownerName: ownerInfo.name,
-			ownerEmail: ownerInfo.email ?? ''
-		};
-	}
+	const users = await usersById([
+		userId,
+		...rows.ownerLoans.map((r) => r.borrowerId),
+		...rows.borrowerLoans.map((r) => r.ownerId)
+	]);
 
 	return {
-		asOwner: rows.ownerLoans.map((r) => enrich(r, true)),
-		asBorrower: rows.borrowerLoans.map((r) => enrich(r, false))
+		asOwner: rows.ownerLoans.map((r) => withParties(r, users)),
+		asBorrower: rows.borrowerLoans.map((r) => withParties(r, users))
 	};
 }
 
@@ -282,26 +294,7 @@ export async function getLoan(userId: string, loanId: string): Promise<LoanWithD
 
 	if (rows.length === 0) return null;
 	const row = rows[0];
-
-	const involvedIds = [...new Set([row.borrowerId, row.ownerId])];
-	const userRows = await db
-		.select({ id: user.id, name: user.name, email: user.email })
-		.from(user)
-		.where(inArray(user.id, involvedIds));
-
-	const userMap = new Map(userRows.map((u) => [u.id, u]));
-	const borrower = userMap.get(row.borrowerId) ?? { name: '?', email: '' };
-	const owner = userMap.get(row.ownerId) ?? { name: '?', email: '' };
-
-	return {
-		...row,
-		...itemFields(row),
-		status: row.status as LoanStatus,
-		borrowerName: borrower.name,
-		borrowerEmail: borrower.email ?? '',
-		ownerName: owner.name,
-		ownerEmail: owner.email ?? ''
-	};
+	return withParties(row, await usersById([row.borrowerId, row.ownerId]));
 }
 
 // ─── Transiciones de estado ───────────────────────────────────────────────────
@@ -335,6 +328,16 @@ const TRANSITIONS: StatusTransition[] = [
 	{ from: ['return_requested'], to: 'active', actor: 'owner' } // owner rechaza la devolución
 ];
 
+// Si la otra parte borró su cuenta con el préstamo en curso, nadie va a pedir ni
+// confirmar la devolución: quien queda lo cierra (lo recuperó, o lo da por perdido).
+const ORPHAN_CLOSE: LoanStatus[] = ['active', 'return_requested'];
+
+/** Si quien mira puede cerrar el préstamo porque la otra parte ya no está */
+export function canCloseOrphan(loan: LoanWithDetails, userId: string): boolean {
+	const otherGone = loan.ownerId === userId ? loan.borrowerDeleted : loan.ownerDeleted;
+	return otherGone && ORPHAN_CLOSE.includes(loan.status);
+}
+
 export async function transitionLoan(
 	userId: string,
 	loanId: string,
@@ -347,9 +350,10 @@ export async function transitionLoan(
 	const isOwner = loan.ownerId === userId;
 	const actor: 'owner' | 'borrower' = isOwner ? 'owner' : 'borrower';
 
-	const transition = TRANSITIONS.find(
-		(t) => t.to === toStatus && t.from.includes(loan.status) && t.actor === actor
-	);
+	const transition =
+		TRANSITIONS.find(
+			(t) => t.to === toStatus && t.from.includes(loan.status) && t.actor === actor
+		) ?? (toStatus === 'returned' && canCloseOrphan(loan, userId) ? { to: toStatus } : undefined);
 
 	if (!transition) {
 		return { success: false, error: `Transición no permitida: ${loan.status} → ${toStatus}` };
@@ -383,7 +387,7 @@ export async function transitionLoan(
 	});
 
 	// Notificar al borrower cuando el owner acepta
-	if (toStatus === 'accepted') {
+	if (toStatus === 'accepted' && loan.borrowerEmail) {
 		sendLoanAcceptedEmail({
 			to: loan.borrowerEmail,
 			borrowerName: loan.borrowerName,
